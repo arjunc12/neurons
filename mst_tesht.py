@@ -170,6 +170,7 @@ def main():
     neural_droots = []
     mst_lengths = []
     sat_droots = []
+    ratios = []
 
     if sys.argv[1] == "rgc":
 
@@ -201,13 +202,15 @@ def main():
                         neural_dists.append(neural_dist)
                         neural_droots.append(neural_droot)
                         mst_lengths.append(mst_length)
-                        sat_droots.append(sat_droot)  
+                        sat_droots.append(sat_droot)
+                        ratios.append(float(neural_dist) / float(neural_droot))
     else:
         assert False
 
 
     PP.scatter(neural_dists, neural_droots, c='r')
     PP.scatter(mst_lengths, sat_droots, c='b')
+    PP.scatter(range(len(ratios)), sorted(ratios), c='g')
     PP.savefig('neural_trees.pdf', format='pdf')
     PP.close()
 
