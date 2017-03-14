@@ -10,7 +10,7 @@
 
 *.pdf
 
-.nfs00000000003b0de2009ea9c4
+.nfs*
 
 neuromorpho/*
 
