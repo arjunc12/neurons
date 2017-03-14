@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import division
+import matplotlib as mpl
+mpl.use('agg')
 from matplotlib import pylab as PP
 import networkx as nx
 import utilities as UTIL
@@ -117,8 +119,7 @@ def doit(filename,annot,dim="3D"):
 
         UTIL.run_checks(G)
 
-
-        return G,P2Coord,P2Label
+        #return G,P2Coord,P2Label
         
         # Compute neural length and d(root).
         neural_length = UTIL.compute_length(G,P2Coord)
@@ -153,7 +154,7 @@ def doit(filename,annot,dim="3D"):
         
         # Output results.
         print "%s\t%.3f\t%.3f\t%.3f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%i\t%.3f\t%.3f" %(check,neural_ab,mst_ab,sat_ab,neural_length,mst_length,sat_length,neural_droot,mst_droot,sat_droot,annot,num_pts,inbox,beatneural)#[filename.rindex("/")+1:])
-        
+        return neural_length, neural_droot, mst_length, sat_droot
 
 def main(): 
     # OLD:
@@ -164,6 +165,11 @@ def main():
     #     doit(directory+"/"+filename,"masland-"+filename,dim="3D")
 
     # return
+
+    neural_dists = []
+    neural_droots = []
+    mst_lengths = []
+    sat_droots = []
 
     if sys.argv[1] == "rgc":
 
@@ -179,19 +185,31 @@ def main():
     elif sys.argv[1] == "all2d":
 
         # Iterate through every species, lab, and neuron.
-        directory = "../data/neurons/neuromorpho"
+        #directory = "../data/neurons/neuromorpho"
+        directory = 'neuromorpho'
+        i = 0
         for species in os.listdir(directory):
             for lab in os.listdir(directory + "/" + species):
                 for neuron in os.listdir(directory + "/" + species + "/" + lab):
-
                     filename = directory + "/" + species + "/" + lab + "/" + neuron
                     if neuron[-4:] != ".swc": continue
 
-                    doit(filename,species+"-"+lab+"-"+neuron,dim="2D")
-                          
+                    result = doit(filename,species+"-"+lab+"-"+neuron,dim="2D")
+                    if result != None:
+                        i += 1
+                        neural_dist, neural_droot, mst_length, sat_droot = result
+                        neural_dists.append(neural_dist)
+                        neural_droots.append(neural_droot)
+                        mst_lengths.append(mst_length)
+                        sat_droots.append(sat_droot)  
     else:
         assert False
 
+
+    PP.scatter(neural_dists, neural_droots, c='r')
+    PP.scatter(mst_lengths, sat_droots, c='b')
+    PP.savefig('neural_trees.pdf', format='pdf')
+    PP.close()
 
 
 if __name__ == "__main__":
