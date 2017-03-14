@@ -207,12 +207,18 @@ def main():
     else:
         assert False
 
-
+    PP.figure()
     PP.scatter(neural_dists, neural_droots, c='r')
-    PP.scatter(mst_lengths, sat_droots, c='b')
-    PP.scatter(range(len(ratios)), sorted(ratios), c='g')
+    PP.scatter(mst_lengths, sat_droots, c='b') 
     PP.savefig('neural_trees.pdf', format='pdf')
     PP.close()
+
+    PP.figure()
+    PP.scatter(range(len(ratios)), sorted(ratios), c='g')
+    PP.savefig('neural_ratios.pdf', format='pdf')
+    PP.close()
+
+
 
 
 if __name__ == "__main__":
