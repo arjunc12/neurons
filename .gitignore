@@ -15,3 +15,5 @@
 neuromorpho/*
 
 *.swp
+
+.vimrc
