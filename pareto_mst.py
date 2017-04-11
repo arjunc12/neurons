@@ -1,7 +1,62 @@
 import numpy as np
 import networkx as nx
-
 from sys import argv
+import matplotlib as mpl
+mpl.use('agg')
+import pylab
+
+def get_neuron_graph(filename):
+    #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
+    for arbor_type in ["3"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
+        
+        # Reads in 3D arborization.
+        G = nx.Graph()
+        P2Coord = {} # u-> (x,y)
+        root = -1
+        with open(filename) as f:
+            for line in f:
+                if line.startswith("#"): continue
+
+                cols = line.strip().split()
+                assert len(cols) == 7
+
+                if not (cols[1] == "1" or cols[1] == arbor_type): continue
+                
+                if cols[6] == "-1":
+                    if root != -1: assert False # duplicate root.
+
+                    root = int(cols[0])
+                                        
+                    assert root not in P2Coord and root not in G
+                    G.add_node(root)
+                    
+                    if dim == "3D":                
+                        P2Coord[root] = (float(cols[2]),float(cols[3]),float(cols[4]))
+                    elif dim == "2D":
+                        P2Coord[root] = (float(cols[2]),float(cols[3]))
+                    else:
+                        assert False
+
+
+                else:
+                    u,v = int(cols[6]),int(cols[0])
+                    assert u in G and u in P2Coord
+                    assert not G.has_edge(u,v)
+            
+                    if dim == "3D":
+                        P2Coord[v] = (float(cols[2]),float(cols[3]),float(cols[4]))
+                    elif dim == "2D":
+                        P2Coord[v] = (float(cols[2]),float(cols[3]))
+                    else: 
+                        assert False
+
+                    G.add_edge(u,v)
+
+                    #if UTIL.euclidean_dist(u,v,P2Coord) > 10:
+                    #    print u,v
+        
+        
+    
 
 def makes_cycle(u, v, node_to_forest):
     f1 = node_to_forest[u]
@@ -48,17 +103,14 @@ def mst_cost(G):
 
 def satellite_cost(G, root):
     total_cost = 0
-    has_root_path = False
     for u in G.nodes_iter():
         if u == root:
             continue
         if nx.has_path(G, root, u):
             total_cost += nx.shortest_path_length(G, root, u, weight='length')
-            has_root_path = True
-    if has_root_path:
-        return total_cost
-    else:
-        return float("inf")
+        else:
+            total_cost += float("inf")
+    return total_cost
 
 def pareto_kruskal(G, root, alpha):
     pareto_mst = nx.Graph()
@@ -85,16 +137,16 @@ def pareto_kruskal(G, root, alpha):
             if makes_cycle(u, v, node_to_forest):
                 ignore_edges.add((u, v))
                 continue
-            pareto_mst.add_edge(u, v)
-            pareto_mst[u][v]['length'] = G[u][v]['length']
-            mcost = alpha * mst_cost(pareto_mst)
+            mst_copy = pareto_mst.copy()
+            mst_copy.add_edge(u, v)
+            mst_copy[u][v]['length'] = G[u][v]['length']
+            mcost = alpha * mst_cost(mst_copy)
 
-            scost = (1 - alpha) * satellite_cost(pareto_mst, root)
+            scost = (1 - alpha) * satellite_cost(mst_copy, root)
             cost = mcost + scost
             if cost < best_cost:
                 best_edge = (u, v)
                 best_cost = cost
-            pareto_mst.remove_edge(u, v)
         if best_edge == None:
             break
         u, v = best_edge
@@ -125,10 +177,22 @@ def pareto_mst(points, root, alpha):
     mst = pareto_kruskal(G, root, alpha)
     return mst
 
+def pareto_plot(points, root):
+    mcosts = []
+    scosts = []
+    for alpha in np.arange(0, 1.05, 0.05):
+        mst = pareto_mst(points, root, alpha)
+        mcost = mst_cost(mst)
+        scost = satellite_cost(mst, root)
+        
+        mcosts.append(mcost)
+        scosts.append(scost)
+
+    pylab.scatter(mcosts, scosts)
+    pylab.savefig('pareto_mst_test.pdf', format='pdf')
+    pylab.close()
+
 if __name__ == '__main__':
-    points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2)]
+    points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
     root = (0, 0)
-    alpha = float(argv[1])
-    mst = pareto_mst(points, root, alpha)
-    print mst.nodes()
-    print mst.edges()
+    pareto_plot(points, root)
