@@ -5,7 +5,7 @@ import matplotlib as mpl
 mpl.use('agg')
 import pylab
 
-def get_neuron_points(filename):
+def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
     for arbor_type in ["3"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
         
@@ -55,7 +55,7 @@ def get_neuron_points(filename):
                     #if UTIL.euclidean_dist(u,v,P2Coord) > 10:
                     #    print u,v
         
-    return G, P2Coord
+    return G, P2Coord, root
     
 
 def makes_cycle(u, v, node_to_forest):
@@ -166,6 +166,7 @@ def point_dist(p1, p2):
 
 def pareto_mst(points, root, alpha):
     G = nx.Graph()
+    print "making graph"
     for i in xrange(len(points)):
         for j in xrange(len(points)):
             if i == j:
@@ -174,13 +175,15 @@ def pareto_mst(points, root, alpha):
             G.add_edge(p1, p2)
             length = point_dist(p1, p2)
             G[p1][p2]['length'] = length
+    print "computing pareto mst"
     mst = pareto_kruskal(G, root, alpha)
     return mst
 
-def pareto_plot(points, root):
+def pareto_plot(points, root, name):
     mcosts = []
     scosts = []
-    for alpha in np.arange(0, 1.05, 0.05):
+    for alpha in np.arange(0, 1.05, 0.1):
+        print "alpha", alpha
         mst = pareto_mst(points, root, alpha)
         mcost = mst_cost(mst)
         scost = satellite_cost(mst, root)
@@ -189,7 +192,7 @@ def pareto_plot(points, root):
         scosts.append(scost)
 
     pylab.scatter(mcosts, scosts)
-    pylab.savefig('pareto_mst_test.pdf', format='pdf')
+    pylab.savefig('pareto_mst_%d.pdf' % name, format='pdf')
     pylab.close()
 
 if __name__ == '__main__':
@@ -197,6 +200,13 @@ if __name__ == '__main__':
     #root = (0, 0)
     #pareto_plot(points, root)
 
-    filename = argv[1]
-    G, P2Coord = get_neuron_points(filename)
-    print P2Coord.values()
+    #filename = argv[1]
+    filename = 'neuromorpho/frog/birinyi/GEN1.CNG.swc'
+    G, P2Coord, root = get_neuron_points(filename)
+    points =P2Coord.values()
+
+    #print P2Coord.keys()
+
+    root_point = P2Coord[root]
+
+    pareto_plot(points, root_point, 'frog')
