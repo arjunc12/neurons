@@ -5,7 +5,7 @@ import matplotlib as mpl
 mpl.use('agg')
 import pylab
 
-def get_neuron_graph(filename):
+def get_neuron_points(filename):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
     for arbor_type in ["3"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
         
