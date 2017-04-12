@@ -55,7 +55,7 @@ def get_neuron_points(filename):
                     #if UTIL.euclidean_dist(u,v,P2Coord) > 10:
                     #    print u,v
         
-        
+    return G, P2Coord
     
 
 def makes_cycle(u, v, node_to_forest):
@@ -193,6 +193,10 @@ def pareto_plot(points, root):
     pylab.close()
 
 if __name__ == '__main__':
-    points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
-    root = (0, 0)
-    pareto_plot(points, root)
+    #points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
+    #root = (0, 0)
+    #pareto_plot(points, root)
+
+    filename = argv[1]
+    G, P2Coord = get_neuron_points(filename)
+    print P2Coord.values()
