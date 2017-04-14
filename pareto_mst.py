@@ -66,7 +66,8 @@ def makes_cycle(u, v, node_to_forest):
 def combine_forests(u, v, node_to_forest, forest_to_nodes, forest_to_edges):
     f1 = node_to_forest[u]
     f2 = node_to_forest[v]
-    assert f1 != f2
+    if f1 == f2:
+        return
     new_forest = min(f1, f2)
     old_forest = max(f1, f2)
     update_nodes = forest_to_nodes[old_forest]
@@ -112,6 +113,85 @@ def satellite_cost(G, root):
             total_cost += float("inf")
     return total_cost
 
+def pareto_kruskal2(G, root, alpha):
+    pareto_mst = nx.Graph()
+    H = G.copy()
+   
+    pareto_mst.add_node(root)
+    pareto_mst.node[root]['droot'] = 0
+   
+    graph_mcost = 0
+    graph_scost = 0
+ 
+    while pareto_mst.number_of_nodes() < H.number_of_nodes():
+        best_edge = None
+        best_cost = float("inf")
+
+        #print "H edges", H.number_of_edges()
+
+        candidate_edges = set()
+        for u in pareto_mst.nodes():
+            candidate_neighbors = H.neighbors(u)
+            closest_neigbor = None
+            closest_dist = float("inf")
+            assert 'droot' in pareto_mst.node[u]
+            for v in candidate_neighbors:
+                if pareto_mst.has_node(v):
+                    H.remove_edge(u, v)
+                    #assert 'droot' in pareto_mst.node[v]
+                elif G[u][v]['length'] < closest_dist:
+                    closest_neighbor = v
+                    closest_dist = H[u][v]['length']
+
+            candidate_edges.add(tuple(sorted((u, closest_neighbor))))
+
+        for i, (u, v) in enumerate(candidate_edges):
+            #print "candidate edge", i, len(candidate_edges)
+
+            scost = graph_scost           
+            if pareto_mst.has_node(u):
+                #assert 'droot' in pareto_mst.node[u]
+                #assert not pareto_mst.has_node(v)
+                scost += pareto_mst.node[u]['droot'] + G[u][v]['length']
+            elif pareto_mst.has_node(v):
+                #assert 'droot' in pareto_mst.node[v]
+                #assert not pareto_mst.has_node(u)
+                scost += pareto_mst.node[v]['droot'] + G[u][v]['length']
+            else:
+                raise ValueError('something is wrong')
+
+            mcost = graph_mcost + G[u][v]['length']
+ 
+            mcost *= alpha
+            scost *= (1 - alpha)
+            cost = mcost + scost
+            
+            if cost < best_cost:
+                best_edge = (u, v)
+                best_cost = cost
+        if best_edge == None:
+            break
+        u, v = best_edge
+        pareto_mst.add_edge(u, v)
+        pareto_mst[u][v]['length'] = G[u][v]['length']
+        
+        #assert ('droot' in pareto_mst.node[u]) or ('droot' in pareto_mst.node[v]) 
+        #assert ('droot' not in pareto_mst.node[u]) or ('droot' not in pareto_mst.node[v])
+
+        if 'droot' in pareto_mst.node[u]:
+            #assert 'droot' not in pareto_mst.node[v]
+            pareto_mst.node[v]['droot'] = pareto_mst.node[u]['droot'] + pareto_mst[u][v]['length']
+        elif 'droot' in pareto_mst.node[v]:
+            #assert 'droot' not in pareto_mst.node[u]
+            pareto_mst.node[u]['droot'] = pareto_mst.node[v]['droot'] + pareto_mst[u][v]['length']
+        else:
+            raise ValueError('something is really wrong')
+
+
+        H.remove_edge(u, v)
+    
+    return pareto_mst 
+
 def pareto_kruskal(G, root, alpha):
     pareto_mst = nx.Graph()
     node_to_forest = {}
@@ -129,9 +209,12 @@ def pareto_kruskal(G, root, alpha):
     ignore_edges = set()
     candidate_edges = G.edges()
     while len(forest_to_nodes) > 1:
+        print "number of candidate edge", len(candidate_edges)
         best_edge = None
         best_cost = float('inf')
-        for u, v in candidate_edges:
+        for i, (u, v) in enumerate(candidate_edges):
+            print "candidate edge", i
+            u, v = sorted((u, v))
             if (u, v) in added_edges or (u, v) in ignore_edges:
                 continue
             if makes_cycle(u, v, node_to_forest):
@@ -176,13 +259,15 @@ def pareto_mst(points, root, alpha):
             length = point_dist(p1, p2)
             G[p1][p2]['length'] = length
     print "computing pareto mst"
-    mst = pareto_kruskal(G, root, alpha)
+    #mst = pareto_kruskal(G, root, alpha)
+    mst = pareto_kruskal2(G, root, alpha)
     return mst
 
-def pareto_plot(points, root, name):
+def pareto_plot(G, points, root, P2Coord, name):
     mcosts = []
     scosts = []
-    for alpha in np.arange(0, 1.05, 0.1):
+    delta = 0.01
+    for alpha in np.arange(0, 1 + delta, delta):
         print "alpha", alpha
         mst = pareto_mst(points, root, alpha)
         mcost = mst_cost(mst)
@@ -191,22 +276,34 @@ def pareto_plot(points, root, name):
         mcosts.append(mcost)
         scosts.append(scost)
 
-    pylab.scatter(mcosts, scosts)
-    pylab.savefig('pareto_mst_%d.pdf' % name, format='pdf')
+    pylab.scatter(mcosts, scosts, c = 'b')
+    neural_mst = nx.Graph()
+    for u, v in G.edges_iter():
+        p1, p2 = P2Coord[u], P2Coord[v]
+        neural_mst.add_edge(p1, p2)
+        neural_mst[p1][p2]['length'] = point_dist(p1, p2)
+
+    neural_length = mst_cost(neural_mst)
+    neural_droot  = satellite_cost(neural_mst, root)
+    
+    pylab.scatter([neural_length], [neural_droot], c='r')
+
+    pylab.savefig('pareto_mst_%s.pdf' % name, format='pdf')
     pylab.close()
 
 if __name__ == '__main__':
-    #points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
-    #root = (0, 0)
-    #pareto_plot(points, root)
+    points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
+    root = (0, 0)
+    #pareto_plot(points, root, 'test')
 
     #filename = argv[1]
     filename = 'neuromorpho/frog/birinyi/GEN1.CNG.swc'
     G, P2Coord, root = get_neuron_points(filename)
-    points =P2Coord.values()
+    
+    points = P2Coord.values()
 
     #print P2Coord.keys()
 
     root_point = P2Coord[root]
 
-    pareto_plot(points, root_point, 'frog')
+    pareto_plot(G, points, root_point, P2Coord, 'frog')
