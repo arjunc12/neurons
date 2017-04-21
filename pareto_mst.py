@@ -4,6 +4,7 @@ from sys import argv
 import matplotlib as mpl
 mpl.use('agg')
 import pylab
+import os
 
 def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
@@ -199,54 +200,6 @@ def pareto_kruskal(G, root, alpha):
     
     return pareto_mst 
 
-'''
-def pareto_kruskal(G, root, alpha):
-    pareto_mst = nx.Graph()
-    node_to_forest = {}
-    forest_to_nodes = {}
-    forest_to_edges = {}
-
-    for i, u in enumerate(G.nodes()):
-        node_to_forest[u] = i
-        forest_to_nodes[i] = [u]
-        forest_to_edges[i] = []
-    
-    pareto_mst.add_node(root)
-
-    added_edges = set()
-    ignore_edges = set()
-    candidate_edges = G.edges()
-    while len(forest_to_nodes) > 1:
-        print "number of candidate edge", len(candidate_edges)
-        best_edge = None
-        best_cost = float('inf')
-        for i, (u, v) in enumerate(candidate_edges):
-            print "candidate edge", i
-            u, v = sorted((u, v))
-            if (u, v) in added_edges or (u, v) in ignore_edges:
-                continue
-            if makes_cycle(u, v, node_to_forest):
-                ignore_edges.add((u, v))
-                continue
-            mst_copy = pareto_mst.copy()
-            mst_copy.add_edge(u, v)
-            mst_copy[u][v]['length'] = G[u][v]['length']
-            mcost = alpha * mst_cost(mst_copy)
-
-            scost = (1 - alpha) * satellite_cost(mst_copy, root)
-            cost = mcost + scost
-            if cost < best_cost:
-                best_edge = (u, v)
-                best_cost = cost
-        if best_edge == None:
-            break
-        u, v = best_edge
-        added_edges.add((u, v))
-        pareto_mst.add_edge(u, v)
-        pareto_mst[u][v]['length'] = G[u][v]['length']
-        combine_forests(u, v, node_to_forest, forest_to_nodes, forest_to_edges)
-    return pareto_mst
-'''
 
 def point_dist(p1, p2):
     assert len(p1) == len(p2)
@@ -292,9 +245,7 @@ def centroid_mst(points, root):
 
     return mcost, scost
 
-
-
-def pareto_plot(filename, name):
+def pareto_plot(filename, name, outdir=None):
     G, P2Coord, root_node = get_neuron_points(filename)
     points = P2Coord.values()
     root = P2Coord[root_node]
@@ -338,8 +289,31 @@ def pareto_plot(filename, name):
     #curr_ax.set_xlim([xmin,xmax + 100])
     #curr_ax.set_ylim([ymin,ymax + 100])
 
-    pylab.savefig('pareto_mst_%s.pdf' % name, format='pdf')
+    if outdir == None:
+        outdir = 'figs'
+
+
+    pylab.savefig('%s/pareto_mst_%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
+
+def neuromorpho_plots():
+    directory = 'neuromorpho'
+    i = 0
+    for species in os.listdir(directory):
+        for lab in os.listdir(directory + "/" + species):
+            for neuron in os.listdir(directory + "/" + species + "/" + lab):
+                filename = directory + "/" + species + "/" + lab + "/" + neuron
+                if neuron[-4:] != ".swc": 
+                    continue
+                name = neuron[:-4]
+                outdir = 'figs/%s/%s' % (species, lab)
+                outdir = outdir.replace(' ', '_')
+                os.system('mkdir -p %s' % outdir)
+
+                print species, lab, neuron
+
+                pareto_plot(filename, neuron, outdir)
+
 
 if __name__ == '__main__':
     points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
@@ -359,16 +333,9 @@ if __name__ == '__main__':
 
     #root_point = P2Coord[root]
 
-    pareto_plot(goldfish_filename, 'goldfish')
-    pareto_plot(pig_filename, 'pig')
-    pareto_plot(agouti_filename, 'agouti')
-    pareto_plot(celegans_filename, 'celegans')
-    pareto_plot(frog_filename, 'frog')
-    
-    '''
-    pareto_plot(G, points, root_point, P2Coord, 'pig')
-    pareto_plot(G, points, root_point, P2Coord, 'pig')
-    pareto_plot(G, points, root_point, P2Coord, 'pig')
-    pareto_plot(G, points, root_point, P2Coord, 'pig')
-    pareto_plot(G, points, root_point, P2Coord, 'pig')
-    '''
+    #pareto_plot(goldfish_filename, 'goldfish')
+    #pareto_plot(pig_filename, 'pig')
+    #pareto_plot(agouti_filename, 'agouti')
+    #pareto_plot(celegans_filename, 'celegans')
+    #pareto_plot(frog_filename, 'frog')
+    neuromorpho_plots()
