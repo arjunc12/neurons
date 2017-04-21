@@ -7,7 +7,10 @@ import pylab
 
 def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
-    for arbor_type in ["3"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
+    H = nx.Graph()
+    H_root = None
+    HP2Coord = None
+    for arbor_type in ["2", "3", "4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
         
         # Reads in 3D arborization.
         G = nx.Graph()
@@ -52,10 +55,14 @@ def get_neuron_points(filename, dim='3D'):
 
                     G.add_edge(u,v)
 
+        if G.number_of_nodes() > H.number_of_nodes():
+            H = G
+            HP2Coord = P2Coord
+            H_root = root
+
                     #if UTIL.euclidean_dist(u,v,P2Coord) > 10:
                     #    print u,v
-        
-    return G, P2Coord, root
+    return H, HP2Coord, H_root
     
 
 def makes_cycle(u, v, node_to_forest):
@@ -113,7 +120,7 @@ def satellite_cost(G, root):
             total_cost += float("inf")
     return total_cost
 
-def pareto_kruskal2(G, root, alpha):
+def pareto_kruskal(G, root, alpha):
     pareto_mst = nx.Graph()
     H = G.copy()
    
@@ -192,6 +199,7 @@ def pareto_kruskal2(G, root, alpha):
     
     return pareto_mst 
 
+'''
 def pareto_kruskal(G, root, alpha):
     pareto_mst = nx.Graph()
     node_to_forest = {}
@@ -238,6 +246,7 @@ def pareto_kruskal(G, root, alpha):
         pareto_mst[u][v]['length'] = G[u][v]['length']
         combine_forests(u, v, node_to_forest, forest_to_nodes, forest_to_edges)
     return pareto_mst
+'''
 
 def point_dist(p1, p2):
     assert len(p1) == len(p2)
@@ -259,11 +268,37 @@ def pareto_mst(points, root, alpha):
             length = point_dist(p1, p2)
             G[p1][p2]['length'] = length
     print "computing pareto mst"
-    #mst = pareto_kruskal(G, root, alpha)
-    mst = pareto_kruskal2(G, root, alpha)
+    mst = pareto_kruskal(G, root, alpha)
     return mst
 
-def pareto_plot(G, points, root, P2Coord, name):
+def centroid_mst(points, root):
+    centroid = np.zeros(len(root))
+    for point in points:
+        assert len(point) == len(root)
+        if point != root:
+            centroid += point
+    centroid /= len(points) - 1
+
+    root_cdist = point_dist(root, centroid)
+
+    mcost = root_cdist
+    scost = 0
+    
+    for point in points:
+        if point != root:
+            cdist = point_dist(point, centroid)
+            scost += cdist
+            mcost += cdist + root_cdist
+
+    return mcost, scost
+
+
+
+def pareto_plot(filename, name):
+    G, P2Coord, root_node = get_neuron_points(filename)
+    points = P2Coord.values()
+    root = P2Coord[root_node]
+    
     mcosts = []
     scosts = []
     delta = 0.01
@@ -276,7 +311,10 @@ def pareto_plot(G, points, root, P2Coord, name):
         mcosts.append(mcost)
         scosts.append(scost)
 
-    pylab.scatter(mcosts, scosts, c = 'b')
+    pylab.plot(mcosts, scosts, c = 'b')
+    pylab.scatter(mcosts, scosts, c='b')
+    pylab.xlabel('spanning tree cost')
+    pylab.ylabel('satellite cost')
     neural_mst = nx.Graph()
     for u, v in G.edges_iter():
         p1, p2 = P2Coord[u], P2Coord[v]
@@ -286,7 +324,19 @@ def pareto_plot(G, points, root, P2Coord, name):
     neural_length = mst_cost(neural_mst)
     neural_droot  = satellite_cost(neural_mst, root)
     
-    pylab.scatter([neural_length], [neural_droot], c='r')
+    pylab.scatter([neural_length], [neural_droot], c='r', marker='x', linewidths=15)
+
+    centroid_droot, centroid_length = centroid_mst(points, root)
+    pylab.scatter([centroid_length], [centroid_droot], c='g', marker='+', linewidths=15)
+
+    xmin = ymin = 0
+    xmax = max(mcosts + [neural_length])
+    ymax = max(scosts + [neural_droot])
+
+
+    curr_ax = pylab.gca()
+    #curr_ax.set_xlim([xmin,xmax + 100])
+    #curr_ax.set_ylim([ymin,ymax + 100])
 
     pylab.savefig('pareto_mst_%s.pdf' % name, format='pdf')
     pylab.close()
@@ -297,13 +347,28 @@ if __name__ == '__main__':
     #pareto_plot(points, root, 'test')
 
     #filename = argv[1]
-    filename = 'neuromorpho/frog/birinyi/GEN1.CNG.swc'
-    G, P2Coord, root = get_neuron_points(filename)
+    frog_filename = 'neuromorpho/frog/birinyi/GEN1.CNG.swc'
+    goldfish_filename= 'neuromorpho/goldfish/stevens/G4-19g-1.CNG.swc'
+    pig_filename = 'neuromorpho/pig/johnson/Pig288-DG-In-Neuron1.CNG.swc'
+    agouti_filename = 'neuromorpho/agouti/guerra da rocha/cco6lam06cel05pa.CNG.swc'
+    celegans_filename = 'neuromorpho/celegans/openworm/SABVR.CNG.swc' 
     
-    points = P2Coord.values()
+    #points = P2Coord.values()
 
     #print P2Coord.keys()
 
-    root_point = P2Coord[root]
+    #root_point = P2Coord[root]
 
-    pareto_plot(G, points, root_point, P2Coord, 'frog')
+    pareto_plot(goldfish_filename, 'goldfish')
+    pareto_plot(pig_filename, 'pig')
+    pareto_plot(agouti_filename, 'agouti')
+    pareto_plot(celegans_filename, 'celegans')
+    pareto_plot(frog_filename, 'frog')
+    
+    '''
+    pareto_plot(G, points, root_point, P2Coord, 'pig')
+    pareto_plot(G, points, root_point, P2Coord, 'pig')
+    pareto_plot(G, points, root_point, P2Coord, 'pig')
+    pareto_plot(G, points, root_point, P2Coord, 'pig')
+    pareto_plot(G, points, root_point, P2Coord, 'pig')
+    '''
