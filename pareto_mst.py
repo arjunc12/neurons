@@ -130,7 +130,12 @@ def pareto_kruskal(G, root, alpha):
    
     graph_mcost = 0
     graph_scost = 0
- 
+
+    print "sorting neighbors"
+    closest_neighbors = {}
+    for u in G.nodes():
+        closest_neighbors[u] = sorted(G.neighbors(u), key=lambda v : G[u][v]['length'])
+
     while pareto_mst.number_of_nodes() < H.number_of_nodes():
         best_edge = None
         best_cost = float("inf")
@@ -139,10 +144,12 @@ def pareto_kruskal(G, root, alpha):
 
         candidate_edges = set()
         for u in pareto_mst.nodes():
-            candidate_neighbors = H.neighbors(u)
-            closest_neigbor = None
-            closest_dist = float("inf")
             assert 'droot' in pareto_mst.node[u]
+            
+            '''
+            #candidate_neighbors = H.neighbors(u)
+            #closest_neigbor = None
+            #closest_dist = float("inf")
             for v in candidate_neighbors:
                 if pareto_mst.has_node(v):
                     H.remove_edge(u, v)
@@ -150,8 +157,23 @@ def pareto_kruskal(G, root, alpha):
                 elif G[u][v]['length'] < closest_dist:
                     closest_neighbor = v
                     closest_dist = H[u][v]['length']
+            '''
+            
+            invalid_neighbors = []
+            closest_neighbor = None
+            for i in xrange(len(closest_neighbors[u])):
+                v = closest_neighbors[u][i]
+                if pareto_mst.has_node(v):
+                    invalid_neighbors.append(v)
+                else:
+                    closest_neighbor = v
+                    break
 
-            candidate_edges.add(tuple(sorted((u, closest_neighbor))))
+            for n in invalid_neighbors:
+                closest_neighbors[u].remove(n)
+
+            if closest_neighbor != None:
+                candidate_edges.add(tuple(sorted((u, closest_neighbor))))
 
         for i, (u, v) in enumerate(candidate_edges):
             #print "candidate edge", i, len(candidate_edges)
@@ -197,9 +219,10 @@ def pareto_kruskal(G, root, alpha):
 
 
         H.remove_edge(u, v)
+        closest_neighbors[u].remove(v)
+        closest_neighbors[v].append(u)
     
     return pareto_mst 
-
 
 def point_dist(p1, p2):
     assert len(p1) == len(p2)
@@ -249,6 +272,9 @@ def pareto_plot(filename, name, outdir=None):
     G, P2Coord, root_node = get_neuron_points(filename)
     points = P2Coord.values()
     root = P2Coord[root_node]
+    print G.number_of_nodes(), "nodes"
+    if G.number_of_nodes() > 1000:
+        return None
     
     mcosts = []
     scosts = []
@@ -296,10 +322,12 @@ def pareto_plot(filename, name, outdir=None):
     pylab.savefig('%s/pareto_mst_%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
 
-def neuromorpho_plots():
+def neuromorpho_plots(plot_species=None):
     directory = 'neuromorpho'
     i = 0
     for species in os.listdir(directory):
+        if plot_species != None and species not in plot_species:
+            continue
         for lab in os.listdir(directory + "/" + species):
             for neuron in os.listdir(directory + "/" + species + "/" + lab):
                 filename = directory + "/" + species + "/" + lab + "/" + neuron
@@ -338,4 +366,4 @@ if __name__ == '__main__':
     #pareto_plot(agouti_filename, 'agouti')
     #pareto_plot(celegans_filename, 'celegans')
     #pareto_plot(frog_filename, 'frog')
-    neuromorpho_plots()
+    neuromorpho_plots(plot_species=['rat'])
