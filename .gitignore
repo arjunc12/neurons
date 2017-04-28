@@ -17,3 +17,5 @@ neuromorpho/*
 *.swp
 
 .vimrc
+
+datasets/*
