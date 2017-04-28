@@ -5,6 +5,7 @@ import matplotlib as mpl
 mpl.use('agg')
 import pylab
 import os
+from random import shuffle
 
 def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
@@ -65,7 +66,6 @@ def get_neuron_points(filename, dim='3D'):
                     #    print u,v
     return H, HP2Coord, H_root
     
-
 def makes_cycle(u, v, node_to_forest):
     f1 = node_to_forest[u]
     f2 = node_to_forest[v]
@@ -104,6 +104,16 @@ def kruskal(nodes, edges):
             
     return sum(forest_to_edges.values(), [])
 
+def random_mst(G):
+    rand_edges = G.edges()
+    shuffle(rand_edges)
+    mst_edges = kruskal(G.nodes(), rand_edges)
+    mst = nx.Graph()
+    for u, v in mst_edges:
+        mst.add_edge(u, v)
+        mst[u][v]['length'] = point_dist(u, v)
+    return mst
+
 def mst_cost(G):
     total_length = 0
     for u, v in G.edges_iter():
@@ -140,25 +150,10 @@ def pareto_kruskal(G, root, alpha):
         best_edge = None
         best_cost = float("inf")
 
-        #print "H edges", H.number_of_edges()
-
         candidate_edges = set()
         for u in pareto_mst.nodes():
             assert 'droot' in pareto_mst.node[u]
-            
-            '''
-            #candidate_neighbors = H.neighbors(u)
-            #closest_neigbor = None
-            #closest_dist = float("inf")
-            for v in candidate_neighbors:
-                if pareto_mst.has_node(v):
-                    H.remove_edge(u, v)
-                    #assert 'droot' in pareto_mst.node[v]
-                elif G[u][v]['length'] < closest_dist:
-                    closest_neighbor = v
-                    closest_dist = H[u][v]['length']
-            '''
-            
+             
             invalid_neighbors = []
             closest_neighbor = None
             for i in xrange(len(closest_neighbors[u])):
@@ -176,16 +171,11 @@ def pareto_kruskal(G, root, alpha):
                 candidate_edges.add(tuple(sorted((u, closest_neighbor))))
 
         for i, (u, v) in enumerate(candidate_edges):
-            #print "candidate edge", i, len(candidate_edges)
 
             scost = graph_scost           
             if pareto_mst.has_node(u):
-                #assert 'droot' in pareto_mst.node[u]
-                #assert not pareto_mst.has_node(v)
                 scost += pareto_mst.node[u]['droot'] + G[u][v]['length']
             elif pareto_mst.has_node(v):
-                #assert 'droot' in pareto_mst.node[v]
-                #assert not pareto_mst.has_node(u)
                 scost += pareto_mst.node[v]['droot'] + G[u][v]['length']
             else:
                 raise ValueError('something is wrong')
@@ -205,14 +195,10 @@ def pareto_kruskal(G, root, alpha):
         pareto_mst.add_edge(u, v)
         pareto_mst[u][v]['length'] = G[u][v]['length']
         
-        #assert ('droot' in pareto_mst.node[u]) or ('droot' in pareto_mst.node[v]) 
-        #assert ('droot' not in pareto_mst.node[u]) or ('droot' not in pareto_mst.node[v])
 
         if 'droot' in pareto_mst.node[u]:
-            #assert 'droot' not in pareto_mst.node[v]
             pareto_mst.node[v]['droot'] = pareto_mst.node[u]['droot'] + pareto_mst[u][v]['length']
         elif 'droot' in pareto_mst.node[v]:
-            #assert 'droot' not in pareto_mst.node[u]
             pareto_mst.node[u]['droot'] = pareto_mst.node[v]['droot'] + pareto_mst[u][v]['length']
         else:
             raise ValueError('something is really wrong')
@@ -232,56 +218,100 @@ def point_dist(p1, p2):
         sq_dist += (x1 - x2) ** 2
     return sq_dist ** 0.5
 
-def pareto_mst(points, root, alpha):
-    G = nx.Graph()
-    print "making graph"
-    for i in xrange(len(points)):
-        for j in xrange(len(points)):
-            if i == j:
-                continue
-            p1, p2 = points[i], points[j]
-            G.add_edge(p1, p2)
-            length = point_dist(p1, p2)
-            G[p1][p2]['length'] = length
-    print "computing pareto mst"
-    mst = pareto_kruskal(G, root, alpha)
-    return mst
-
-def centroid_mst(points, root):
+def centroid(points, root=None):
     centroid = np.zeros(len(root))
     for point in points:
         assert len(point) == len(root)
         if point != root:
             centroid += point
     centroid /= len(points) - 1
+    return centroid
 
-    root_cdist = point_dist(root, centroid)
+def centroid_mst(points, root):
+    G = nx.Graph()
+    centroidp = centroid(points, root)
+    for point in points:
+        G.add_edge(point, centroid)
+        G[point][centroid]['length'] = point_dist(point, centroidp)
+    return G
+
+def centroid_mst_costs(points, root):
+    centroidp = centroid(points, root)
+    root_cdist = point_dist(root, centroidp)
 
     mcost = root_cdist
     scost = 0
     
     for point in points:
         if point != root:
-            cdist = point_dist(point, centroid)
-            scost += cdist
-            mcost += cdist + root_cdist
+            cdist = point_dist(point, centroidp)
+            mcost += cdist
+            scost += cdist + root_cdist
 
     return mcost, scost
+
+def points_to_graph(points):
+    point_graph = nx.Graph()
+    for i in xrange(len(points)):
+        for j in xrange(len(points)):
+            if i == j:
+                continue
+            p1, p2 = points[i], points[j]
+            point_graph.add_edge(p1, p2)
+            length = point_dist(p1, p2)
+            point_graph[p1][p2]['length'] = length
+    return point_graph
+   
+def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
+    best_pareto_mcost = None
+    best_pareto_scost = None
+    best_dist = float("inf")
+
+    assert len(pareto_mcosts) == len(pareto_scosts)
+
+    for i in xrange(len(pareto_mcosts)):
+        pareto_mcost = pareto_mcosts[i]
+        pareto_scost = pareto_scosts[i]
+
+        dist = point_dist((pareto_mcost, pareto_scost), (mcost, scost))
+        if dist < best_dist:
+            best_dist = dist
+            best_pareto_mcost = pareto_mcost
+            best_pareto_scost = pareto_scost
+
+    return best_pareto_mcost, best_pareto_scost, best_dist
+
+def best_satellite_cost(root, points):
+    best_cost = 0
+    for point in points:
+        best_cost += point_dist(root, point)
+    return best_cost
+
+def best_mst_cost(G):
+    sorted_edges = sorted(G.edges(), key= lambda x : G[x[0]][x[1]]['length'])
+    mst_edges = kruskal(G.nodes(), sorted_edges)
+    best_cost = 0
+    for u, v in mst_edges:
+        best_cost += G[u][v]['length']
+    return best_cost
 
 def pareto_plot(filename, name, outdir=None):
     G, P2Coord, root_node = get_neuron_points(filename)
     points = P2Coord.values()
     root = P2Coord[root_node]
     print G.number_of_nodes(), "nodes"
-    if G.number_of_nodes() > 1000:
+    if G.number_of_nodes() <= 1000 or G.number_of_nodes() > 2000:
         return None
+   
+    print "making graph"
+    point_graph = points_to_graph(points)
     
     mcosts = []
     scosts = []
     delta = 0.01
     for alpha in np.arange(0, 1 + delta, delta):
         print "alpha", alpha
-        mst = pareto_mst(points, root, alpha)
+        mst = pareto_kruskal(point_graph, root, alpha)
         mcost = mst_cost(mst)
         scost = satellite_cost(mst, root)
         
@@ -289,7 +319,7 @@ def pareto_plot(filename, name, outdir=None):
         scosts.append(scost)
 
     pylab.plot(mcosts, scosts, c = 'b')
-    pylab.scatter(mcosts, scosts, c='b')
+    pylab.scatter(mcosts, scosts, c='b', label='pareto mst')
     pylab.xlabel('spanning tree cost')
     pylab.ylabel('satellite cost')
     neural_mst = nx.Graph()
@@ -298,29 +328,45 @@ def pareto_plot(filename, name, outdir=None):
         neural_mst.add_edge(p1, p2)
         neural_mst[p1][p2]['length'] = point_dist(p1, p2)
 
-    neural_length = mst_cost(neural_mst)
-    neural_droot  = satellite_cost(neural_mst, root)
-    
-    pylab.scatter([neural_length], [neural_droot], c='r', marker='x', linewidths=15)
+    neural_mcost = mst_cost(neural_mst)
+    neural_scost  = satellite_cost(neural_mst, root)
 
-    centroid_droot, centroid_length = centroid_mst(points, root)
-    pylab.scatter([centroid_length], [centroid_droot], c='g', marker='+', linewidths=15)
+    neural_closem, neural_closes, neural_dist = pareto_dist(mcosts, scosts, neural_mcost, neural_scost)
 
-    xmin = ymin = 0
-    xmax = max(mcosts + [neural_length])
-    ymax = max(scosts + [neural_droot])
+    pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x', linewidths=15, label='neural mst')
+    pylab.plot([neural_mcost, neural_closem], [neural_scost, neural_closes], c='r', linestyle='--')
 
+    centroid_mcost, centroid_scost = centroid_mst_costs(points, root)
+    centroid_closem, centroid_closes, centroid_dist = pareto_dist(mcosts, scosts, centroid_mcost, centroid_scost)
 
-    curr_ax = pylab.gca()
-    #curr_ax.set_xlim([xmin,xmax + 100])
-    #curr_ax.set_ylim([ymin,ymax + 100])
+    pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+', linewidths=15, label='centroid mst')
+    pylab.plot([centroid_mcost, centroid_closem], [centroid_scost, centroid_closes], c='g', linestyle='--')
+
+    opt_scost = best_satellite_cost(root, points)
+    opt_mcost = best_mst_cost(point_graph)
+
+    #pylab.axhline(opt_scost)
+    #pylab.axvline(opt_mcost)
 
     if outdir == None:
         outdir = 'figs'
 
-
     pylab.savefig('%s/pareto_mst_%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
+
+    f = open('pareto_mst.csv', 'a')
+    for i in xrange(100):
+        rand_mst = random_mst(point_graph)
+        rand_mcost = mst_cost(rand_mst)
+        rand_scost = satellite_cost(rand_mst, root)
+        rand_closem, rand_closes, rand_dist = pareto_dist(mcosts, scosts, rand_mcost, rand_scost)
+        f.write('%s, %d, %d\n' % (name, neural_dist, rand_dist))
+
+
+
+    #pylab.scatter([rand_mcost], [rand_scost], c='m', marker='*', linewidths=15)
+    #pylab.plot([rand_mcost, rand_closem], [rand_scost, rand_closes], c='m', linestyle='-')
+
 
 def neuromorpho_plots(plot_species=None):
     directory = 'neuromorpho'
@@ -366,4 +412,4 @@ if __name__ == '__main__':
     #pareto_plot(agouti_filename, 'agouti')
     #pareto_plot(celegans_filename, 'celegans')
     #pareto_plot(frog_filename, 'frog')
-    neuromorpho_plots(plot_species=['rat'])
+    neuromorpho_plots()
