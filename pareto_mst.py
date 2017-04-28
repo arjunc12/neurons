@@ -408,8 +408,8 @@ if __name__ == '__main__':
     #root_point = P2Coord[root]
 
     #pareto_plot(goldfish_filename, 'goldfish')
-    #pareto_plot(pig_filename, 'pig')
+    pareto_plot(pig_filename, 'pig')
     #pareto_plot(agouti_filename, 'agouti')
     #pareto_plot(celegans_filename, 'celegans')
     #pareto_plot(frog_filename, 'frog')
-    neuromorpho_plots()
+    #neuromorpho_plots()
