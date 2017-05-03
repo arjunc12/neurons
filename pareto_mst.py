@@ -263,9 +263,8 @@ def points_to_graph(points):
     return point_graph
    
 def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
-    best_pareto_mcost = None
-    best_pareto_scost = None
     best_dist = float("inf")
+    best_index = None
 
     assert len(pareto_mcosts) == len(pareto_scosts)
 
@@ -276,10 +275,9 @@ def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
         dist = point_dist((pareto_mcost, pareto_scost), (mcost, scost))
         if dist < best_dist:
             best_dist = dist
-            best_pareto_mcost = pareto_mcost
-            best_pareto_scost = pareto_scost
+            best_index = i
 
-    return best_pareto_mcost, best_pareto_scost, best_dist
+    return best_dist, best_index
 
 def best_satellite_cost(root, points):
     best_cost = 0
@@ -295,12 +293,12 @@ def best_mst_cost(G):
         best_cost += G[u][v]['length']
     return best_cost
 
-def pareto_plot(filename, name, outdir=None):
+def pareto_plot(filename, name, cell_type, species, region, lab, outdir=None):
     G, P2Coord, root_node = get_neuron_points(filename)
     points = P2Coord.values()
     root = P2Coord[root_node]
     print G.number_of_nodes(), "nodes"
-    if G.number_of_nodes() <= 1000 or G.number_of_nodes() > 2000:
+    if G.number_of_nodes() <= 2000 or G.number_of_nodes() > 3000:
         return None
    
     print "making graph"
@@ -309,7 +307,8 @@ def pareto_plot(filename, name, outdir=None):
     mcosts = []
     scosts = []
     delta = 0.01
-    for alpha in np.arange(0, 1 + delta, delta):
+    alphas = np.arange(0, 1 + delta, delta)
+    for alpha in alphas:
         print "alpha", alpha
         mst = pareto_kruskal(point_graph, root, alpha)
         mcost = mst_cost(mst)
@@ -331,13 +330,19 @@ def pareto_plot(filename, name, outdir=None):
     neural_mcost = mst_cost(neural_mst)
     neural_scost  = satellite_cost(neural_mst, root)
 
-    neural_closem, neural_closes, neural_dist = pareto_dist(mcosts, scosts, neural_mcost, neural_scost)
+    neural_dist, neural_index = pareto_dist(mcosts, scosts, neural_mcost, neural_scost)
+    neural_closem = mcosts[neural_index] 
+    neural_closes = scosts[neural_index]
+    neural_alpha = alphas[neural_index]
 
     pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x', linewidths=15, label='neural mst')
     pylab.plot([neural_mcost, neural_closem], [neural_scost, neural_closes], c='r', linestyle='--')
 
     centroid_mcost, centroid_scost = centroid_mst_costs(points, root)
-    centroid_closem, centroid_closes, centroid_dist = pareto_dist(mcosts, scosts, centroid_mcost, centroid_scost)
+    centroid_dist, centroid_index = pareto_dist(mcosts, scosts, centroid_mcost, centroid_scost)
+    centroid_closem = mcosts[centroid_index]
+    centroid_closes = scosts[centroid_index]
+    centroid_alpha = alphas[centroid_index]
 
     pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+', linewidths=15, label='centroid mst')
     pylab.plot([centroid_mcost, centroid_closem], [centroid_scost, centroid_closes], c='g', linestyle='--')
@@ -351,42 +356,60 @@ def pareto_plot(filename, name, outdir=None):
     if outdir == None:
         outdir = 'figs'
 
+    pylab.legend()
+
     pylab.savefig('%s/pareto_mst_%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
 
     f = open('pareto_mst.csv', 'a')
-    for i in xrange(100):
+    ntrials = 100
+    successes = 0
+    total_rand_dist = 0.0
+    for i in xrange(ntrials):
         rand_mst = random_mst(point_graph)
         rand_mcost = mst_cost(rand_mst)
         rand_scost = satellite_cost(rand_mst, root)
-        rand_closem, rand_closes, rand_dist = pareto_dist(mcosts, scosts, rand_mcost, rand_scost)
-        f.write('%s, %d, %d\n' % (name, neural_dist, rand_dist))
-
-
+        rand_dist, rand_index = pareto_dist(mcosts, scosts, rand_mcost, rand_scost)
+        total_rand_dist += rand_dist
+        rand_closem = mcosts[rand_index]
+        rand_closes = scosts[rand_index]
+        rand_alpha = alphas[rand_index]
+        if rand_dist < neural_dist:
+            success += 1
+    mean_rand_dist = total_rand_dist / ntrials
+    write_items = [name, cell_type, species, region, lab]
+    write_items.append(neural_alpha)
+    write_items += [neural_dist, centroid_dist, mean_rand_dist]
+    write_items += [ntrials, successes]
+    write_items = map(str, write_items)
+    write_items = ', '.join(write_items)
+    f.write('%s\n' % write_items)
 
     #pylab.scatter([rand_mcost], [rand_scost], c='m', marker='*', linewidths=15)
     #pylab.plot([rand_mcost, rand_closem], [rand_scost, rand_closes], c='m', linestyle='-')
 
 
 def neuromorpho_plots(plot_species=None):
-    directory = 'neuromorpho'
+    #directory = 'neuromorpho'
+    directory = 'datasets'
     i = 0
-    for species in os.listdir(directory):
-        if plot_species != None and species not in plot_species:
-            continue
-        for lab in os.listdir(directory + "/" + species):
-            for neuron in os.listdir(directory + "/" + species + "/" + lab):
-                filename = directory + "/" + species + "/" + lab + "/" + neuron
-                if neuron[-4:] != ".swc": 
-                    continue
-                name = neuron[:-4]
-                outdir = 'figs/%s/%s' % (species, lab)
-                outdir = outdir.replace(' ', '_')
-                os.system('mkdir -p %s' % outdir)
+    for cell_type in os.listdir(directory):
+        for species in os.listdir(directory + '/' + cell_type):
+            if plot_species != None and species not in plot_species:
+                continue
+            for region in os.listdir(directory + '/' + cell_type + '/' + species):
+                for lab in os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region):
+                    for neuron in os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
+                        filename = directory + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron
+                        if neuron[-4:] != ".swc": 
+                            continue
+                        name = neuron[:-4]
+                        outdir = 'figs/%s/%s/%s/%s' % (cell_type, species, region, lab)
+                        outdir = outdir.replace(' ', '_')
+                        os.system('mkdir -p %s' % outdir)
 
-                print species, lab, neuron
-
-                pareto_plot(filename, neuron, outdir)
+                        print species, lab, neuron
+                        pareto_plot(filename, name, cell_type, species, region, lab, outdir)
 
 
 if __name__ == '__main__':
@@ -408,8 +431,8 @@ if __name__ == '__main__':
     #root_point = P2Coord[root]
 
     #pareto_plot(goldfish_filename, 'goldfish')
-    pareto_plot(pig_filename, 'pig')
+    #pareto_plot(pig_filename, 'pig')
     #pareto_plot(agouti_filename, 'agouti')
     #pareto_plot(celegans_filename, 'celegans')
     #pareto_plot(frog_filename, 'frog')
-    #neuromorpho_plots()
+    neuromorpho_plots()
