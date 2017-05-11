@@ -11,8 +11,19 @@ def neuron_info(neuron_file):
     data = urllib2.urlopen(url)
     data = json.load(data)
     data = data['data'][0]
-    print sorted(data)
-    return data['species'], data['archive_name'], data['region1'], data['class1']
+    
+    species = data['species']
+    lab = data['archive_name']
+    region = data['region1']
+    class1 = data['class1']
+    cell_type = class1
+    if class1 == 'interneuron':
+        class2 = data['class2']
+        if class2 != None and class2 != '':
+            cell_type = class2
+    
+    return cell_type, species, region, lab
+    
 
 def main():
     neuron_file = argv[1]
