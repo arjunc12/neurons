@@ -19,3 +19,7 @@ neuromorpho/*
 .vimrc
 
 datasets/*
+
+*.sh
+
+neuron_nmo/*
