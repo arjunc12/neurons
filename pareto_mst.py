@@ -90,7 +90,7 @@ def get_neuron_points(filename, dim='3D'):
 
                 else:
                     u,v = int(cols[6]),int(cols[0])
-                    #assert u in G #and u in P2Coord
+                    assert u in G #and u in P2Coord
                     assert not G.has_edge(u,v)
             
                     coord = None
@@ -452,7 +452,10 @@ def pareto_drawings(filename, name, outdir='drawings'):
     viz_tree(mst, name + '_mst', outdir=outdir)
 
 def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
-    G = get_neuron_points(filename)
+    try:
+        G = get_neuron_points(filename)
+    except AssertionError:
+        return None
 
     if not (nx.is_connected(G) and G.number_of_edges() == G.number_of_nodes() - 1):
         print "not a tree"
