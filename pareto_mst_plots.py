@@ -4,6 +4,11 @@ mpl.use('agg')
 import pylab
 import seaborn as sns
 
+OUTDIR = 'stats'
+
+COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'alpha', 'neural_dist',\
+            'centroid_dist', 'random_dist', 'trials', 'successes']
+
 def cat_to_num(categories):
     unique_categories = set()
     index = 1
@@ -19,17 +24,65 @@ def cat_to_num(categories):
         cat_nums.append(cat_map[category])
     return cat_nums
 
+def alpha_distribution(df, identifiers, plot_func, plot_descriptor):
+    for identifier in identifiers:
+        pylab.figure()
+        dist_plot = plot_func(x='alpha', y=identifier, data=df, orient='h')
+        dist_plot.tick_params(labelsize=5, axis='y')
+        pylab.savefig('%s/%s_alphas_%s.pdf' % (OUTDIR, identifier, plot_descriptor), format='pdf')
+        pylab.close
+
 def cluster_alphas(df, identifiers):
+    '''
     alphas = df['alpha']
     for identifier in identifiers:
-        sns.stripplot(x=identifier, y='alpha', data=df)
-        pylab.savefig('figs/%s_alphas.pdf' % identifier, format='pdf')
+        pylab.figure()
+        stp = sns.stripplot(x='alpha', y=identifier, data=df, orient='h')
+        #stp.set_xticklabels(stp.get_xticklabels(), rotation=75)
+        stp.tick_params(labelsize=5)
+        pylab.savefig('%s/%s_alphas.pdf' % (OUTDIR, identifier), format='pdf')
+        pylab.close()
+    '''
+    alpha_distribution(df, identifiers, sns.stripplot, 'cluster')
 
 def boxplot_alphas(df, identifiers):
+    '''
     alphas = df['alpha']
     for identifier in identifiers:
-        bp = sns.boxplot(x=df[identifier], y=df['alpha'])
-        pylab.savefig('figs/%s_alphas_box.pdf' % identifier, format='pdf')
+        pylab.figure()
+        bp = sns.boxplot(x='alpha', y=identifier, data=df, orient='h')
+        #bp.set_xticklabels(bp.get_xticklabels(), rotation=75)
+        bp.tick_params(labelsize=5)
+        pylab.savefig('%s/%s_alphas_box.pdf' % (OUTDIR, identifier), format='pdf')
+        pylab.close()
+    '''
+    alpha_distribution(df, identifiers, sns.boxplot, 'box')
+
+def violin_alphas(df, identifiers):
+    '''
+    alphas = df['alpha']
+    for identifier in identifiers:
+        pylab.figure()
+        vp = sns.violinplot(x='alpha', y=identifier, data=df, orient='h')
+        #vp.set_xticklabels(bp.get_xticklabels(), rotation=75)
+        vp.tick_params(labelsize=5)
+        pylab.savefig('%s/%s_alphas_violin.pdf' % (OUTDIR, identifier), format='pdf')
+        pylab.close()
+    '''
+    alpha_distribution(df, identifiers, sns.violinplot, 'violin')
+
+def swarm_alphas(df, identifiers):
+    '''
+    alphas = df['alpha']
+    for identifier in identifiers:
+        pylab.figure()
+        swp = sns.swarmplot(x='alpha', y=identifier, data=df, orient='h')
+        #swp.set_xticklabels(bp.get_xticklabels(), rotation=75)
+        swp.tick_params(labelsize=5)
+        pylab.savefig('%s/%s_alphas_swarm.pdf' % (OUTDIR, identifier), format='pdf')
+        pylab.close()
+    '''
+    alpha_distribution(df, identifiers, sns.swarmplot, 'swarm')
 
 def scatter_dists(df):
     neural_dist = df['neural_dist']
@@ -51,18 +104,20 @@ def scatter_dists(df):
     pylab.ylabel('log-distance')
     pylab.title('Distance to Pareto Front') 
     pylab.legend()
-    pylab.savefig('figs/pareto_dists.pdf', format='pdf')
+    pylab.savefig('%s/pareto_dists.pdf' % OUTDIR, format='pdf')
     pylab.close()
 
 def main():
-    columns = ['name', 'cell_type', 'species', 'region', 'lab', 'alpha', 'neural_dist',\
-            'centroid_dist', 'random_dist', 'trials', 'successes']
     fname = 'pareto_mst.csv'
-    df = pd.read_csv(fname, names=columns)
+    df = pd.read_csv(fname, names=COLUMNS)
+    for column in ['species', 'cell_type', 'region']:
+        df[column] = df[column].apply(str)
+    #print df['species']
     scatter_dists(df)
-    #cluster_alphas(df, ['species', 'cell_type', 'region'])
-    #boxplot_alphas(df, ['species', 'cell_type', 'region'])
-    
+    cluster_alphas(df, ['species', 'cell_type', 'region'])
+    boxplot_alphas(df, ['species', 'cell_type', 'region'])
+    violin_alphas(df, ['species', 'cell_type', 'region'])
+    swarm_alphas(df, ['species', 'cell_type', 'region'])
 
 if __name__ == '__main__':
     main()
