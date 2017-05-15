@@ -9,8 +9,9 @@ from random import shuffle
 from itertools import combinations
 
 VIZ_TREES = False
-MIN_NODES = 2000
-MAX_NODES = 4000
+MIN_NODES = 0
+MAX_NODES = 1000
+NO_CONTINUE = False
 
 def viz_tree(G, name, outdir='figs'):
     """ Displays plant/tree visualization. """
@@ -478,7 +479,11 @@ def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
     viz_tree(G, name + str('_neural'), outdir=outdir)
 
     print "making graph"
-    point_graph = non_continue_subgraph(G)
+    point_graph = None
+    if NO_CONTINUE:
+        point_graph = non_continue_subgraph(G)
+    else:
+        point_graph = complete_graph(G)
     print point_graph.number_of_nodes(), "points"
    
     sat_tree = satellite_tree(point_graph)
@@ -601,7 +606,7 @@ def neuromorpho_plots(plot_species=None):
                         outdir = outdir.replace(' ', '_')
                         os.system('mkdir -p %s' % outdir)
                         if len(os.listdir(outdir)) > 0:
-                            pass #continue
+                            continue
                         print species, lab, neuron
                         pareto_plot(filename, name, cell_type, species, region, lab, outdir)
 
