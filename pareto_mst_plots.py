@@ -114,10 +114,10 @@ def main():
         df[column] = df[column].apply(str)
     #print df['species']
     scatter_dists(df)
-    cluster_alphas(df, ['species', 'cell_type', 'region'])
+    #cluster_alphas(df, ['species', 'cell_type', 'region'])
     boxplot_alphas(df, ['species', 'cell_type', 'region'])
-    violin_alphas(df, ['species', 'cell_type', 'region'])
-    swarm_alphas(df, ['species', 'cell_type', 'region'])
+    #violin_alphas(df, ['species', 'cell_type', 'region'])
+    #swarm_alphas(df, ['species', 'cell_type', 'region'])
 
 if __name__ == '__main__':
     main()
