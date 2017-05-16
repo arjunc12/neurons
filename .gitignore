@@ -23,3 +23,5 @@ datasets/*
 *.sh
 
 neuron_nmo/*
+
+.DS_Store
