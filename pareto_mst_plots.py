@@ -3,6 +3,7 @@ import matplotlib as mpl
 mpl.use('agg')
 import pylab
 import seaborn as sns
+import os
 
 OUTDIR = 'stats'
 
@@ -110,8 +111,7 @@ def scatter_dists(df):
 def main():
     fname = 'pareto_mst.csv'
     df = pd.read_csv(fname, names=COLUMNS)
-    for column in ['species', 'cell_type', 'region']:
-        df[column] = df[column].apply(str)
+    os.system('mkdir -p stats')
     #print df['species']
     scatter_dists(df)
     #cluster_alphas(df, ['species', 'cell_type', 'region'])
