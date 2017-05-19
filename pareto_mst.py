@@ -10,7 +10,7 @@ from itertools import combinations
 
 VIZ_TREES = False
 MIN_NODES = 0
-MAX_NODES = 1000
+MAX_NODES = 2000
 NO_CONTINUE = False
 
 def viz_tree(G, name, outdir='figs'):
