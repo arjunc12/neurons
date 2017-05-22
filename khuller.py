@@ -56,7 +56,7 @@ def DFS(G, KT, T_span, T_sat, u, alpha):
             relax(G, KT, u, v)
             DFS(G, KT, T_span, T_sat, v, alpha)
 
-def khuller(G, T_span, T_sat, root, alpha):
+def khuller(G, T_span, T_sat, alpha):
     assert alpha > 1
     initialize_parents(T_span)
     initialize_parents(T_sat)
@@ -69,6 +69,7 @@ def khuller(G, T_span, T_sat, root, alpha):
             parent = KT.node[u]['parent']
             assert parent != None
             KT.add_edge(u, parent)
+            KT[u][parent]['length'] = G[u][parent]['length']
 
     return KT
 
