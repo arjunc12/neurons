@@ -7,6 +7,8 @@ import pylab
 import os
 from random import shuffle
 from itertools import combinations
+import argparse
+from khuller import khuller
 
 VIZ_TREES = False
 MIN_NODES = 0
@@ -255,7 +257,9 @@ def pareto_kruskal(G, alpha):
                 raise ValueError('something is wrong')
 
             mcost = graph_mcost + G[u][v]['length']
- 
+            
+            # alpha = 0 minimizes satellite cost
+            # alpha = 1 minimizes spanning tree cost
             mcost *= alpha
             scost *= (1 - alpha)
             cost = mcost + scost
@@ -462,7 +466,8 @@ def sort_neighbors(G):
     for u in G.nodes_iter():
         G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
 
-def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
+def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs',\
+                min_nodes=MIN_NODES, max_nodes=MAX_NODES, algorithm='greedy'):
     try:
         G = get_neuron_points(filename)
     except AssertionError:
@@ -473,11 +478,9 @@ def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
         return None
 
     print G.number_of_nodes(), "nodes"
-    if G.number_of_nodes() <= MIN_NODES or G.number_of_nodes() > MAX_NODES:
+    if G.number_of_nodes() <= min_nodes or G.number_of_nodes() > max_nodes:
         return None
    
-    viz_tree(G, name + str('_neural'), outdir=outdir)
-
     print "making graph"
     point_graph = None
     if NO_CONTINUE:
@@ -487,9 +490,7 @@ def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
     print point_graph.number_of_nodes(), "points"
    
     sat_tree = satellite_tree(point_graph)
-    viz_tree(sat_tree, name + str('_sat'), outdir=outdir)
     span_tree = min_spanning_tree(point_graph)
-    viz_tree(span_tree, name + str('_mst'), outdir=outdir)
     
     opt_scost = float(satellite_cost(sat_tree))
     normalize_scost = lambda cost : normalize_cost(cost, opt_scost)
@@ -504,7 +505,18 @@ def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
     sort_neighbors(point_graph)
     for i, alpha in enumerate(alphas):
         print "alpha", alpha
-        pareto_tree = pareto_kruskal(point_graph, alpha)
+        pareto_tree = None
+        if alpha == 0:
+            pareto_tree = sat_tree
+        elif alpha == 1:
+            pareto_tree = span_tree
+        else:
+            if algorithm == 'greedy':
+                pareto_tree = pareto_kruskal(point_graph, alpha)
+            elif algorithm == 'khuller':
+                pareto_tree = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
+            else:
+                raise ValueError('invalid algorithm')
         if (alpha == 0 or alpha == 1 or i % 10 == 0) and VIZ_TREES:
             viz_tree(pareto_tree, name + '-' + str(alpha), outdir=outdir)
         mcost = mst_cost(pareto_tree)
@@ -515,6 +527,10 @@ def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
         
         mcosts.append(mcost)
         scosts.append(scost)
+
+    viz_tree(G, name + str('_neural'), outdir=outdir) 
+    viz_tree(sat_tree, name + str('_sat'), outdir=outdir)
+    viz_tree(span_tree, name + str('_mst'), outdir=outdir)
 
     pylab.figure()
     pylab.plot(mcosts, scosts, c = 'b')
@@ -556,7 +572,7 @@ def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
 
     viz_tree(centroid_tree, name + '_centroid', outdir=outdir)
 
-    f = open('pareto_mst.csv', 'a')
+    f = open('pareto_mst_%s.csv' % algorithm, 'a')
     ntrials = 100
     successes = 0
     total_rand_dist = 0.0
@@ -587,14 +603,12 @@ def pareto_plot(filename, name, cell_type, species, region, lab, outdir='figs'):
     #pylab.plot([rand_mcost, rand_closem], [rand_scost, rand_closes], c='m', linestyle='-')
 
 
-def neuromorpho_plots(plot_species=None):
+def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES, algorithm='greedy'):
     #directory = 'neuromorpho'
     directory = 'datasets'
     i = 0
     for cell_type in os.listdir(directory):
         for species in os.listdir(directory + '/' + cell_type):
-            if plot_species != None and species not in plot_species:
-                continue
             for region in os.listdir(directory + '/' + cell_type + '/' + species):
                 for lab in os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region):
                     for neuron in os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
@@ -602,16 +616,27 @@ def neuromorpho_plots(plot_species=None):
                         if neuron[-8:] != ".CNG.swc": 
                             continue
                         name = neuron[:-8]
-                        outdir = 'figs/%s/%s/%s/%s/%s' % (cell_type, species, region, lab, name)
+                        outdir = 'figs/%s/%s/%s/%s/%s/%s' % (algorithm, cell_type, species, region, lab, name)
                         outdir = outdir.replace(' ', '_')
                         os.system('mkdir -p %s' % outdir)
                         if len(os.listdir(outdir)) > 0:
                             continue
                         print species, lab, neuron
-                        pareto_plot(filename, name, cell_type, species, region, lab, outdir)
+                        pareto_plot(filename, name, cell_type, species, region,\
+                                    lab, outdir, min_nodes, max_nodes, algorithm)
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-min_nodes', type=int, default=MIN_NODES)
+    parser.add_argument('-max_nodes', type=int, default=MAX_NODES)
+    parser.add_argument('-a', '--algorithm', choices=['greedy', 'khuller'], default='greedy')
+
+    args = parser.parse_args()
+    min_nodes = args.min_nodes
+    max_nodes = args.max_nodes
+    algorithm = args.algorithm
+
     points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
     root = (0, 0)
     #pareto_plot(points, root, 'test')
@@ -630,12 +655,15 @@ if __name__ == '__main__':
 
     #root_point = P2Coord[root]
 
-    #pareto_plot(goldfish_filename, 'goldfish', 'cell_type1', 'species1', 'region1', 'lab1', 'figs/')
+    #pareto_plot(goldfish_filename, 'goldfish', 'cell_type1', 'species1',\
+    #                               'region1', 'lab1', 'figs/',\
+    #                               0, 1000, 'khuller')
+    
     #pareto_plot(pig_filename, 'pig')
     #pareto_plot(agouti_filename, 'agouti')
     #pareto_plot(celegans_filename, 'celegans')
     #pareto_plot(frog_filename, 'frog')
-    neuromorpho_plots()
+    neuromorpho_plots(min_nodes, max_nodes, algorithm)
     #pareto_plot(thinstar_filename, 'thinstar', 'amacrine', 'rabbit', 'retina', 'miller', outdir='sandbox')
 
     #pareto_drawings(goldfish_filename, 'goldfish')
