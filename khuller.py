@@ -1,6 +1,8 @@
 import networkx as nx
 from sys import argv
 from itertools import combinations
+import numpy as np
+from cost_functions import *
 
 def initialize(KT):
     root = KT.graph['root']
@@ -70,7 +72,9 @@ def khuller(G, T_span, T_sat, alpha):
             assert parent != None
             KT.add_edge(u, parent)
             KT[u][parent]['length'] = G[u][parent]['length']
-
+    
+    assert nx.is_connected(KT)
+    assert KT.number_of_edges() == KT.number_of_nodes() - 1
     return KT
 
 def main():
@@ -90,11 +94,15 @@ def main():
     T_span = nx.minimum_spanning_tree(G, weight='length')
     for H in [G, T_span, T_sat]:
         H.graph['root'] = root
+    
+    for beta in np.arange(0.01, 0.99, 0.01):
+        print beta
+        alpha = 1.0 / (1 - beta)
 
-    alpha = float(argv[1])
-
-    KT = khuller(G, T_span, T_sat, root, alpha)
-    print sorted(map(lambda x : tuple(sorted(x)), KT.edges()))
+        KT = khuller(G, T_span, T_sat, alpha)
+        #print sorted(map(lambda x : tuple(sorted(x)), KT.edges()))
+        print "satellite cost", satellite_cost(KT)
+        print "mst cost", mst_cost(KT)
 
 
 if __name__ == '__main__':
