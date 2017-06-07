@@ -8,7 +8,8 @@ import os
 OUTDIR = 'stats'
 
 COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'alpha', 'neural_dist',\
-            'centroid_dist', 'random_dist', 'trials', 'successes']
+            'centroid_dist', 'random_dist', 'trials', 'successes', 'comparisons',\
+            'dominates']
 
 def cat_to_num(categories):
     unique_categories = set()
@@ -34,55 +35,15 @@ def alpha_distribution(df, identifiers, plot_func, plot_descriptor):
         pylab.close
 
 def cluster_alphas(df, identifiers):
-    '''
-    alphas = df['alpha']
-    for identifier in identifiers:
-        pylab.figure()
-        stp = sns.stripplot(x='alpha', y=identifier, data=df, orient='h')
-        #stp.set_xticklabels(stp.get_xticklabels(), rotation=75)
-        stp.tick_params(labelsize=5)
-        pylab.savefig('%s/%s_alphas.pdf' % (OUTDIR, identifier), format='pdf')
-        pylab.close()
-    '''
     alpha_distribution(df, identifiers, sns.stripplot, 'cluster')
 
 def boxplot_alphas(df, identifiers):
-    '''
-    alphas = df['alpha']
-    for identifier in identifiers:
-        pylab.figure()
-        bp = sns.boxplot(x='alpha', y=identifier, data=df, orient='h')
-        #bp.set_xticklabels(bp.get_xticklabels(), rotation=75)
-        bp.tick_params(labelsize=5)
-        pylab.savefig('%s/%s_alphas_box.pdf' % (OUTDIR, identifier), format='pdf')
-        pylab.close()
-    '''
     alpha_distribution(df, identifiers, sns.boxplot, 'box')
 
 def violin_alphas(df, identifiers):
-    '''
-    alphas = df['alpha']
-    for identifier in identifiers:
-        pylab.figure()
-        vp = sns.violinplot(x='alpha', y=identifier, data=df, orient='h')
-        #vp.set_xticklabels(bp.get_xticklabels(), rotation=75)
-        vp.tick_params(labelsize=5)
-        pylab.savefig('%s/%s_alphas_violin.pdf' % (OUTDIR, identifier), format='pdf')
-        pylab.close()
-    '''
     alpha_distribution(df, identifiers, sns.violinplot, 'violin')
 
 def swarm_alphas(df, identifiers):
-    '''
-    alphas = df['alpha']
-    for identifier in identifiers:
-        pylab.figure()
-        swp = sns.swarmplot(x='alpha', y=identifier, data=df, orient='h')
-        #swp.set_xticklabels(bp.get_xticklabels(), rotation=75)
-        swp.tick_params(labelsize=5)
-        pylab.savefig('%s/%s_alphas_swarm.pdf' % (OUTDIR, identifier), format='pdf')
-        pylab.close()
-    '''
     alpha_distribution(df, identifiers, sns.swarmplot, 'swarm')
 
 def scatter_dists(df):
@@ -99,10 +60,10 @@ def scatter_dists(df):
 
     x = range(len(neural_dist))
     pylab.figure()
-    pylab.scatter(x, pylab.log(neural_dist), c='r', label='neural')
-    pylab.scatter(x, pylab.log(centroid_dist), c='b', label='centroid')
-    pylab.scatter(x, pylab.log(random_dist), c='m', label='random')
-    pylab.ylabel('log-distance')
+    pylab.scatter(x, neural_dist, c='r', label='neural')
+    pylab.scatter(x, centroid_dist, c='b', label='centroid')
+    pylab.scatter(x, random_dist, c='m', label='random')
+    pylab.ylabel('distance')
     pylab.title('Distance to Pareto Front') 
     pylab.legend()
     pylab.savefig('%s/pareto_dists.pdf' % OUTDIR, format='pdf')
