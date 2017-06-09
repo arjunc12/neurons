@@ -383,6 +383,7 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         print "not a tree"
         return None
 
+    assert G.number_of_nodes() > 0
     print G.number_of_nodes(), "nodes"
     if G.number_of_nodes() <= min_nodes or G.number_of_nodes() > max_nodes:
         return None
@@ -553,6 +554,8 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES):
                             continue
 
                         for i, G in enumerate(graphs):
+                            if G.number_of_nodes() <= 1:
+                                continue
                             name = neuron[:-8] + str(i)
                             outdir = 'figs/%s/%s/%s/%s/%s' % (cell_type, species, region, lab, name)
                             outdir = outdir.replace(' ', '_')
@@ -613,8 +616,8 @@ if __name__ == '__main__':
     #pareto_plot(celegans_filename, 'celegans')
     #pareto_plot(frog_filename, 'frog')
     
-    neuromorpho_plots(min_nodes, max_nodes)
     #imaris_plots()
+    neuromorpho_plots(min_nodes, max_nodes)
 
     #pareto_plot(thinstar_filename, 'thinstar', 'amacrine', 'rabbit', 'retina', 'miller', outdir='sandbox')
 
