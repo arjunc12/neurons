@@ -95,7 +95,10 @@ def neuron_info(neuron_file):
     url = 'http://neuromorpho.org:8081/neuron/query/neuron_name&=&' + neuron
     data = urllib2.urlopen(url)
     data = json.load(data)
-    data = data['data'][0]
+    data = data['data']
+    if len(data) == 0:
+        return None
+    data = data[0]
     
     species = data['species']
     lab = data['archive_name']
