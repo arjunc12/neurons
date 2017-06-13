@@ -55,6 +55,12 @@ def viz_tree(G, name, outdir='figs'):
         elif label == 'centroid':
             node_color.append('purple')
             node_size.append(250)
+        elif label == 'isolated_start':
+            node_color.append('yellow')
+            node_size.append(100)
+        elif label == 'isolated_end':
+            node_color.append('blue')
+            node_size.append(100)
         else:
             assert False
 

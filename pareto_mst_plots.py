@@ -30,7 +30,7 @@ def alpha_distribution(df, identifiers, plot_func, plot_descriptor):
     for identifier in identifiers:
         pylab.figure()
         dist_plot = plot_func(x='alpha', y=identifier, data=df, orient='h')
-        dist_plot.tick_params(labelsize=5, axis='y')
+        dist_plot.tick_params(labelsize=10, axis='y')
         pylab.savefig('%s/%s_alphas_%s.pdf' % (OUTDIR, identifier, plot_descriptor), format='pdf')
         pylab.close
 
@@ -60,9 +60,9 @@ def scatter_dists(df):
 
     x = range(len(neural_dist))
     pylab.figure()
-    pylab.scatter(x, neural_dist, c='r', label='neural')
-    pylab.scatter(x, centroid_dist, c='b', label='centroid')
     pylab.scatter(x, random_dist, c='m', label='random')
+    pylab.scatter(x, centroid_dist, c='g', label='centroid')
+    pylab.scatter(x, neural_dist, c='r', label='neural')
     pylab.ylabel('distance')
     pylab.title('Distance to Pareto Front') 
     pylab.legend()

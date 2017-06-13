@@ -76,6 +76,7 @@ def get_neuron_points(filename, dim='3D'):
                     
                     G[u][v]['length'] = point_dist(G.node[u]['coord'], G.node[v]['coord'])
 
+        assert 'root' in G.graph
         label_points(G)
         graphs.append(G)
 
@@ -427,7 +428,7 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         else:
             pareto_tree1 = pareto_kruskal(point_graph, alpha)
             pareto_tree2 = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
-        if (alpha != 0 and alpha != 1 or i % 5 == 0) and viz_trees:
+        if (alpha != 0 and alpha != 1 and i % 5 == 0) and viz_trees:
             viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
         
         mcost1 = normalize_mcost(mst_cost(pareto_tree1))
@@ -486,8 +487,7 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
 
     #pylab.legend()
 
-    f = open('pareto_mst.csv', 'a')
-    ntrials = 100
+    ntrials = 20
     successes = 0
     total_rand_dist = 0.0
     rand_mcosts = []
@@ -519,7 +519,8 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
     viz_tree(centroid_tree, name + '_centroid', outdir=outdir) 
 
     mean_rand_dist = total_rand_dist / ntrials
-    
+   
+    f = open('pareto_mst.csv', 'a')
     if output:
         write_items = [name, cell_type, species, region, lab]
         write_items = map(str, write_items)
@@ -573,7 +574,7 @@ def imaris_plots():
             for fname in os.listdir('imaris/' + subdir):
                 if 'Position' in fname:
                     imfiles.append('imaris/' + subdir + '/' + fname)
-            G = read_imaris(imfiles)
+            G = read_imaris(imfiles, viz=False)
             outdir = 'imaris/' + subdir
             pareto_plot(G, subdir, None, None, None, None, outdir, output=False, viz_trees=True)
 
@@ -583,11 +584,15 @@ if __name__ == '__main__':
     parser.add_argument('-min_nodes', type=int, default=MIN_NODES)
     parser.add_argument('-max_nodes', type=int, default=MAX_NODES)
     parser.add_argument('-a', '--algorithm', choices=['greedy', 'khuller'], default='greedy')
+    parser.add_argument('-n', '--neuromorpho', action='store_true', default=False)
+    parser.add_argument('-i', '--imaris', action='store_true', default=False)
 
     args = parser.parse_args()
     min_nodes = args.min_nodes
     max_nodes = args.max_nodes
     algorithm = args.algorithm
+    neuromorpho = args.neuromorpho
+    imaris = args.imaris
 
     points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
     root = (0, 0)
@@ -616,8 +621,10 @@ if __name__ == '__main__':
     #pareto_plot(celegans_filename, 'celegans')
     #pareto_plot(frog_filename, 'frog')
     
-    #imaris_plots()
-    neuromorpho_plots(min_nodes, max_nodes)
+    if imaris:
+        imaris_plots()
+    if neuromorpho:
+        neuromorpho_plots(min_nodes, max_nodes)
 
     #pareto_plot(thinstar_filename, 'thinstar', 'amacrine', 'rabbit', 'retina', 'miller', outdir='sandbox')
 

@@ -6,9 +6,11 @@ import networkx as nx
 from neuron_utils import *
 from collections import defaultdict
 
-MAX_SEGMENTS = 30
+MAX_SEGMENTS = float("inf")
 
-def read_imaris(trace_pos):
+VIZ_TREE = False
+
+def read_imaris(trace_pos, viz=VIZ_TREE):
     nodeid = 0
     G = nx.Graph()
     start_counts = defaultdict(int)
@@ -41,8 +43,9 @@ def read_imaris(trace_pos):
                 index2, row2 = rows[j - 1]
                 prev_coord = (row2['Position X'], row2['Position Y'], row2['Position Z'])
                 id2 = coord_ids[prev_coord]
-                G.add_edge(id1, id2)
-                G[id1][id2]['length'] = point_dist(G.node[id1]['coord'], G.node[id2]['coord'])
+                if id1 != id2:
+                    G.add_edge(id1, id2)
+                    G[id1][id2]['length'] = point_dist(G.node[id1]['coord'], G.node[id2]['coord'])
 
                 if j == len(rows) - 1:
                     end_ids.append(id1)
@@ -58,26 +61,53 @@ def read_imaris(trace_pos):
             closest_dist = float("inf")
             closest_end = None
             for end_id in end_ids:
+                if nx.has_path(G, start_id, end_id):
+                    continue
                 start_coord = G.node[start_id]['coord']
                 end_coord = G.node[end_id]['coord']
                 dist = point_dist(start_coord, end_coord)
                 if dist < closest_dist:
                     closest_dist = dist
                     closest_end = end_id
+            #print G.node[start_id]['coord'], G.node[closest_end]['coord']
             G.add_edge(start_id, closest_end)
             G[start_id][closest_end]['length'] = closest_dist
 
+    connected_components = nx.connected_components(G)
+    connected_components = list(connected_components)
+    isolated_nodes = []
+    for component in connected_components:
+        if G.graph['root'] not in component:
+            isolated_nodes += component
+
+    #G.remove_nodes_from(isolated_nodes)
+
+    for u, v in G.edges():
+        if u == v:
+            G.remove_edge(u, v)
+
     label_points(G)
-    #viz_tree(G, 'imaris2', 'imaris2')
-    #print G.number_of_nodes()
-    #print G.number_of_edges()
+
+    for start_id in start_ids:
+        if start_id in isolated_nodes:
+            G.node[start_id]['label'] = 'isolated_start'
+
+    for end_id in end_ids:
+        if end_id in isolated_nodes:
+            G.node[end_id]['label'] = 'isolated_end'
+
+    if viz:
+        viz_tree(G, 'imaris', 'imaris')
+    print G.number_of_nodes()
+    print G.number_of_edges()
+    print nx.is_connected(G)
     return G
 
 def main():
     trace_pos = []
-    for fname in os.listdir('imaris2'):
+    for fname in os.listdir('imaris/CGI2/'):
         if 'Position' in fname:
-            trace_pos.append('imaris2/' + fname)
+            trace_pos.append('imaris/CGI2/' + fname)
     read_imaris(trace_pos)
 
 if __name__ == '__main__':
