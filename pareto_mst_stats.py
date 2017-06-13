@@ -15,3 +15,6 @@ print "p-value", float(total_successes) / total_trials
 print "neural to centroid ratio", infmean(df['neural_dist'] / df['centroid_dist'])
 print "neural to random ratio", infmean(df['neural_dist'] / df['random_dist'])
 print "dominate percentage", float(df['dominates'].sum()) / df['comparisons'].sum()
+
+df2 = df[df['neural_dist'] < df['centroid_dist']]
+print "beats centroid", float(df2['neural_dist'].count()) / float(df['neural_dist'].count())
