@@ -25,3 +25,5 @@ datasets/*
 neuron_nmo/*
 
 .DS_Store
+
+tracings/*
