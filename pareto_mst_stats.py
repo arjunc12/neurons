@@ -37,7 +37,7 @@ def infmean(arr):
 def main():
     fname = 'pareto_mst.csv'
     df = pd.read_csv(fname, names=COLUMNS)
-    #basic_stats(df)
+    basic_stats(df)
     categories_correlations(df)
 
 if __name__ == '__main__':
