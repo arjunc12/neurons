@@ -1,0 +1,7 @@
+library(ICC)
+colnames = c('name', 'cell_type', 'species', 'region', 'lab', 'alpha', 'neural_dist', 'centroid_dist', 'random_dist', 'trials', 'successes', 'comparisons', 'dominates')
+df = read.csv('pareto_mst.csv', col.names=colnames)
+
+print(ICCbare(x=cell_type, y=alpha, data=df))
+print(ICCbare(x=species, y=alpha, data=df))
+print(ICCbare(x=region, y=alpha, data=df))
