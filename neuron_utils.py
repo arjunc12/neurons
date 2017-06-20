@@ -7,6 +7,19 @@ import networkx as nx
 import pylab
 import numpy as np
 
+def is_tree(G):
+    assert nx.is_connected(G)
+    assert G.number_of_edges() == G.number_of_nodes() - 1
+    return True
+
+def pareto_cost(mcost, scost, alpha):
+    # alpha = 0 minimizes satellite cost
+    # alpha = 1 minimizes spanning tree cost
+    mcost *= alpha
+    scost *= (1 - alpha)
+    cost = mcost + scost
+    return cost 
+
 def centroid(G):
     root = G.graph['root']
     root_coord = G.node[root]['coord']
