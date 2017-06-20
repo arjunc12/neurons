@@ -1,4 +1,5 @@
 import networkx as nx
+from neuron_utils import point_dist, pareto_cost
 
 def pareto_kruskal(G, alpha):
     root = G.graph['root']
@@ -80,12 +81,79 @@ def pareto_kruskal(G, alpha):
 
 def initialize_khuller(mst):
     root = H.graph['root']
-    H.node[root]['parent'] = None
-    H.node[root]['droot'] = 0
+    mst.node[root]['parent'] = None
+    mst.node[root]['droot'] = 0
+    queue = [root]
+    while len(queue) > 0:
+        curr = queue.pop(0)
+        for child in mst.neighbors(curr):
+            if child != mst.node[curr]['parent']:
+                mst.node[child]['parent'] = curr
+                queue.append(node)
 
 def pareto_khuller(G, alpha, mst=None):
     if mst == None:
         mst = nx.minimum_spanning_tree(G, weight='length')
-    H = mst.copy()
+        initialize_khuller(mst)
     
+    H = mst.copy()
 
+    root = H.graph['root']
+    queue = [root]
+    root_coord = H.node[root]['coord']
+    while len(queue) > 0:
+        curr = queue.pop()
+        parent = H.node[curr]['parent']
+        if parent != None:
+            best_cost = float("inf")
+            best_parent = None
+            for candidate in nx.shortest_path(H, parent, root):
+                w1 = H[curr][candidate]['next']
+                w2 = G.node[curr][root]['length']
+
+                d1 = H.node[curr]['droot']
+                d2 = w2
+
+                cost1 = pareto_cost(w1, d1, alpha)
+                cost2 = pareto_cost(w1, d2, alpha)
+
+                if cost2 < cost1:
+                    H.node[curr]['parent'] = root
+                    H.node[curr]['droot']
+                    H[curr][root]['length'] = w2
+                    H.remove_edge(curr, parent)
+
+        for child in H.neighbors(curr):
+            if H.node[child]['parent'] == curr:
+                queue.append(child)
+                H.node[child]['droot'] = H.node[curr]['droot'] + H[curr][child]['weight']
+
+    return H
+
+def main():
+    pass
+    G = nx.Graph()
+    root = (0, 0)
+    points = [root, (0, 0.1), (0.001, 0.2), (0.2, 0), (1, 1), (2, 2.000001), (2, 2.1), (2.1, 2), (0.1001, 0.1)]
+    for p1, p2 in combinations(points, 2):
+        G.add_edge(p1, p2)
+        G[p1][p2]['length'] = (((p1[0] - p2[0]) ** 2) + ((p1[1] - p2[1]) ** 2)) ** 0.5
+
+    T_sat = nx.Graph()
+    for u in G.nodes_iter():
+        if u != root:
+            T_sat.add_edge(u, root)
+            T_sat[u][root]['length'] = (((u[0] - root[0]) ** 2) + ((u[1] - root[1]) ** 2)) ** 0.5
+
+    T_span = nx.minimum_spanning_tree(G, weight='length')
+    for H in [G, T_span, T_sat]:
+        H.graph['root'] = root
+    
+    for alpha in np.arange(0.01, 0.99, 0.01):
+        print beta
+        pareto_mst = pareto_khuller(G, alpha, T_span)
+        print "satellite cost", satellite_cost(KT)
+        print "mst cost", mst_cost(KT)
+
+if __name__ == '__main__':
+    pass
