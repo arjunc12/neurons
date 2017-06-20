@@ -32,7 +32,7 @@ def alpha_distribution(df, identifiers, plot_func, plot_descriptor):
         dist_plot = plot_func(x='alpha', y=identifier, data=df, orient='h')
         dist_plot.tick_params(labelsize=10, axis='y')
         pylab.savefig('%s/%s_alphas_%s.pdf' % (OUTDIR, identifier, plot_descriptor), format='pdf')
-        pylab.close
+        pylab.close()
 
 def cluster_alphas(df, identifiers):
     alpha_distribution(df, identifiers, sns.stripplot, 'cluster')
