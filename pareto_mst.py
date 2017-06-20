@@ -12,6 +12,7 @@ from khuller import khuller
 from cost_functions import *
 from neuron_utils import *
 from read_imaris import *
+from pareto_functions import *
 
 VIZ_TREES = False
 MIN_NODES = 0
@@ -135,14 +136,6 @@ def random_mst(G):
         mst.add_edge(u, v)
         mst[u][v]['length'] = G[u][v]['length']
     return mst
-
-def pareto_cost(mcost, scost, alpha):
-    # alpha = 0 minimizes satellite cost
-    # alpha = 1 minimizes spanning tree cost
-    mcost *= alpha
-    scost *= (1 - alpha)
-    cost = mcost + scost
-    return cost 
 
 def centroid_mst(G):
     cent_mst = G.copy()
@@ -350,6 +343,10 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         else:
             pareto_tree1 = pareto_kruskal(point_graph, alpha)
             pareto_tree2 = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
+
+        assert is_tree(pareto_tree1)
+        assert is_tree(pareto_tree2)
+
         if (alpha != 0 and alpha != 1 and i % 5 == 0) and viz_trees:
             viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
         
