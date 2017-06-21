@@ -13,118 +13,12 @@ from cost_functions import *
 from neuron_utils import *
 from read_imaris import *
 from pareto_functions import *
+from kruskal import *
 
 VIZ_TREES = False
 MIN_NODES = 0
 MAX_NODES = 3000
 NO_CONTINUE = False
-
-def get_neuron_points(filename, dim='3D'):
-    #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
-    graphs = []
-    for arbor_type in ["2", "3", "4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
-        
-        # Reads in 3D arborization.
-        G = nx.Graph()
-        P2Coord = {} # u-> (x,y)
-        root = -1
-        with open(filename) as f:
-            for line in f:
-                if line.startswith("#"): continue
-
-                cols = line.strip().split()
-                assert len(cols) == 7
-
-                if not (cols[1] == "1" or cols[1] == arbor_type): continue
-                
-                if cols[6] == "-1":
-                    if root != -1: assert False # duplicate root.
-
-                    root = int(cols[0])
-                                        
-                    assert root not in P2Coord and root not in G
-                    G.add_node(root)
-                    coord = None
-                    if dim == "3D":
-                        coord = (float(cols[2]),float(cols[3]),float(cols[4]))
-                        #P2Coord[root] = (float(cols[2]),float(cols[3]),float(cols[4]))
-                    elif dim == "2D":
-                        coord = (float(cols[2]),float(cols[3]))
-                        #P2Coord[root] = (float(cols[2]),float(cols[3]))
-                    else:
-                        assert False
-                    G.node[root]['coord'] = coord
-                    G.graph['root'] = root
-
-
-                else:
-                    u,v = int(cols[6]),int(cols[0])
-                    assert u in G #and u in P2Coord
-                    assert not G.has_edge(u,v)
-            
-                    coord = None
-                    if dim == "3D":
-                        coord = (float(cols[2]),float(cols[3]),float(cols[4]))
-                        #P2Coord[root] = (float(cols[2]),float(cols[3]),float(cols[4]))
-                    elif dim == "2D":
-                        coord = (float(cols[2]),float(cols[3]))
-                        #P2Coord[root] = (float(cols[2]),float(cols[3]))
-                    else:
-                        assert False
-                    G.add_edge(u, v)
-                    
-                    G.node[v]['coord'] = coord
-                    
-                    G[u][v]['length'] = point_dist(G.node[u]['coord'], G.node[v]['coord'])
-
-        assert 'root' in G.graph
-        label_points(G)
-        graphs.append(G)
-
-    return graphs
-
-def initialize_lengths(G):
-    for u, v in G.edges_iter():
-        p1, p2 = G.node[u]['coord'], G.node[v]['coord']
-        G[u][v]['length'] = point_dist(p1, p2)
-
-def makes_cycle(u, v, node_to_forest):
-    f1 = node_to_forest[u]
-    f2 = node_to_forest[v]
-    return f1 == f2
- 
-def combine_forests(u, v, node_to_forest, forest_to_nodes, forest_to_edges):
-    f1 = node_to_forest[u]
-    f2 = node_to_forest[v]
-    if f1 == f2:
-        return
-    new_forest = min(f1, f2)
-    old_forest = max(f1, f2)
-    update_nodes = forest_to_nodes[old_forest]
-    update_edges = forest_to_edges[old_forest]
-    for node in update_nodes:
-        node_to_forest[node] = new_forest
-    forest_to_nodes[new_forest] += update_nodes
-    forest_to_edges[new_forest] += update_edges
-    forest_to_edges[new_forest].append((u, v))
-    del forest_to_nodes[old_forest]
-    del forest_to_edges[old_forest]
-    
-def kruskal(nodes, edges):
-    node_to_forest = {}
-    forest_to_nodes = {}
-    forest_to_edges = {}
-    
-    for i, u in enumerate(nodes):
-        node_to_forest[u] = i
-        forest_to_nodes[i] = [u]
-        forest_to_edges[i] = []
-        
-    for u, v in edges:
-        if not makes_cycle(u, v, node_to_forest):
-            combine_forests(u, v, node_to_forest, forest_to_nodes, forest_to_edges)
-            
-    return sum(forest_to_edges.values(), [])
 
 def random_mst(G):
     rand_edges = G.edges()
