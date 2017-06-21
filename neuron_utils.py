@@ -32,6 +32,75 @@ def centroid(G):
     centroid /= G.number_of_nodes() - 1
     return centroid
 
+def get_neuron_points(filename, dim='3D'):
+    #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
+    graphs = []
+    for arbor_type in ["2", "3", "4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
+        
+        # Reads in 3D arborization.
+        G = nx.Graph()
+        P2Coord = {} # u-> (x,y)
+        root = -1
+        with open(filename) as f:
+            for line in f:
+                if line.startswith("#"): continue
+
+                cols = line.strip().split()
+                assert len(cols) == 7
+
+                if not (cols[1] == "1" or cols[1] == arbor_type): continue
+                
+                if cols[6] == "-1":
+                    if root != -1: assert False # duplicate root.
+
+                    root = int(cols[0])
+                                        
+                    assert root not in P2Coord and root not in G
+                    G.add_node(root)
+                    coord = None
+                    if dim == "3D":
+                        coord = (float(cols[2]),float(cols[3]),float(cols[4]))
+                        #P2Coord[root] = (float(cols[2]),float(cols[3]),float(cols[4]))
+                    elif dim == "2D":
+                        coord = (float(cols[2]),float(cols[3]))
+                        #P2Coord[root] = (float(cols[2]),float(cols[3]))
+                    else:
+                        assert False
+                    G.node[root]['coord'] = coord
+                    G.graph['root'] = root
+
+
+                else:
+                    u,v = int(cols[6]),int(cols[0])
+                    assert u in G #and u in P2Coord
+                    assert not G.has_edge(u,v)
+            
+                    coord = None
+                    if dim == "3D":
+                        coord = (float(cols[2]),float(cols[3]),float(cols[4]))
+                        #P2Coord[root] = (float(cols[2]),float(cols[3]),float(cols[4]))
+                    elif dim == "2D":
+                        coord = (float(cols[2]),float(cols[3]))
+                        #P2Coord[root] = (float(cols[2]),float(cols[3]))
+                    else:
+                        assert False
+                    G.add_edge(u, v)
+                    
+                    G.node[v]['coord'] = coord
+                    
+                    G[u][v]['length'] = point_dist(G.node[u]['coord'], G.node[v]['coord'])
+
+        assert 'root' in G.graph
+        label_points(G)
+        graphs.append(G)
+
+    return graphs
+
+def initialize_lengths(G):
+    for u, v in G.edges_iter():
+        p1, p2 = G.node[u]['coord'], G.node[v]['coord']
+        G[u][v]['length'] = point_dist(p1, p2)
+
 def label_points(G):
     root = G.graph['root']
     for u in G:
