@@ -27,3 +27,7 @@ neuron_nmo/*
 .DS_Store
 
 tracings/*
+
+.RData
+
+.Rhistory
