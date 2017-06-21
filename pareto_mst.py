@@ -91,47 +91,7 @@ def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
             best_dist = dist
             best_index = i
 
-    return best_dist, best_index
-
-def satellite_tree(G):
-    root = G.graph['root']
-    
-    satellite = G.copy()
-    satellite.remove_edges_from(G.edges())
-
-    for u in satellite.nodes_iter():
-        if u != root:
-            satellite.add_edge(u, root)
-            p1, p2 = satellite.node[u]['coord'], satellite.node[root]['coord']
-            satellite[u][root]['length'] = point_dist(p1, p2)
-    
-    return satellite
-
-def best_satellite_cost(G):
-    best_cost = 0
-    root = G.graph['root']
-    root_coord = G.node[root]['coord']
-    for u in G.nodes_iter():
-        best_cost += point_dist(root_coord, G.node[u]['coord'])
-    return best_cost
-
-def min_spanning_tree(G):
-    sorted_edges = sorted(G.edges(), key= lambda x : G[x[0]][x[1]]['length'])
-    mst_edges = kruskal(G.nodes(), sorted_edges)
-    mst = G.copy()
-    mst.remove_edges_from(mst.edges())
-    for u, v in mst_edges:
-        mst.add_edge(u, v)
-        mst[u][v]['length'] = G[u][v]['length']
-    return mst
-
-def best_mst_cost(G):
-    sorted_edges = sorted(G.edges(), key= lambda x : G[x[0]][x[1]]['length'])
-    mst_edges = kruskal(G.nodes(), sorted_edges)
-    best_cost = 0
-    for u, v in mst_edges:
-        best_cost += G[u][v]['length']
-    return best_cost 
+    return best_dist, best_index 
 
 def non_continue_subgraph(G):
     H = G.copy()

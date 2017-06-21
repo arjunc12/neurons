@@ -1,6 +1,30 @@
 import networkx as nx
 from neuron_utils import point_dist, pareto_cost
 
+def satellite_tree(G):
+    root = G.graph['root']
+    
+    satellite = G.copy()
+    satellite.remove_edges_from(G.edges())
+
+    for u in satellite.nodes_iter():
+        if u != root:
+            satellite.add_edge(u, root)
+            p1, p2 = satellite.node[u]['coord'], satellite.node[root]['coord']
+            satellite[u][root]['length'] = point_dist(p1, p2)
+    
+    return satellite
+
+def min_spanning_tree(G):
+    sorted_edges = sorted(G.edges(), key= lambda x : G[x[0]][x[1]]['length'])
+    mst_edges = kruskal(G.nodes(), sorted_edges)
+    mst = G.copy()
+    mst.remove_edges_from(mst.edges())
+    for u, v in mst_edges:
+        mst.add_edge(u, v)
+        mst[u][v]['length'] = G[u][v]['length']
+    return mst
+
 def pareto_kruskal(G, alpha):
     root = G.graph['root']
     H = nx.Graph()
