@@ -6,6 +6,15 @@ from sys import argv
 import networkx as nx
 import pylab
 import numpy as np
+from itertools import combinations
+
+def complete_graph(G):
+    H = G.copy()
+    H.remove_edges_from(H.edges())
+    for u, v in combinations(H.nodes(), 2):
+        H.add_edge(u, v)
+        H[u][v]['length'] = point_dist(H.node[u]['coord'], H.node[v]['coord'])
+    return H
 
 def is_tree(G):
     assert nx.is_connected(G)
