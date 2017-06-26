@@ -3,6 +3,10 @@ from sys import argv
 from itertools import combinations
 import numpy as np
 from cost_functions import *
+from neuron_utils import *
+from pareto_functions import *
+
+TEST_NEURON = 'datasets/bipolar/rat/neocortex/markram/RP140319-CHC-3-IDA.CNG.swc'
 
 def initialize(KT):
     root = KT.graph['root']
@@ -45,6 +49,7 @@ def add_path(G, KT, T_sat, u):
     root = G.graph['root']
     if KT.node[u]['droot'] > nx.shortest_path_length(T_sat, root, u, weight='length'):
         parent = T_sat.node[u]['parent']
+        assert T_sat.has_node(parent)
         add_path(G, KT, T_sat, parent)
         relax(G, KT, parent, u)
 
@@ -57,6 +62,7 @@ def DFS(G, KT, T_span, T_sat, u, alpha):
         if v != T_span.node[u]['parent']:
             relax(G, KT, u, v)
             DFS(G, KT, T_span, T_sat, v, alpha)
+
 
 def khuller(G, T_span, T_sat, alpha):
     assert alpha > 1
@@ -78,6 +84,7 @@ def khuller(G, T_span, T_sat, alpha):
     return KT
 
 def main():
+    '''
     G = nx.Graph()
     root = (0, 0)
     points = [root, (0, 0.1), (0.001, 0.2), (0.2, 0), (1, 1), (2, 2.000001), (2, 2.1), (2.1, 2), (0.1001, 0.1)]
@@ -94,7 +101,18 @@ def main():
     T_span = nx.minimum_spanning_tree(G, weight='length')
     for H in [G, T_span, T_sat]:
         H.graph['root'] = root
-    
+    '''
+
+    graphs = get_neuron_points(TEST_NEURON)
+    G = graphs[0]
+    assert is_tree(G)
+    print "making graph"
+    G = complete_graph(G)
+    print "getting satellite tree"
+    T_sat = satellite_tree(G)
+    print "getting spanning tree"
+    T_span = nx.minimum_spanning_tree(G, weight='length')
+
     for beta in np.arange(0.01, 0.99, 0.01):
         print beta
         alpha = 1.0 / (1 - beta)
