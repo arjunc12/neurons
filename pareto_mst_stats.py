@@ -1,6 +1,6 @@
 from collections import defaultdict
 import pandas as pd
-from pareto_mst_plots import COLUMNS
+from pareto_mst_plots import COLUMNS, NEURON_TYPE_LABELS
 import pylab
 from numpy.ma import masked_invalid
 from scipy.stats import pearsonr
@@ -34,9 +34,28 @@ def basic_stats(df):
 def infmean(arr):
     return pylab.mean(masked_invalid(arr))
 
+def metadata(df):
+    print "unique species"
+    print len(df['species'].unique())
+    
+    print "unique cell types"
+    print len(df['cell_type'].unique())
+
+    print "unique brain regions"
+    print len(df['region'].unique())
+
+def neuron_type_alphas(df):
+    for neuron_type, group in df.groupby('neuron_type'):
+        print neuron_type, pylab.mean(group['alpha'])
+
 def main():
     fname = 'pareto_mst.csv'
     df = pd.read_csv(fname, names=COLUMNS)
+    df['neuron_type'] = df['name'].str[-1]
+    df['neuron_type'] = df['neuron_type'].astype(int)
+    df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
+    metadata(df)
+    neuron_type_alphas(df)
     basic_stats(df)
     categories_correlations(df)
 
