@@ -4,12 +4,29 @@ mpl.use('agg')
 import pylab
 import seaborn as sns
 import os
+from itertools import combinations
 
 OUTDIR = 'stats'
 
+'''
 COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'alpha', 'neural_dist',\
             'centroid_dist', 'random_dist', 'trials', 'successes', 'comparisons',\
             'dominates']
+'''
+COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',\
+           'neural_dist', 'centroid_dist', 'random_dist', 'trials', 'successes',\
+            'comparisons', 'dominates']
+
+NEURON_TYPE_LABELS = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite'}
+
+def alphas_heat(df, categories):
+    for cat1, cat2 in combinations(categories, 2):
+        df2 = df.groupby([cat1, cat2], as_index=False).agg({'alpha' : pylab.mean})
+        data = df2.pivot(cat1, cat2, 'alpha')
+        pylab.figure()
+        ax = sns.heatmap(data, vmin=0, vmax=1)
+        pylab.savefig('%s/%s_%s_alphas_heat.pdf' % (OUTDIR, cat1, cat2), format='pdf')
+        pylab.close()
 
 def cat_to_num(categories):
     unique_categories = set()
@@ -69,16 +86,44 @@ def scatter_dists(df):
     pylab.savefig('%s/pareto_dists.pdf' % OUTDIR, format='pdf')
     pylab.close()
 
+def alphas_hist(df):
+    alphas = list(df['alpha'])
+    weights = pylab.ones_like(alphas) / len(alphas)
+    pylab.hist(alphas, range=(0, 1), weights=weights)
+    curr_ax = pylab.gca()
+    curr_ax.set_ylim((0, 1))
+    pylab.savefig('%s/alphas_hist.pdf' % OUTDIR, format='pdf')
+
+def neuron_types_hist(df):
+    pylab.figure()
+    for neuron_type, group in df.groupby('neuron_type'):
+        alphas = list(group['alpha'])
+        weights = pylab.ones_like(alphas) / len(alphas)
+        pylab.hist(alphas, alpha=0.5, label=NEURON_TYPE_LABELS[neuron_type],\
+                   range=(0, 1), weights=weights)
+    pylab.legend()
+    curr_ax = pylab.gca()
+    curr_ax.set_ylim((0, 1))
+    pylab.savefig('%s/neuron_types_hist.pdf' % OUTDIR, format='pdf')
+    pylab.close()
+
 def main():
     fname = 'pareto_mst.csv'
     df = pd.read_csv(fname, names=COLUMNS)
+    df['neuron_type'] = df['name'].str[-1]
+    df['neuron_type'] = df['neuron_type'].astype(int)
+    #print df
     os.system('mkdir -p stats')
     #print df['species']
     scatter_dists(df)
-    #cluster_alphas(df, ['species', 'cell_type', 'region'])
-    boxplot_alphas(df, ['species', 'cell_type', 'region'])
-    #violin_alphas(df, ['species', 'cell_type', 'region'])
-    #swarm_alphas(df, ['species', 'cell_type', 'region'])
+    categories = ['species', 'cell_type', 'region']
+    #cluster_alphas(df, categories)
+    boxplot_alphas(df, categories)
+    #violin_alphas(df, categories)
+    #swarm_alphas(df, categories)
+    alphas_hist(df)
+    neuron_types_hist(df)
+    alphas_heat(df, categories)
 
 if __name__ == '__main__':
     main()
