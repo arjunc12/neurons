@@ -15,6 +15,8 @@ from read_imaris import *
 from pareto_functions import *
 from kruskal import *
 
+SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported', 'interneuron-specific_interneuron']
+
 VIZ_TREES = False
 MIN_NODES = 0
 MAX_NODES = 3000
@@ -67,14 +69,6 @@ def points_to_graph(points):
         length = point_dist(p1, p2)
         point_graph[p1][p2]['length'] = length
     return point_graph
-
-def complete_graph(G):
-    H = G.copy()
-    H.remove_edges_from(H.edges())
-    for u, v in combinations(H.nodes(), 2):
-        H.add_edge(u, v)
-        H[u][v]['length'] = point_dist(H.node[u]['coord'], H.node[v]['coord'])
-    return H
 
 def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
     best_dist = float("inf")
@@ -148,15 +142,12 @@ def sort_neighbors(G):
         G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
 
 def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
-                min_nodes=MIN_NODES, max_nodes=MAX_NODES, output=True, viz_trees=VIZ_TREES):
+                output=True, viz_trees=VIZ_TREES, axon=False):
     if not (nx.is_connected(G) and G.number_of_edges() == G.number_of_nodes() - 1):
         print "not a tree"
         return None
 
     assert G.number_of_nodes() > 0
-    print G.number_of_nodes(), "nodes"
-    if G.number_of_nodes() <= min_nodes or G.number_of_nodes() > max_nodes:
-        return None
    
     print "making graph"
     point_graph = None
@@ -167,7 +158,7 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
     print point_graph.number_of_nodes(), "points"
    
     sat_tree = satellite_tree(point_graph)
-    span_tree = min_spanning_tree(point_graph)
+    span_tree = nx.minimum_spanning_tree(point_graph, weight='length')
     
     opt_scost = float(satellite_cost(sat_tree))
     normalize_scost = lambda cost : normalize_cost(cost, opt_scost)
@@ -176,8 +167,12 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
     
     mcosts1 = []
     scosts1 = []
+    
     mcosts2 = []
     scosts2 = []
+
+    mcosts3 = []
+    scosts3 = []
 
     delta = 0.01
     alphas = np.arange(0, 1 + delta, delta)
@@ -192,11 +187,14 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         pareto_tree2 = None
         if alpha == 0:
             pareto_tree1 = pareto_tree2 = sat_tree
+            #pareto_tree3 = sat_tree
         elif alpha == 1:
             pareto_tree1 = pareto_tree2 = span_tree
+            #pareto_tree3 = span_tree
         else:
-            pareto_tree1 = pareto_kruskal(point_graph, alpha)
+            pareto_tree1 = pareto_kruskal(point_graph, alpha, axon=axon)
             pareto_tree2 = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
+            #pareto_tree3 = pareto_khuller(point_graph, alpha, span_tree)
 
         assert is_tree(pareto_tree1)
         assert is_tree(pareto_tree2)
@@ -216,12 +214,18 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         #mcost2 = normalize_mcost(mst_cost(pareto_tree2))
         #scost2 = normalize_scost(satellite_cost(pareto_tree2))
         
+        #mcost3 = normalize_mcost(mst_cost(pareto_tree3))
+        #scost3 = normalize_scost(satellite_cost(pareto_tree3))
+        
         mcosts1.append(mcost1)
         scosts1.append(scost1)
         
         mcosts2.append(mcost2)
         scosts2.append(scost2)
 
+        #mcosts3.append(mcost3)
+        #scosts3.append(scost3)
+        
         if alpha not in [0, 1]:
             comparisons += 1
             if pareto_cost(mcost1, scost1, alpha) <= pareto_cost(mcost2, scost2, alpha):
@@ -233,6 +237,9 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
     
     pylab.plot(mcosts2, scosts2, c = 'k')
     pylab.scatter(mcosts2, scosts2, c='k', label='khuller mst')
+    
+    #pylab.plot(mcosts3, scosts3, c = 'y')
+    #pylab.scatter(mcosts3, scosts3, c='y', label='khuller3')
     
     pylab.xlabel('spanning tree cost')
     pylab.ylabel('satellite cost')
@@ -301,7 +308,7 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
    
     f = open('pareto_mst.csv', 'a')
     if output:
-        write_items = [name, cell_type, species, region, lab]
+        write_items = [name, cell_type, species, region, lab, point_graph.number_of_nodes()]
         write_items = map(str, write_items)
         write_items.append(neural_alpha)
         write_items += [neural_dist, centroid_dist, mean_rand_dist]
@@ -319,6 +326,8 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES):
     directory = 'datasets'
     i = 0
     for cell_type in os.listdir(directory):
+        if cell_type in SKIP_TYPES:
+            continue
         for species in os.listdir(directory + '/' + cell_type):
             for region in os.listdir(directory + '/' + cell_type + '/' + species):
                 for lab in os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region):
@@ -334,7 +343,7 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES):
                             continue
 
                         for i, G in enumerate(graphs):
-                            if G.number_of_nodes() <= 1:
+                            if not (min_nodes <= G.number_of_nodes() <= max_nodes):
                                 continue
                             name = neuron[:-8] + str(i)
                             outdir = 'figs/%s/%s/%s/%s/%s' % (cell_type, species, region, lab, name)
@@ -343,8 +352,12 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES):
                             if len(os.listdir(outdir)) > 0:
                                 continue
                             print species, lab, neuron
-                            pareto_plot(G, name, cell_type, species, region,\
-                                        lab, outdir, min_nodes, max_nodes)
+                            axon = i == 0
+                            try:
+                                pareto_plot(G, name, cell_type, species, region,\
+                                            lab, outdir, axon=axon)
+                            except RuntimeError:
+                                continue
 
 def imaris_plots():
     for subdir in os.listdir('imaris'):

@@ -10,7 +10,7 @@ MAX_SEGMENTS = float("inf")
 
 VIZ_TREE = False
 
-def read_imaris(trace_pos, viz=VIZ_TREE):
+def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
     nodeid = 0
     G = nx.Graph()
     start_counts = defaultdict(int)
@@ -18,6 +18,8 @@ def read_imaris(trace_pos, viz=VIZ_TREE):
     
     start_ids = []
     end_ids = []
+
+    start_end = {}
 
     for i, pos in enumerate(trace_pos):
         if i + 1 > MAX_SEGMENTS:
@@ -97,18 +99,21 @@ def read_imaris(trace_pos, viz=VIZ_TREE):
             G.node[end_id]['label'] = 'isolated_end'
 
     if viz:
-        viz_tree(G, 'imaris', 'imaris')
+        viz_tree(G, outname, 'imaris')
     print G.number_of_nodes()
     print G.number_of_edges()
     print nx.is_connected(G)
     return G
 
 def main():
-    trace_pos = []
-    for fname in os.listdir('imaris/CGI2/'):
-        if 'Position' in fname:
-            trace_pos.append('imaris/CGI2/' + fname)
-    read_imaris(trace_pos)
+    for i, neuron in enumerate(os.listdir('imaris')):
+        print neuron
+        if os.path.isdir('imaris/%s' % neuron):
+            trace_pos = []
+            for fname in os.listdir('imaris/%s' % neuron):
+                if 'Position' in fname:
+                    trace_pos.append('imaris/%s/%s' % (neuron, fname))
+            read_imaris(trace_pos, viz=True, outname='imaris' + str(i))
 
 if __name__ == '__main__':
     main()
