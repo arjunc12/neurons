@@ -22,17 +22,6 @@ MIN_NODES = 0
 MAX_NODES = 3000
 NO_CONTINUE = False
 
-def random_mst(G):
-    rand_edges = G.edges()
-    shuffle(rand_edges)
-    mst_edges = kruskal(G.nodes(), rand_edges)
-    mst = G.copy()
-    mst.remove_edges_from(G.edges())
-    for u, v in mst_edges:
-        mst.add_edge(u, v)
-        mst[u][v]['length'] = G[u][v]['length']
-    return mst
-
 def centroid_mst(G):
     cent_mst = G.copy()
     cent_mst.remove_edges_from(G.edges())

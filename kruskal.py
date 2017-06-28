@@ -35,3 +35,14 @@ def kruskal(nodes, edges):
             combine_forests(u, v, node_to_forest, forest_to_nodes, forest_to_edges)
             
     return sum(forest_to_edges.values(), [])
+
+def random_mst(G):
+    rand_edges = G.edges()
+    shuffle(rand_edges)
+    mst_edges = kruskal(G.nodes(), rand_edges)
+    mst = G.copy()
+    mst.remove_edges_from(G.edges())
+    for u, v in mst_edges:
+        mst.add_edge(u, v)
+        mst[u][v]['length'] = G[u][v]['length']
+    return mst
