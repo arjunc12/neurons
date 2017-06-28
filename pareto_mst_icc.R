@@ -18,11 +18,17 @@ df = read.csv('pareto_mst.csv', col.names=colnames)
 
 df$neuron_type = str_sub(df$name, -1, -1)
 
-print("axons")
+print("-----all-----")
+getICCs(df)
+
+print("-----axons-----")
 getICCs(df[df$neuron_type == '0',])
 
-print("basal dendrite")
+print("-----basal dendrite-----")
 getICCs(df[df$neuron_type == '1',])
 
-print("apical dendrite")
+print("-----apical dendrite-----")
 getICCs(df[df$neuron_type == '2',])
+
+print("-----neuron type-----")
+print(ICCbare(x=neuron_type, y=alpha, data=df))
