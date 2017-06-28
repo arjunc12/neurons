@@ -17,8 +17,13 @@ def complete_graph(G):
     return H
 
 def is_tree(G):
-    assert nx.is_connected(G)
-    assert G.number_of_edges() == G.number_of_nodes() - 1
+    if G.number_of_edges() != G.number_of_nodes() - 1:
+        print "wrong number of edges"
+        print G.number_of_edges(), G.number_of_nodes()
+        return False
+    if not nx.is_connected(G):
+        print "not connected"
+        return False
     return True
 
 def pareto_cost(mcost, scost, alpha):
