@@ -1,5 +1,31 @@
 import networkx as nx
 
+def graph_costs(G):
+    scost = 0
+    mcost = 0
+    
+    droot = {}
+    root = G.graph['root']
+    droot[root] = 0
+    
+    parent = {}
+    parent[root] = None
+
+    queue = [root]
+    while len(queue) > 0:
+        curr = queue.pop(0)
+        for child in G.neighbors(curr):
+            if child != parent[curr]:
+                length = G[curr][child]['length']
+                mcost += length
+                child_droot = length + droot[length]
+                droot[child] = child_droot
+                scost += child_droot
+                parent[child] = droot
+                queue.append(child)
+
+    return mcost, scost
+
 def best_mst_cost(G):
     sorted_edges = sorted(G.edges(), key= lambda x : G[x[0]][x[1]]['length'])
     mst_edges = kruskal(G.nodes(), sorted_edges)

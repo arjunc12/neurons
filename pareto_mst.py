@@ -191,11 +191,17 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         if (alpha != 0 and alpha != 1 and i % 5 == 0) and viz_trees:
             viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
         
-        mcost1 = normalize_mcost(mst_cost(pareto_tree1))
-        scost1 = normalize_scost(satellite_cost(pareto_tree1))
+        mcost1, scost1 = graph_costs(pareto_tree1)
+        mcost1 = normalize_mcost(mcost1)
+        scost1 = normalize_scost(scost1)
+        #mcost1 = normalize_mcost(mst_cost(pareto_tree1))
+        #scost1 = normalize_scost(satellite_cost(pareto_tree1))
         
-        mcost2 = normalize_mcost(mst_cost(pareto_tree2))
-        scost2 = normalize_scost(satellite_cost(pareto_tree2))
+        mcost2, scost2 = graph_costs(pareto_tree2)
+        mcost2 = normalize_mcost(mcost2)
+        scost2 = normalize_scost(scost2)
+        #mcost2 = normalize_mcost(mst_cost(pareto_tree2))
+        #scost2 = normalize_scost(satellite_cost(pareto_tree2))
         
         #mcost3 = normalize_mcost(mst_cost(pareto_tree3))
         #scost3 = normalize_scost(satellite_cost(pareto_tree3))
