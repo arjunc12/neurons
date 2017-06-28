@@ -113,7 +113,7 @@ def main():
             for fname in os.listdir('imaris/%s' % neuron):
                 if 'Position' in fname:
                     trace_pos.append('imaris/%s/%s' % (neuron, fname))
-            read_imaris(trace_pos, viz=True, outname='imaris' + str(i))
+            read_imaris(trace_pos, viz=True, outname=neuron)
 
 if __name__ == '__main__':
     main()
