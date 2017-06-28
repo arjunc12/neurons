@@ -1,12 +1,15 @@
 import networkx as nx
 from neuron_utils import point_dist, pareto_cost
-from kruskal import kruskal
+from kruskal import kruskal, random_mst
 from itertools import combinations
 import numpy as np
 from cost_functions import *
+import pylab
+from bisect import bisect_left, insort
+from random import sample, choice
 
-POP_SIZE = 400
-GENERATIONS = 20000
+POP_SIZE = 50
+GENERATIONS = 500
 
 def satellite_tree(G):
     root = G.graph['root']
@@ -35,10 +38,57 @@ def min_spanning_tree(G):
     '''
     return nx.minimum_spanning_tree(G, weight='length')
 
+def replace_edge(G, T, u1, v1, u2, v2):
+    T.remove_edge(u1, v1)
+    T.add_edge(u2, v2)
+    T[u2][v2]['length'] = G[u2][v2]['length']
+
+def crossover_trees(G, p1, p2):
+    T1 = p1.copy()
+    T2 = p2.copy()
+
+    u1, v1 = choice(T1.edges())
+    u2, v2 = choice(T2.edges())
+
+    replace_edge(G, T1, u1, v1, u2, v2)
+    replace_edge(G, T2, u2, v2, u1, v1)
+
+    return T1, T2
+
 def pareto_genetic(G, alpha, axon=False, pop_size=POP_SIZE, generations=GENERATIONS):
     population = []
-    for i in xrange(generations):
-        Population.append(rand_mst(G))
+    for i in xrange(pop_size):
+        mst = random_mst(G)
+        mcost, scost = graph_costs(mst)
+        cost = pareto_cost(mcost, scost, alpha)
+        population.append((cost, mst))
+
+    population = sorted(population)
+
+    for generation in xrange(generations):
+        parent1, parent2 = sample(population, 2)
+
+        c1, p1 = parent1
+        c2, p2 = parent2
+
+        o1, o2 = crossover_trees(G, p1, p2)
+
+        mcost1, scost1 = graph_costs(o1)
+        cost1 = pareto_cost(mcost1, scost1, alpha)
+        mcost2, scost2 = graph_costs(o2)
+        cost2 = pareto_cost(mcost2, scost2, alpha)
+
+        offspring1 = (cost1, o1)
+        offspring2 = (cost2, o2)
+
+        best_offspring = min([offspring1, offspring2])
+       
+        insort(population, best_offspring)
+        
+        worst_ind = population.pop()
+
+    best_cost, best_tree = population[0]
+    return best_tree
 
 def pareto_kruskal(G, alpha, axon=False):
     root = G.graph['root']
