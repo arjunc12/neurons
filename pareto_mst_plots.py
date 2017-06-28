@@ -99,7 +99,7 @@ def neuron_types_hist(df):
     for neuron_type, group in df.groupby('neuron_type'):
         alphas = list(group['alpha'])
         weights = pylab.ones_like(alphas) / len(alphas)
-        pylab.hist(alphas, alpha=0.5, label=NEURON_TYPE_LABELS[neuron_type],\
+        pylab.hist(alphas, alpha=0.5, label=neuron_type,\
                    range=(0, 1), weights=weights)
     pylab.legend()
     curr_ax = pylab.gca()
@@ -112,11 +112,12 @@ def main():
     df = pd.read_csv(fname, names=COLUMNS)
     df['neuron_type'] = df['name'].str[-1]
     df['neuron_type'] = df['neuron_type'].astype(int)
+    df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
     #print df
     os.system('mkdir -p stats')
     #print df['species']
     scatter_dists(df)
-    categories = ['species', 'cell_type', 'region']
+    categories = ['species', 'cell_type', 'region', 'neuron_type']
     #cluster_alphas(df, categories)
     boxplot_alphas(df, categories)
     #violin_alphas(df, categories)
