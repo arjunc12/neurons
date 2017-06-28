@@ -5,6 +5,9 @@ from itertools import combinations
 import numpy as np
 from cost_functions import *
 
+POP_SIZE = 400
+GENERATIONS = 20000
+
 def satellite_tree(G):
     root = G.graph['root']
     
@@ -31,6 +34,11 @@ def min_spanning_tree(G):
     return mst
     '''
     return nx.minimum_spanning_tree(G, weight='length')
+
+def pareto_genetic(G, alpha, axon=False, pop_size=POP_SIZE, generations=GENERATIONS):
+    population = []
+    for i in xrange(generations):
+        Population.append(rand_mst(G))
 
 def pareto_kruskal(G, alpha, axon=False):
     root = G.graph['root']
