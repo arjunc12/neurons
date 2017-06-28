@@ -12,17 +12,26 @@ def graph_costs(G):
     parent[root] = None
 
     queue = [root]
+    visited = set()
     while len(queue) > 0:
         curr = queue.pop(0)
+        
+        if curr in visited:
+            return float("inf"), float("inf")
+        
+        visited.add(curr)
         for child in G.neighbors(curr):
             if child != parent[curr]:
                 length = G[curr][child]['length']
                 mcost += length
-                child_droot = length + droot[length]
+                child_droot = length + droot[curr]
                 droot[child] = child_droot
                 scost += child_droot
-                parent[child] = droot
+                parent[child] = curr
                 queue.append(child)
+
+    if len(visited) < G.number_of_nodes():
+        scost = float("inf") # graph is not connected
 
     return mcost, scost
 
