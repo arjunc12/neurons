@@ -19,7 +19,7 @@ def complete_graph(G):
 def is_tree(G):
     if G.number_of_edges() != G.number_of_nodes() - 1:
         print "wrong number of edges"
-        print G.number_of_edges(), G.number_of_nodes()
+        print "edges", G.number_of_edges(), "nodes", G.number_of_nodes()
         return False
     if not nx.is_connected(G):
         print "not connected"
@@ -115,17 +115,20 @@ def initialize_lengths(G):
         p1, p2 = G.node[u]['coord'], G.node[v]['coord']
         G[u][v]['length'] = point_dist(p1, p2)
 
+def get_label(G, u):
+    if u == G.graph['root']: 
+        return "root"
+    elif G.degree(u) == 1: 
+        return "tip"
+    elif G.degree(u) > 2: 
+        return "branch"
+    else:                  
+        return "continue"
+
 def label_points(G):
     root = G.graph['root']
     for u in G:
-        if u == root: 
-            G.node[u]['label'] = "root"
-        elif G.degree(u) == 1: 
-            G.node[u]['label'] = "tip"
-        elif G.degree(u) > 2: 
-            G.node[u]['label'] = "branch"
-        else:                  
-            G.node[u]['label'] = "continue"
+        G.node[u]['label'] = get_label(G, u)
 
 def viz_tree(G, name, outdir='figs'):
     """ Displays plant/tree visualization. """
@@ -137,7 +140,11 @@ def viz_tree(G, name, outdir='figs'):
         coord = G.node[u]['coord']
         pos[u] = (coord[0], coord[1])
         
-        label = G.node[u]['label']
+        label = None
+        if 'label' in G.node[u]:
+            label = G.node[u]['label']
+        else:
+            label = get_label(G, u)
         if label == "root":
             node_color.append('black')
             node_size.append(350)
