@@ -163,7 +163,7 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
     mcosts3 = []
     scosts3 = []
 
-    delta = 0.05
+    delta = 0.01
     alphas = np.arange(0, 1 + delta, delta)
     print "sorting neighbors"
     sort_neighbors(point_graph)
@@ -181,16 +181,16 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
             pareto_tree1 = pareto_tree2 = span_tree
             pareto_tree3 = span_tree
         else:
-            print "Greedy"
+            #print "Greedy"
             pareto_tree1 = pareto_kruskal(point_graph, alpha, axon=axon)
-            print "khuller"
+            #print "khuller"
             pareto_tree2 = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
-            print "genetic"
-            pareto_tree3 = pareto_genetic(point_graph, alpha)
+            #print "genetic"
+            #pareto_tree3 = pareto_genetic(point_graph, alpha)
 
         assert is_tree(pareto_tree1)
         assert is_tree(pareto_tree2)
-        assert is_tree(pareto_tree3)
+        #assert is_tree(pareto_tree3)
 
         if (alpha != 0 and alpha != 1 and i % 5 == 0) and viz_trees:
             viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
@@ -198,20 +198,14 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         mcost1, scost1 = graph_costs(pareto_tree1)
         mcost1 = normalize_mcost(mcost1)
         scost1 = normalize_scost(scost1)
-        #mcost1 = normalize_mcost(mst_cost(pareto_tree1))
-        #scost1 = normalize_scost(satellite_cost(pareto_tree1))
         
         mcost2, scost2 = graph_costs(pareto_tree2)
         mcost2 = normalize_mcost(mcost2)
         scost2 = normalize_scost(scost2)
-        #mcost2 = normalize_mcost(mst_cost(pareto_tree2))
-        #scost2 = normalize_scost(satellite_cost(pareto_tree2))
         
-        mcost3, scost3 = graph_costs(pareto_tree3)
-        mcost3 = normalize_mcost(mcost3)
-        scost3 = normalize_scost(scost3)
-        #mcost3 = normalize_mcost(mst_cost(pareto_tree3))
-        #scost3 = normalize_scost(satellite_cost(pareto_tree3))
+        #mcost3, scost3 = graph_costs(pareto_tree3)
+        #mcost3 = normalize_mcost(mcost3)
+        #scost3 = normalize_scost(scost3)
         
         mcosts1.append(mcost1)
         scosts1.append(scost1)
@@ -219,8 +213,8 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         mcosts2.append(mcost2)
         scosts2.append(scost2)
 
-        mcosts3.append(mcost3)
-        scosts3.append(scost3)
+        #mcosts3.append(mcost3)
+        #scosts3.append(scost3)
         
         if alpha not in [0, 1]:
             comparisons += 1
@@ -234,8 +228,8 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
     pylab.plot(mcosts2, scosts2, c = 'k')
     pylab.scatter(mcosts2, scosts2, c='k', label='khuller mst')
     
-    pylab.plot(mcosts3, scosts3, c = 'y')
-    pylab.scatter(mcosts3, scosts3, c='y', label='genetic')
+    #pylab.plot(mcosts3, scosts3, c = 'y')
+    #pylab.scatter(mcosts3, scosts3, c='y', label='genetic')
     
     pylab.xlabel('spanning tree cost')
     pylab.ylabel('satellite cost')
