@@ -133,16 +133,20 @@ def pareto_kruskal(G, alpha, axon=False):
                 candidate_edges.add(tuple(sorted((u, closest_neighbor))))
 
         for u, v in candidate_edges:
+            length = G[u][v]['length']
+            
+            #mcost = length + graph_mcost 
+            mcost = length
 
-            scost = graph_scost           
+            #scost = graph_scost
+            scost = 0
             if H.has_node(u):
-                scost += H.node[u]['droot'] + G[u][v]['length']
+                scost += length + H.node[u]['droot']
             elif H.has_node(v):
-                scost += H.node[v]['droot'] + G[u][v]['length']
+                scost += length + H.node[v]['droot'] 
             else:
                 raise ValueError('something is wrong')
 
-            mcost = graph_mcost + G[u][v]['length']
             
             cost = pareto_cost(mcost, scost, alpha)
             
