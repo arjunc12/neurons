@@ -7,6 +7,7 @@ from cost_functions import *
 import pylab
 from bisect import bisect_left, insort
 from random import sample, choice
+from collections import defaultdict
 
 POP_SIZE = 50
 GENERATIONS = 500
@@ -105,11 +106,15 @@ def pareto_kruskal(G, alpha, axon=False):
     for u in G.nodes_iter():
         closest_neighbors[u] = G.node[u]['close_neighbors'][:]
 
+    unpaired_neighbors = []
+    candidate_nodes = defaultdict(int)
+
     while H.number_of_nodes() < G.number_of_nodes():
         best_edge = None
         best_cost = float("inf")
 
-        candidate_edges = set()
+        #candidate_edges = set()
+        candidate_edges = []
         for u in H.nodes():
             if axon and (u == H.graph['root']) and (H.degree(u) > 0):
                 continue
@@ -130,7 +135,9 @@ def pareto_kruskal(G, alpha, axon=False):
                 closest_neighbors[u].remove(n)
 
             if closest_neighbor != None:
-                candidate_edges.add(tuple(sorted((u, closest_neighbor))))
+                #candidate_edges.add(tuple(sorted((u, closest_neighbor))))
+                candidate_edges.append((u, closest_neighbor))
+                candidate_nodes[closest_neighbor].append(u)
 
         for u, v in candidate_edges:
             length = G[u][v]['length']
@@ -140,12 +147,17 @@ def pareto_kruskal(G, alpha, axon=False):
 
             #scost = graph_scost
             scost = 0
+            
+            assert H.has_node(u)
+            scost += length + H.node[u]['droot']
+            '''
             if H.has_node(u):
                 scost += length + H.node[u]['droot']
             elif H.has_node(v):
                 scost += length + H.node[v]['droot'] 
             else:
                 raise ValueError('something is wrong')
+            '''
 
             
             cost = pareto_cost(mcost, scost, alpha)
@@ -158,12 +170,17 @@ def pareto_kruskal(G, alpha, axon=False):
         u, v = best_edge
         H.add_edge(u, v)
 
+        assert 'droot' in H.node[u]
+        H.node[v]['droot'] = H.node[u]['droot'] + G[u][v]['length']
+        
+        '''
         if 'droot' in H.node[u]:
             H.node[v]['droot'] = H.node[u]['droot'] + G[u][v]['length']
         elif 'droot' in H.node[v]:
             H.node[u]['droot'] = H.node[v]['droot'] + G[u][v]['length']
         else:
             raise ValueError('something is really wrong')
+        '''
 
         closest_neighbors[u].remove(v)
         closest_neighbors[v].append(u)
