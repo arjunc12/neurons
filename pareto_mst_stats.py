@@ -3,7 +3,14 @@ import pandas as pd
 from pareto_mst_plots import COLUMNS, NEURON_TYPE_LABELS
 import pylab
 from numpy.ma import masked_invalid
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr
+
+def size_correlation(df):
+    print "---------------size-alpha correlation----------------"
+    corr1 = pearsonr(df['points'], df['alpha'])
+    corr2 = spearmanr(df['points'], df['alpha'])
+    print "pearson correlation: " + str(corr1) 
+    print "spearman correlation: " + str(corr2)
 
 def category_correlation(df, category):
     alphas = df['alpha']
@@ -26,7 +33,10 @@ def basic_stats(df):
     print "p-value", float(total_successes) / total_trials
     print "neural to centroid ratio", infmean(df['neural_dist'] / df['centroid_dist'])
     print "neural to random ratio", infmean(df['neural_dist'] / df['random_dist'])
+
     print "dominate percentage", float(df['dominates'].sum()) / df['comparisons'].sum()
+    df2 = df[df['neuron_type'] != 'axon']
+    print "dendrite dominate percentage", float(df2['dominates'].sum()) / df2['comparisons'].sum()
 
     df2 = df[df['neural_dist'] < df['centroid_dist']]
     print "beats centroid", float(df2['neural_dist'].count()) / float(df['neural_dist'].count())
@@ -57,7 +67,8 @@ def main():
     metadata(df)
     neuron_type_alphas(df)
     basic_stats(df)
-    categories_correlations(df)
+    #categories_correlations(df)
+    size_correlation(df)
 
 if __name__ == '__main__':
     main()
