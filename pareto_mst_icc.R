@@ -30,5 +30,12 @@ getICCs(df[df$neuron_type == '1',])
 print("-----apical dendrite-----")
 getICCs(df[df$neuron_type == '2',])
 
+print("-----dendrite-----")
+getICCs(df[df$neuron_type != '0',])
+
 print("-----neuron type-----")
 print(ICCbare(x=neuron_type, y=alpha, data=df))
+
+print("-----axon vs dendrite-----")
+df$axon = as.numeric(df$neuron_type == '0')
+print(ICCbare(x=axon, y=alpha, data=df))
