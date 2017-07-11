@@ -107,7 +107,7 @@ def pareto_kruskal(G, alpha, axon=False):
         closest_neighbors[u] = G.node[u]['close_neighbors'][:]
 
     unpaired_neighbors = []
-    candidate_nodes = defaultdict(int)
+    candidate_nodes = defaultdict(list)
 
     while H.number_of_nodes() < G.number_of_nodes():
         best_edge = None
