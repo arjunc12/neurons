@@ -31,3 +31,5 @@ tracings/*
 .RData
 
 .Rhistory
+
+neuron_builder/*
