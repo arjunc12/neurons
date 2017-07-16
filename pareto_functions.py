@@ -193,6 +193,103 @@ def pareto_kruskal(G, alpha, axon=False):
 
     return pareto_mst
 
+def pareto_kruskal_sandbox(G, alpha, axon=False):
+    root = G.graph['root']
+    H = nx.Graph()
+   
+    H.add_node(root)
+    H.graph['root'] = root
+    H.node[root]['droot'] = 0
+   
+    graph_mcost = 0
+    graph_scost = 0
+
+    closest_neighbors = {}
+    for u in G.nodes_iter():
+        closest_neighbors[u] = G.node[u]['close_neighbors'][:]
+
+    unpaired_nodes = [root]
+    candidate_nodes = defaultdict(list)
+
+    while H.number_of_nodes() < G.number_of_nodes():
+        best_edge = None
+        best_cost = float("inf")
+
+        candidate_edges = []
+        for u in unpaired_nodes:
+            if axon and (u == H.graph['root']) and (H.degree(u) > 0):
+                continue
+
+            assert 'droot' in H.node[u]
+             
+            invalid_neighbors = []
+            closest_neighbor = None
+            for i in xrange(len(closest_neighbors[u])):
+                v = closest_neighbors[u][i]
+                if H.has_node(v):
+                    invalid_neighbors.append(v)
+                else:
+                    closest_neighbor = v
+                    break
+
+            for n in invalid_neighbors:
+                closest_neighbors[u].remove(n)
+
+            if closest_neighbor != None:
+                #candidate_edges.append((u, closest_neighbor))
+                candidate_nodes[closest_neighbor].append(u)
+
+                length = G[u][closest_neighbor]['length']
+                mcost = length
+                scost = 0
+                assert H.has_node(u)
+                scost = length + H.node[u]['droot']
+                cost = pareto_cost(mcost, scost, alpha)
+                insort(candidate_edges, (cost, (u, closest_neighbor)))
+
+        '''
+        for v in candidate_nodes:
+            for u in candidate_nodes[v]:
+                length = G[u][v]['length']
+                
+                mcost = length
+
+                scost = 0
+                
+                assert H.has_node(u)
+                scost += length + H.node[u]['droot']
+                
+                cost = pareto_cost(mcost, scost, alpha)
+                
+                if cost < best_cost:
+                    best_edge = (u, v)
+                    best_cost = cost
+        '''
+        #print candidate_edges
+        best_cost, best_edge = candidate_edges.pop(0)
+
+        if best_edge == None:
+            break
+        u, v = best_edge
+        H.add_edge(u, v)
+
+        unpaired_nodes = [v] + candidate_nodes[v]
+        del candidate_nodes[v]
+
+        assert 'droot' in H.node[u]
+        H.node[v]['droot'] = H.node[u]['droot'] + G[u][v]['length']
+        
+        closest_neighbors[u].remove(v)
+        closest_neighbors[v].append(u)
+   
+    pareto_mst = G.copy()
+    pareto_mst.remove_edges_from(G.edges())
+    for u, v in H.edges():
+        pareto_mst.add_edge(u, v)
+        pareto_mst[u][v]['length'] = G[u][v]['length']
+
+    return pareto_mst
+
 def initialize_khuller(mst):
     root = mst.graph['root']
     mst.node[root]['parent'] = None
