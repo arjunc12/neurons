@@ -183,6 +183,7 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         else:
             #print "Greedy"
             pareto_tree1 = pareto_kruskal(point_graph, alpha, axon=axon)
+            #pareto_tree1 = pareto_kruskal_sandbox(point_graph, alpha, axon=axon)
             #print "khuller"
             pareto_tree2 = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
             #print "genetic"
