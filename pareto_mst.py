@@ -14,6 +14,7 @@ from neuron_utils import *
 from read_imaris import *
 from pareto_functions import *
 from kruskal import *
+from neuron_builder import build_neuron
 
 SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported', 'interneuron-specific_interneuron']
 
@@ -347,7 +348,8 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES):
                             try:
                                 pareto_plot(G, name, cell_type, species, region,\
                                             lab, outdir, axon=axon)
-                            except RuntimeError:
+                            except RuntimeError as r:
+                                print r
                                 continue
 
 def imaris_plots():
@@ -362,13 +364,82 @@ def imaris_plots():
             pareto_plot(G, subdir, None, None, None, None, outdir, output=False, viz_trees=True)
 
 
+def neuron_builder_plots(rmin=1, rmax=1.25, rstep=0.01, num_iters=10):
+    for i in xrange(num_iters):
+        for radius in pylab.arange(rmax, rmin - rstep, -rstep):
+            print "radius", radius
+            G = build_neuron(radius)
+            point_graph = complete_graph(G)
+            print point_graph.number_of_nodes(), "points"
+
+            print "sorting neighbors"
+            sort_neighbors(point_graph)
+           
+            sat_tree = satellite_tree(point_graph)
+            span_tree = nx.minimum_spanning_tree(point_graph, weight='length')
+            
+            opt_scost = float(satellite_cost(sat_tree))
+            normalize_scost = lambda cost : normalize_cost(cost, opt_scost)
+            opt_mcost = float(mst_cost(span_tree))
+            normalize_mcost = lambda cost : normalize_cost(cost, opt_mcost)
+            
+            mcosts = []
+            scosts = []
+            
+            delta = 0.01
+            alphas = pylab.arange(0, 1 + delta, delta)
+            for i, alpha in enumerate(alphas):
+                print "alpha", alpha
+                pareto_tree = None
+                if alpha == 0:
+                    pareto_tree = sat_tree
+                elif alpha == 1:
+                    pareto_tree = span_tree
+                else:
+                    pareto_tree = pareto_kruskal(point_graph, alpha)
+    
+                mcost, scost = graph_costs(pareto_tree)
+                mcost = normalize_mcost(mcost)
+                scost = normalize_scost(scost)
+                mcosts.append(mcost)
+                scosts.append(scost)
+
+            neural_mcost = normalize_mcost(mst_cost(G))
+            neural_scost  = normalize_scost(satellite_cost(G))
+            
+            pylab.figure()
+            pylab.scatter(mcosts, scosts)
+            pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x')
+            pylab.plot(mcosts, scosts)
+            fname = 'pareto_front%d' % len(os.listdir('neuron_builder'))
+            pylab.savefig('%s/%s.pdf' % ('neuron_builder', fname), format='pdf')
+
+            neural_dist, neural_index = pareto_dist(mcosts, scosts, neural_mcost, neural_scost)
+            neural_closem = mcosts[neural_index] 
+            neural_closes = scosts[neural_index]
+
+            neural_alpha = alphas[neural_index]
+
+            neural_cost = pareto_cost(neural_mcost, neural_scost, neural_alpha)
+            neural_close_cost = pareto_cost(neural_closem, neural_closes, neural_alpha)
+            if  neural_cost < neural_close_cost:
+                neural_dist *= -1
+
+            write_items = [radius, G.number_of_nodes(), neural_dist, neural_alpha]
+            write_items = map(str, write_items)
+            write_items = ', '.join(write_items)
+            outfile = open('neuron_builder.csv', 'a')
+            outfile.write('%s\n' % write_items)
+            outfile.close()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-min_nodes', type=int, default=MIN_NODES)
     parser.add_argument('-max_nodes', type=int, default=MAX_NODES)
     parser.add_argument('-a', '--algorithm', choices=['greedy', 'khuller'], default='greedy')
-    parser.add_argument('-n', '--neuromorpho', action='store_true', default=False)
-    parser.add_argument('-i', '--imaris', action='store_true', default=False)
+    parser.add_argument('-n', '--neuromorpho', action='store_true')
+    parser.add_argument('-i', '--imaris', action='store_true')
+    parser.add_argument('-b', '--neuron_builder', action='store_true')
 
     args = parser.parse_args()
     min_nodes = args.min_nodes
@@ -376,6 +447,7 @@ if __name__ == '__main__':
     algorithm = args.algorithm
     neuromorpho = args.neuromorpho
     imaris = args.imaris
+    neuron_builder = args.neuron_builder
 
     points = [(0, 0), (1, 1), (1, 1.1), (0, 0.1), (2, 2), (-1, -1), (-1, -1.1), (-1, 2), (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (1.1, 0.01)]
     root = (0, 0)
@@ -408,6 +480,8 @@ if __name__ == '__main__':
         imaris_plots()
     if neuromorpho:
         neuromorpho_plots(min_nodes, max_nodes)
+    if neuron_builder:
+        neuron_builder_plots()
 
     #pareto_plot(thinstar_filename, 'thinstar', 'amacrine', 'rabbit', 'retina', 'miller', outdir='sandbox')
 
