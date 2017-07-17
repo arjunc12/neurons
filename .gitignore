@@ -33,3 +33,5 @@ tracings/*
 .Rhistory
 
 neuron_builder/*
+
+*.swc
