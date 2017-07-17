@@ -28,7 +28,7 @@ __all__ = ['from_nested_tuple', 'from_prufer_sequence', 'NotATree',
            'to_nested_tuple', 'to_prufer_sequence']
 
 
-[docs]class NotATree(nx.NetworkXException):
+class NotATree(nx.NetworkXException):
     """Raised when a function expects a tree (that is, a connected
     undirected graph with no cycles) but gets a non-tree graph as input
     instead.
@@ -37,7 +37,7 @@ __all__ = ['from_nested_tuple', 'from_prufer_sequence', 'NotATree',
 
 
 
-[docs]@not_implemented_for('directed')
+@not_implemented_for('directed')
 def to_nested_tuple(T, root, canonical_form=False):
     """Returns a nested tuple representation of the given tree.
 
@@ -134,7 +134,7 @@ def to_nested_tuple(T, root, canonical_form=False):
 
 
 
-[docs]def from_nested_tuple(sequence, sensible_relabeling=False):
+def from_nested_tuple(sequence, sensible_relabeling=False):
     """Returns the rooted tree corresponding to the given nested tuple.
 
     The nested tuple representation of a tree is defined
@@ -218,9 +218,9 @@ def to_nested_tuple(T, root, canonical_form=False):
 
 
 
-[docs]@not_implemented_for('directed')
+@not_implemented_for('directed')
 def to_prufer_sequence(T):
-    r"""Returns the Prüfer sequence of the given tree.
+    """Returns the Prüfer sequence of the given tree.
 
     A *Prüfer sequence* is a list of *n* - 2 numbers between 0 and
     *n* - 1, inclusive. The tree corresponding to a given Prüfer
@@ -320,8 +320,8 @@ def to_prufer_sequence(T):
 
 
 
-[docs]def from_prufer_sequence(sequence):
-    r"""Returns the tree corresponding to the given Prüfer sequence.
+def from_prufer_sequence(sequence):
+    """Returns the tree corresponding to the given Prüfer sequence.
 
     A *Prüfer sequence* is a list of *n* - 2 numbers between 0 and
     *n* - 1, inclusive. The tree corresponding to a given Prüfer
