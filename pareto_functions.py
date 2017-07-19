@@ -1,16 +1,18 @@
 import networkx as nx
 from neuron_utils import point_dist, pareto_cost
-from kruskal import kruskal, random_mst
+from kruskal import kruskal
+from random_graphs import random_mst
 from itertools import combinations
 import numpy as np
 from cost_functions import *
 import pylab
 from bisect import bisect_left, insort
-from random import sample, choice
+from random import sample, choice, uniform, randint
 from collections import defaultdict
+from prufer import *
 
-POP_SIZE = 50
-GENERATIONS = 500
+POP_SIZE = 40
+GENERATIONS = 200000
 
 def satellite_tree(G):
     root = G.graph['root']
@@ -39,24 +41,44 @@ def min_spanning_tree(G):
     '''
     return nx.minimum_spanning_tree(G, weight='length')
 
-def replace_edge(G, T, u1, v1, u2, v2):
-    T.remove_edge(u1, v1)
-    T.add_edge(u2, v2)
-    T[u2][v2]['length'] = G[u2][v2]['length']
+def crossover_trees(seq1, seq2):
+    assert len(seq1) == len(seq2)
+    
+    s1 = seq1[:]
+    s2 = seq2[:]
+    
+    i = randint(0, len(s1) - 1)
+    j = randint(0, len(s2) - 1)
 
-def crossover_trees(G, p1, p2):
-    T1 = p1.copy()
-    T2 = p2.copy()
+    s1[i] = seq2[j]
+    s2[j] = seq1[i]
 
-    u1, v1 = choice(T1.edges())
-    u2, v2 = choice(T2.edges())
+    return s1, s2
 
-    replace_edge(G, T1, u1, v1, u2, v2)
-    replace_edge(G, T2, u2, v2, u1, v1)
+def seq_to_tree(seq, G):
+    T = from_prufer_sequence(seq)
+    T.graph = G.graph
+    for u in T.nodes():
+        T.node[u] = G.node[u]
 
-    return T1, T2
+    for u, v in T.edges():
+        T[u][v] = G[u][v]
+        T[v][u] = G[v][u]
+    
+    return T
 
 def pareto_genetic(G, alpha, axon=False, pop_size=POP_SIZE, generations=GENERATIONS):
+    root = G.graph['root']
+    
+    label_map = {}
+    label_map_inv = {}
+    for i, u in enumerate(G.nodes()):
+        label_map[u] = i
+        label_map_inv[i] = u
+
+    G = nx.relabel_nodes(G, label_map)
+    G.graph['root'] = label_map[root]
+
     population = []
     for i in xrange(pop_size):
         mst = random_mst(G)
@@ -72,7 +94,13 @@ def pareto_genetic(G, alpha, axon=False, pop_size=POP_SIZE, generations=GENERATI
         c1, p1 = parent1
         c2, p2 = parent2
 
-        o1, o2 = crossover_trees(G, p1, p2)
+        p1 = to_prufer_sequence(p1)
+        p2 = to_prufer_sequence(p2)
+
+        o1, o2 = crossover_trees(p1, p2)
+
+        o1 = seq_to_tree(o1, G)
+        o2 = seq_to_tree(o2, G)
 
         mcost1, scost1 = graph_costs(o1)
         cost1 = pareto_cost(mcost1, scost1, alpha)
@@ -88,10 +116,15 @@ def pareto_genetic(G, alpha, axon=False, pop_size=POP_SIZE, generations=GENERATI
         
         worst_ind = population.pop()
 
+    G = nx.relabel_nodes(G, label_map_inv)
+    G.graph['root'] = root
+
     best_cost, best_tree = population[0]
+    best_tree = nx.relabel_nodes(best_tree, label_map_inv)
+    best_tree.graph['root'] = root
     return best_tree
 
-def pareto_kruskal(G, alpha, axon=False):
+def pareto_prim(G, alpha, axon=False):
     root = G.graph['root']
     H = nx.Graph()
    
@@ -193,7 +226,7 @@ def pareto_kruskal(G, alpha, axon=False):
 
     return pareto_mst
 
-def pareto_kruskal_sandbox(G, alpha, axon=False):
+def pareto_prim_sandbox(G, alpha, axon=False):
     root = G.graph['root']
     H = nx.Graph()
    
@@ -343,7 +376,6 @@ def pareto_khuller(G, alpha, mst=None):
     return H
 
 def main():
-    pass
     G = nx.Graph()
     root = (0, 0)
     points = [root, (0, 0.1), (0.001, 0.2), (0.2, 0), (1, 1), (2, 2.000001), (2, 2.1), (2.1, 2), (0.1001, 0.1)]
@@ -363,7 +395,8 @@ def main():
     
     for alpha in np.arange(0.01, 0.99, 0.01):
         print alpha
-        pareto_mst = pareto_khuller(G, T_span, alpha)
+        #pareto_mst = pareto_khuller(G, T_span, alpha)
+        pareto_mst = pareto_genetic(G, alpha)
         print "satellite cost", satellite_cost(pareto_mst)
         print "mst cost", mst_cost(pareto_mst)
 
