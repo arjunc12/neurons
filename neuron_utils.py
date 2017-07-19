@@ -214,7 +214,10 @@ def neuron_info(neuron_file):
             cell_type = class2
     
     return cell_type, species, region, lab
-    
+   
+def sort_neighbors(G):
+    for u in G.nodes_iter():
+        G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
 
 def main():
     neuron_file = argv[1]
