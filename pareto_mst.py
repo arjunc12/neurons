@@ -15,6 +15,7 @@ from read_imaris import *
 from pareto_functions import *
 from kruskal import *
 from neuron_builder import build_neuron
+from random_graphs import random_mst
 
 SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported', 'interneuron-specific_interneuron']
 
@@ -112,7 +113,7 @@ def pareto_drawings(filename, name, outdir='drawings'):
     alphas = np.arange(0, 1 + delta, delta)
     for alpha in alphas:
         print "alpha", alpha
-        pareto_tree = pareto_kruskal(H, alpha)
+        pareto_tree = pareto_prim(H, alpha)
         viz_tree(pareto_tree, name + str(alpha), outdir=outdir)
 
 
@@ -126,10 +127,6 @@ def pareto_drawings(filename, name, outdir='drawings'):
 
 def normalize_cost(cost, opt_cost):
     return 1 - (opt_cost / cost)
-
-def sort_neighbors(G):
-    for u in G.nodes_iter():
-        G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
 
 def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
                 output=True, viz_trees=VIZ_TREES, axon=False):
@@ -183,8 +180,8 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
             pareto_tree3 = span_tree
         else:
             #print "Greedy"
-            pareto_tree1 = pareto_kruskal(point_graph, alpha, axon=axon)
-            #pareto_tree1 = pareto_kruskal_sandbox(point_graph, alpha, axon=axon)
+            pareto_tree1 = pareto_prim(point_graph, alpha, axon=axon)
+            #pareto_tree1 = pareto_prim_sandbox(point_graph, alpha, axon=axon)
             #print "khuller"
             pareto_tree2 = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
             #print "genetic"
@@ -364,7 +361,7 @@ def imaris_plots():
             pareto_plot(G, subdir, None, None, None, None, outdir, output=False, viz_trees=True)
 
 
-def neuron_builder_plots(rmin=1, rmax=1.25, rstep=0.01, num_iters=10):
+def neuron_builder_plots(rmin=0.5, rmax=1.5, rstep=0.01, num_iters=10):
     for i in xrange(num_iters):
         for radius in pylab.arange(rmax, rmin - rstep, -rstep):
             print "radius", radius
@@ -396,7 +393,7 @@ def neuron_builder_plots(rmin=1, rmax=1.25, rstep=0.01, num_iters=10):
                 elif alpha == 1:
                     pareto_tree = span_tree
                 else:
-                    pareto_tree = pareto_kruskal(point_graph, alpha)
+                    pareto_tree = pareto_prim(point_graph, alpha)
     
                 mcost, scost = graph_costs(pareto_tree)
                 mcost = normalize_mcost(mcost)
