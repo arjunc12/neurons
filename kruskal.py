@@ -41,32 +41,6 @@ def kruskal(nodes, edges):
             
     return sum(forest_to_edges.values(), [])
 
-def random_mst(G):
-    H = G.copy()
-    H.remove_edges_from(G.edges())
-    root = H.graph['root']
-
-    in_tree = defaultdict(bool)
-    in_tree[root] = True
-    successor = {}
-    successor[root] = None
-
-    for u in H.nodes():
-        curr = u
-        while not in_tree[curr]:
-            successor[curr] = choice(G.neighbors(curr))
-            curr = successor[curr]
-
-        curr = u
-        while not in_tree[curr]:
-            in_tree[curr] = True
-            next = successor[curr]
-            H.add_edge(curr, next)
-            H[curr][next]['length'] = G[curr][next]['length']
-            curr = next
-    
-    return H
-
 def random_kruskal(G):
     rand_edges = G.edges()
     shuffle(rand_edges)
