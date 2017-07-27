@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib as mpl
+mpl.use('agg')
 import matplotlib.pyplot as plt
 import networkx as nx
 
@@ -73,17 +75,19 @@ if __name__ == "__main__":
     inds=[(N-j-1,N-i-1) for i,j in inds]
     pos2=dict(zip(vals,inds))
 
-    fig, ax = plt.subplots(1,1)
-    nx.draw_networkx(G, pos=pos2, with_labels=True, node_size = 200, node_color='orange',font_size=10,ax=ax)
-    plt.axis('off')
-    plt.title('grid')
+    #fig, ax = plt.subplots(1,1)
+    #nx.draw_networkx(G, pos=pos2, with_labels=True, node_size = 200, node_color='orange',font_size=10,ax=ax)
+    #plt.axis('off')
+    #plt.title('grid')
 
     ST = find_all_spanning_trees(G)
     print len(ST)
-
+    
+    '''
     for g in ST:
         fig, ax = plt.subplots(1,1)
         nx.draw_networkx(g, pos=pos2, with_labels=True, node_size = 200, node_color='orange',font_size=10,ax=ax)
         plt.axis('off')
         plt.title('grid')
         plt.show()
+    '''
