@@ -5,24 +5,45 @@ import pylab
 from pareto_functions import pareto_prim, pareto_genetic
 from time import time
 from cost_functions import graph_costs
-from neuron_utils import complete_graph, pareto_cost, sort_neighbors
+from neuron_utils import complete_graph, pareto_cost, sort_neighbors, is_tree
 from random_graphs import random_point_graph
+import argparse
+import pandas as pd
 
 MIN_POINTS = 8
-MAX_POINTS = 15
+MAX_POINTS = 50
+
+COLNAMES = ['num_points', 'time1', 'time2', 'comparisons', 'dominates']
+
+def runtimes_stats():
+    df = pd.read_csv('test_runtimes.csv', names=COLNAMES)
+    print "greedy success rate", float(sum(df['dominates'])) / float(sum(df['comparisons']))
+    df = df[['num_points', 'time1', 'time2']]
+    df = df.groupby('num_points', as_index=False).agg(pylab.mean)
+    pylab.figure()
+    time1 = df['time1'] * 60
+    time2 = df['time2'] * 60
+    pylab.plot(df['num_points'], time1, c='b', label='greedy')
+    pylab.scatter(df['num_points'], time2, c='r', label='genetic')
+    pylab.ylim(ymin=-1)
+    pylab.legend(loc=2)
+    pylab.xlabel('number of points')
+    pylab.ylabel('rumtime (minutes)')
+    pylab.savefig('test_runtimes/runtimes.pdf', format='pdf')
+    pylab.close()
 
 def time_function(G, alpha, pareto_func):
     start = time()
     mst = pareto_func(G, alpha)
     end = time()
     runtime = (end - start) / 60.0
-    mcost, scost = graph_costs(G)
-    return mcost, scost, time
+    mcost, scost = graph_costs(mst)
+    return mcost, scost, runtime
 
-def test_runtimes(num_iters=10):
+def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
     for i in xrange(num_iters):
         print "iteration", i
-        for num_points in xrange(MIN_POINTS, MAX_POINTS + 1):
+        for num_points in xrange(min_points, max_points + 1):
             print "num_points", num_points
             G = random_point_graph(num_points=num_points)
             sort_neighbors(G)
@@ -64,7 +85,7 @@ def test_runtimes(num_iters=10):
             pylab.plot(mcosts1, scosts1, c='b')
 
             pylab.scatter(mcosts2, scosts2, c='r', label='genetic')
-            pylab.plot(mcosts2, scosts2, c='r')
+            #pylab.plot(mcosts2, scosts2, c='r')
 
             pylab.legend()
             pylab.xlabel('spanning tree cost')
@@ -87,7 +108,24 @@ def test_runtimes(num_iters=10):
             outfile.close()
 
 def main():
-    test_runtimes(num_iters=1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--test', action='store_true')
+    parser.add_argument('-n', '--num_iters', type=int, default=10)
+    parser.add_argument('-s', '--stats', action='store_true')
+    parser.add_argument('--min_points', type=int, default=8)
+    parser.add_argument('--max_points', type=int, default=50)
+
+    args = parser.parse_args()
+    test = args.test
+    num_iters = args.num_iters
+    stats = args.stats
+    min_points = args.min_points
+    max_points = args.max_points
+    if test:
+        test_runtimes(num_iters=num_iters,\
+                      min_points=min_points, max_points=max_points)
+    if stats:
+        runtimes_stats()
 
 if __name__ == '__main__':
     main()
