@@ -10,9 +10,10 @@ from bisect import bisect_left, insort
 from random import sample, choice, uniform, randint
 from collections import defaultdict
 from prufer import *
+from enumerate_trees import find_all_spanning_trees
 
-POP_SIZE = 40
-GENERATIONS = 200000
+POP_SIZE = 400
+GENERATIONS = 20000
 
 def satellite_tree(G):
     root = G.graph['root']
@@ -374,6 +375,21 @@ def pareto_khuller(G, alpha, mst=None):
                 H.node[child]['droot'] = H.node[curr]['droot'] + H[curr][child]['length']
 
     return H
+
+def pareto_brute_force(G, alpha, trees=None):
+    if trees == None:
+        trees = find_all_spanning_trees(G)
+
+    best_tree = None
+    best_cost = float("inf")
+    for tree in trees:
+        mcost, scost = graph_costs(tree)
+        cost = pareto_cost(mcost, scost, alpha)
+        if cost < best_cost:
+            best_cost = cost
+            best_tree = tree
+
+    return tree
 
 def main():
     G = nx.Graph()
