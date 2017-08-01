@@ -1,5 +1,5 @@
 import networkx as nx
-from neuron_utils import point_dist, pareto_cost
+from neuron_utils import point_dist, pareto_cost, sort_neighbors
 from kruskal import kruskal
 from random_graphs import random_mst
 from itertools import combinations
@@ -7,13 +7,15 @@ import numpy as np
 from cost_functions import *
 import pylab
 from bisect import bisect_left, insort
-from random import sample, choice, uniform, randint
+from random import sample, choice, uniform, randint, random
 from collections import defaultdict
 from prufer import *
 from enumerate_trees import find_all_spanning_trees
+from random_graphs import random_point_graph
 
 POP_SIZE = 400
 GENERATIONS = 20000
+MUTATION_PROB = 0.01
 
 def satellite_tree(G):
     root = G.graph['root']
@@ -56,6 +58,12 @@ def crossover_trees(seq1, seq2):
 
     return s1, s2
 
+def mutate_tree(seq1, mutation_prob=MUTATION_PROB):
+    if random() < MUTATION_PROB:
+        idx = randint(0, len(seq1) - 1)
+        new_digit = randint(0, 9)
+        seq1[idx] = new_digit
+
 def seq_to_tree(seq, G):
     T = from_prufer_sequence(seq)
     T.graph = G.graph
@@ -68,7 +76,20 @@ def seq_to_tree(seq, G):
     
     return T
 
-def pareto_genetic(G, alpha, axon=False, pop_size=POP_SIZE, generations=GENERATIONS):
+def partially_dominates(costs1, costs2):
+    assert len(costs1) == len(costs2)
+    strict = False
+    for i in xrange(len(costs1)):
+        cost1, cost2 = costs1[i], costs2[i]
+        if cost1 > cost2:
+            return False
+        elif cost1 < cost2:
+            strict = True
+
+    return strict
+
+def pareto_genetic(G, axon=False, pop_size=POP_SIZE, generations=GENERATIONS,\
+                   mutation_prob=MUTATION_PROB):
     root = G.graph['root']
     
     label_map = {}
@@ -84,46 +105,74 @@ def pareto_genetic(G, alpha, axon=False, pop_size=POP_SIZE, generations=GENERATI
     for i in xrange(pop_size):
         mst = random_mst(G)
         mcost, scost = graph_costs(mst)
-        cost = pareto_cost(mcost, scost, alpha)
-        population.append((cost, mst))
+        #cost = pareto_cost(mcost, scost, alpha)
+        population.append((mst, mcost, scost))
 
-    population = sorted(population)
+    #population = sorted(population)
 
     for generation in xrange(generations):
+        for i, (ind, mcost, scost) in enumerate(population):
+            if random() < MUTATION_PROB:
+                seq = to_prufer_sequence(ind)
+                mutate_tree(seq, mutation_prob=1)
+                ind = seq_to_tree(seq, G)
+                population[i] = (ind, mcost, scost)
+
         parent1, parent2 = sample(population, 2)
 
-        c1, p1 = parent1
-        c2, p2 = parent2
+        p1, m1, s1 = parent1
+        p2, m2, s2 = parent2
 
         p1 = to_prufer_sequence(p1)
         p2 = to_prufer_sequence(p2)
+        #mutate_tree(p1, MUTATION_PROB)
+        #mutate_tree(p2, MUTATION_PROB)
 
         o1, o2 = crossover_trees(p1, p2)
+        #mutate_tree(o1, MUTATION_PROB)
+        #mutate_tree(o2, MUTATION_PROB)
 
         o1 = seq_to_tree(o1, G)
         o2 = seq_to_tree(o2, G)
 
         mcost1, scost1 = graph_costs(o1)
-        cost1 = pareto_cost(mcost1, scost1, alpha)
+        #cost1 = pareto_cost(mcost1, scost1, alpha)
         mcost2, scost2 = graph_costs(o2)
-        cost2 = pareto_cost(mcost2, scost2, alpha)
+        #cost2 = pareto_cost(mcost2, scost2, alpha)
+        offspring = [(o1, mcost1, scost1), (o2, mcost2, scost2)]
+        origin = (0, 0)
+        for ospring, mcosto, scosto in offspring:
+            worst_index = None
+            worst_dist = 0
+            for i, (ind, mcosti, scosti) in enumerate(population):
+                if partially_dominates((mcosto, scosto), (mcosti, scosti)):
+                    worst_index = i
+                    break
+            if worst_index != None:
+                population[worst_index] = (ospring, mcosto, scosto)
 
-        offspring1 = (cost1, o1)
-        offspring2 = (cost2, o2)
 
-        best_offspring = min([offspring1, offspring2])
+
+        #offspring1 = (cost1, o1)
+        #offspring2 = (cost2, o2)
+
+        #best_offspring = min([offspring1, offspring2])
        
-        insort(population, best_offspring)
+        #insort(population, best_offspring)
         
-        worst_ind = population.pop()
+        #worst_ind = population.pop()
 
-    G = nx.relabel_nodes(G, label_map_inv)
-    G.graph['root'] = root
-
-    best_cost, best_tree = population[0]
-    best_tree = nx.relabel_nodes(best_tree, label_map_inv)
-    best_tree.graph['root'] = root
-    return best_tree
+    best_trees = []
+    for ind, mcost, scost in population:
+        T = nx.relabel_nodes(ind, label_map_inv)
+        T.graph['root'] = root
+        best_trees.append((mcost, scost, T))
+    return best_trees
+    
+    #best_cost, best_tree = population[0]
+    #best_tree = nx.relabel_nodes(best_tree, label_map_inv)
+    #best_tree.graph['root'] = root
+    #return best_tree
 
 def pareto_prim(G, alpha, axon=False):
     root = G.graph['root']
@@ -389,32 +438,50 @@ def pareto_brute_force(G, alpha, trees=None):
             best_cost = cost
             best_tree = tree
 
-    return tree
+    return best_tree
 
 def main():
-    G = nx.Graph()
-    root = (0, 0)
-    points = [root, (0, 0.1), (0.001, 0.2), (0.2, 0), (1, 1), (2, 2.000001), (2, 2.1), (2.1, 2), (0.1001, 0.1)]
-    for p1, p2 in combinations(points, 2):
-        G.add_edge(p1, p2)
-        G[p1][p2]['length'] = (((p1[0] - p2[0]) ** 2) + ((p1[1] - p2[1]) ** 2)) ** 0.5
-
-    T_sat = nx.Graph()
-    for u in G.nodes_iter():
-        if u != root:
-            T_sat.add_edge(u, root)
-            T_sat[u][root]['length'] = (((u[0] - root[0]) ** 2) + ((u[1] - root[1]) ** 2)) ** 0.5
-
-    T_span = nx.minimum_spanning_tree(G, weight='length')
-    for H in [G, T_span, T_sat]:
-        H.graph['root'] = root
+    G = random_point_graph(15)
     
-    for alpha in np.arange(0.01, 0.99, 0.01):
+    sat_tree = satellite_tree(G)
+    span_tree = nx.minimum_spanning_tree(G, weight='length')
+           
+    opt_scost = float(satellite_cost(sat_tree))
+    normalize_scost = lambda cost : normalize_cost(cost, opt_scost)
+    opt_mcost = float(mst_cost(span_tree))
+    normalize_mcost = lambda cost : normalize_cost(cost, opt_mcost)
+
+    mcosts1  = []
+    scosts1 = []
+
+    sort_neighbors(G)
+
+    delta = 0.01
+    alphas = pylab.arange(delta, 1, delta)
+    for alpha in alphas:
         print alpha
-        #pareto_mst = pareto_khuller(G, T_span, alpha)
-        pareto_mst = pareto_genetic(G, alpha)
-        print "satellite cost", satellite_cost(pareto_mst)
-        print "mst cost", mst_cost(pareto_mst)
+        pareto_mst = pareto_prim(G, alpha)
+        mcost1, scost1 = graph_costs(pareto_mst)
+        mcost1 = normalize_mcost(mcost1)
+        scost1 = normalize_scost(scost1)
+        mcosts1.append(mcost1)
+        scosts1.append(scost1)
+
+    best_trees = pareto_genetic(G)
+    mcosts2 = []
+    scosts2 = []
+    for mcost2, scost2, tree in best_trees:
+        mcost2 = normalize_mcost(mcost2)
+        scost2 = normalize_scost(scost2)
+        mcosts2.append(mcost2)
+        scosts2.append(scost2)
+
+    pylab.figure()
+    pylab.plot(mcosts1, scosts1, c='b')
+    pylab.scatter(mcosts1, scosts1, c='b')
+    pylab.scatter(mcosts2, scosts2, c='r')
+    pylab.savefig('genetic.pdf')
+    pylab.close()
 
 if __name__ == '__main__':
     main()
