@@ -15,6 +15,8 @@ colnames = c('name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',
              'neural_dist', 'centroid_dist', 'random_dist', 'trials', 
              'successes', 'comparisons', 'dominates')
 df = read.csv('pareto_mst.csv', col.names=colnames)
+#print(df$cell_type == df$cell_type[3541])
+df = df[df$cell_type != df$cell_type[3541],]
 
 df$neuron_type = str_sub(df$name, -1, -1)
 
