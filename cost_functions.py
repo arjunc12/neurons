@@ -1,5 +1,8 @@
 import networkx as nx
 
+def normalize_cost(cost, opt_cost):
+    return 1 - (opt_cost / cost)
+
 def graph_costs(G):
     scost = 0
     mcost = 0
