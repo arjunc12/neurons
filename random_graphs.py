@@ -3,7 +3,7 @@ from random import uniform
 from itertools import combinations
 from neuron_utils import point_dist
 from collections import defaultdict
-from random import choice
+from random import choice, shuffle
 
 def random_points(num_points=10, xmin=-10, xmax=10, ymin=-10, ymax=10,\
                                  zmin=-10, zmax=10):
@@ -42,7 +42,9 @@ def random_mst(G):
     successor = {}
     successor[root] = None
 
-    for u in H.nodes():
+    vertices = H.nodes()
+    shuffle(vertices)
+    for u in vertices:
         curr = u
         while not in_tree[curr]:
             successor[curr] = choice(G.neighbors(curr))
