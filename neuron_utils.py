@@ -46,6 +46,28 @@ def centroid(G):
     centroid /= G.number_of_nodes() - 1
     return centroid
 
+def new_synapse_points(coord1, coord2, dist=1):
+    new_points = []
+    pass
+    return new_points
+
+def add_synapses(G, dist=1):
+    latest_node = max(G.nodes())
+    for u, v in G.edges():
+        new_points = add_synapse_points(G.node[u]['coord'], G.node[v]['coord'])
+        new_nodes = []
+        for new_point in new_point:
+            new_node = latest_node + 1
+            new_nodes.append(new_node)
+            G.add_node(new_node)
+            G.node[new_node]['coord'] = new_point
+            latest_node = new_node
+
+        new_nodes = [u] + new_nodes + [y]
+        for i in xrange(len(new_nodes) - 1):
+            x, y = new_nodes[i], new_nodes[i + 1]
+            pass
+
 def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
     graphs = []
