@@ -125,11 +125,8 @@ def pareto_drawings(filename, name, outdir='drawings'):
     mst = min_spanning_tree(H)
     viz_tree(mst, name + '_mst', outdir=outdir)
 
-def normalize_cost(cost, opt_cost):
-    return 1 - (opt_cost / cost)
-
 def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
-                output=True, viz_trees=VIZ_TREES, axon=False):
+                output=True, viz_trees=VIZ_TREES, axon=False, compare=True):
     if not (nx.is_connected(G) and G.number_of_edges() == G.number_of_nodes() - 1):
         print "not a tree"
         return None
@@ -183,12 +180,14 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
             pareto_tree1 = pareto_prim(point_graph, alpha, axon=axon)
             #pareto_tree1 = pareto_prim_sandbox(point_graph, alpha, axon=axon)
             #print "khuller"
-            pareto_tree2 = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
+            if compare:
+                pareto_tree2 = khuller(point_graph, span_tree, sat_tree, 1.0 / (1 - alpha))
             #print "genetic"
             #pareto_tree3 = pareto_genetic(point_graph, alpha)
 
         assert is_tree(pareto_tree1)
-        assert is_tree(pareto_tree2)
+        if compare:
+            assert is_tree(pareto_tree2)
         #assert is_tree(pareto_tree3)
 
         if (alpha != 0 and alpha != 1 and i % 5 == 0) and viz_trees:
@@ -197,10 +196,11 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         mcost1, scost1 = graph_costs(pareto_tree1)
         mcost1 = normalize_mcost(mcost1)
         scost1 = normalize_scost(scost1)
-        
-        mcost2, scost2 = graph_costs(pareto_tree2)
-        mcost2 = normalize_mcost(mcost2)
-        scost2 = normalize_scost(scost2)
+       
+        if compare:
+            mcost2, scost2 = graph_costs(pareto_tree2)
+            mcost2 = normalize_mcost(mcost2)
+            scost2 = normalize_scost(scost2)
         
         #mcost3, scost3 = graph_costs(pareto_tree3)
         #mcost3 = normalize_mcost(mcost3)
@@ -208,14 +208,15 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
         
         mcosts1.append(mcost1)
         scosts1.append(scost1)
-        
-        mcosts2.append(mcost2)
-        scosts2.append(scost2)
+       
+        if compare:
+            mcosts2.append(mcost2)
+            scosts2.append(scost2)
 
         #mcosts3.append(mcost3)
         #scosts3.append(scost3)
         
-        if alpha not in [0, 1]:
+        if alpha not in [0, 1] and compare:
             comparisons += 1
             if pareto_cost(mcost1, scost1, alpha) <= pareto_cost(mcost2, scost2, alpha):
                 dominates += 1
@@ -224,8 +225,9 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
     pylab.plot(mcosts1, scosts1, c = 'b')
     pylab.scatter(mcosts1, scosts1, c='b', label='greedy mst')
     
-    pylab.plot(mcosts2, scosts2, c = 'k')
-    pylab.scatter(mcosts2, scosts2, c='k', label='khuller mst')
+    if compare:
+        pylab.plot(mcosts2, scosts2, c = 'k')
+        pylab.scatter(mcosts2, scosts2, c='k', label='khuller mst')
     
     #pylab.plot(mcosts3, scosts3, c = 'y')
     #pylab.scatter(mcosts3, scosts3, c='y', label='genetic')
@@ -358,7 +360,8 @@ def imaris_plots():
                     imfiles.append('imaris/' + subdir + '/' + fname)
             G = read_imaris(imfiles, viz=False)
             outdir = 'imaris/' + subdir
-            pareto_plot(G, subdir, None, None, None, None, outdir, output=False, viz_trees=True)
+            pareto_plot(G, subdir, None, None, None, None, outdir,\
+                        output=False, viz_trees=True, compare=False)
 
 
 def neuron_builder_plots(rmin=0.5, rmax=1.5, rstep=0.01, num_iters=10):
