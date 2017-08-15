@@ -240,6 +240,7 @@ def neuron_info(neuron_file):
 def sort_neighbors(G):
     for u in G.nodes_iter():
         G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
+    G.graph['sorted'] = True
 
 def main():
     neuron_file = argv[1]
