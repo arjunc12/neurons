@@ -1,5 +1,5 @@
 import networkx as nx
-from random import uniform
+from random import uniform, choice
 from itertools import combinations
 from neuron_utils import point_dist
 from collections import defaultdict
@@ -7,7 +7,7 @@ from random import choice, shuffle
 
 def random_points(num_points=10, xmin=-10, xmax=10, ymin=-10, ymax=10,\
                                  zmin=-10, zmax=10):
-    points = [(0, 0, 0)]
+    points = []
     for i in xrange(num_points):
         x = uniform(xmin, xmax)
         y = uniform(ymin, ymax)
@@ -24,7 +24,7 @@ def random_point_graph(num_points=10, xmin=-10, xmax=10,\
     for i, point in enumerate(points):
         G.add_node(i)
         G.node[i]['coord'] = point
-    G.graph['root'] = 0
+    G.graph['root'] = choice(G.nodes())
     
     for u, v in combinations(G.nodes(), 2):
         G.add_edge(u, v)
