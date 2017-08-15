@@ -107,12 +107,16 @@ def neuron_types_hist(df):
     pylab.savefig('%s/neuron_types_hist.pdf' % OUTDIR, format='pdf')
     pylab.close()
 
-def main():
+def get_df():
     fname = 'pareto_mst.csv'
-    df = pd.read_csv(fname, names=COLUMNS)
+    df = pd.read_csv(fname, names=COLUMNS, skipinitialspace=True)
     df['neuron_type'] = df['name'].str[-1]
     df['neuron_type'] = df['neuron_type'].astype(int)
     df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
+    return df
+
+def main():
+    df = get_df()
     #print df
     os.system('mkdir -p stats')
     #print df['species']

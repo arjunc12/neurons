@@ -1,6 +1,7 @@
 from collections import defaultdict
 import pandas as pd
-from pareto_mst_plots import COLUMNS, NEURON_TYPE_LABELS
+import pareto_mst_plots
+import neuron_density
 import pylab
 from numpy.ma import masked_invalid
 from scipy.stats import pearsonr, spearmanr
@@ -60,10 +61,7 @@ def neuron_type_alphas(df):
 
 def main():
     fname = 'pareto_mst.csv'
-    df = pd.read_csv(fname, names=COLUMNS)
-    df['neuron_type'] = df['name'].str[-1]
-    df['neuron_type'] = df['neuron_type'].astype(int)
-    df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
+    df = pareto_mst_plots.get_df()
     metadata(df)
     neuron_type_alphas(df)
     basic_stats(df)
