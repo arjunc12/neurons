@@ -2,7 +2,7 @@ import networkx
 import matplotlib as mpl
 mpl.use('agg')
 import pylab
-from pareto_functions import pareto_prim, pareto_genetic
+from pareto_functions import *
 from time import time
 from cost_functions import graph_costs, normalize_cost
 from neuron_utils import complete_graph, pareto_cost, sort_neighbors, is_tree
