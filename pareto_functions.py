@@ -176,6 +176,9 @@ def pareto_genetic(G, axon=False, pop_size=POP_SIZE, generations=GENERATIONS,\
 
 def pareto_prim(G, alpha, axon=False):
     root = G.graph['root']
+    if 'sorted' not in G.graph:
+        sort_neighbors(G)
+
     H = nx.Graph()
    
     H.add_node(root)
