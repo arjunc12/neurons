@@ -9,8 +9,8 @@ from scipy.stats import pearsonr, spearmanr
 def size_correlation(df):
     print "---------------size-alpha correlation----------------"
     df2 = df.drop_duplicates(subset='name')
-    corr1 = pearsonr(df['points'], df2['alpha'])
-    corr2 = spearmanr(df['points'], df2['alpha'])
+    corr1 = pearsonr(df2['points'], df2['alpha'])
+    corr2 = spearmanr(df2['points'], df2['alpha'])
     print "pearson correlation: " + str(corr1) 
     print "spearman correlation: " + str(corr2)
 

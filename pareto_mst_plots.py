@@ -5,6 +5,9 @@ import pylab
 import seaborn as sns
 import os
 from itertools import combinations
+from scipy.stats import entropy
+from collections import defaultdict
+import numpy as np
 
 OUTDIR = 'stats'
 
@@ -19,9 +22,151 @@ COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',\
 
 NEURON_TYPE_LABELS = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite'}
 
+TEST_NEW_FUNCTION = False
+
+PSEUDOCOUNT = 0.0001
+
+CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type']
+
+def alpha_counts(df, category, cat_value, alphas=None):
+    alpha_values = df['alpha'][df[category] == cat_value]
+    alpha_values = list(alpha_values)
+    
+    counts_dict = defaultdict(int)
+    for alpha_value in alpha_values:
+        counts_dict[alpha_value] += 1
+
+    counts = []
+    if alphas == None:
+        delta = 0.01
+        alphas = pylab.arange(0, 1 + delta, delta)
+    for alpha in alphas:
+        count = counts_dict[alpha]
+        counts.append(count)
+
+    return counts
+
+def all_counts(df, category, alphas=None):
+    counts = {}
+    for cat_val in df[category].unique():
+        counts[cat_val] = alpha_counts(df, category, cat_val, alphas)
+
+    return counts
+
+def jsdiv(P, Q):
+    """
+    Compute the Jensen-Shannon divergence between two probability distributions.
+    Input
+    -----
+    P, Q : array-like
+    Probability distributions of equal length that sum to 1
+    """
+        
+    P = np.array(P).astype(float)
+    P /= float(sum(P))
+    Q = np.array(Q).astype(float)
+    Q /= float(sum(Q))
+
+
+    M = 0.5 * (P + Q)
+
+    def _kldiv(A, B):
+        return np.sum([v for v in A * np.log2(A/B) if not np.isnan(v)])
+
+    return 0.5 * (_kldiv(P, M) +_kldiv(Q, M))
+
+def pseudo_kld(counts1, counts2):
+    assert len(counts1) == len(counts2)
+    pseudocounts1 = []
+    pseudocounts2 = []
+    for i in xrange(len(counts1)):
+        c1 = counts1[i]
+        c2 = counts2[i]
+        '''
+        if c1 == 0 or c2 == 0:
+            continue
+        else:
+            pseudocounts1.append(c1)
+            pseudocounts2.append(c2)
+        '''
+        pseudocounts1.append(max(c1, PSEUDOCOUNT))
+        pseudocounts2.append(max(c2, PSEUDOCOUNT))
+
+    kld = entropy(pseudocounts1, pseudocounts2)
+
+    return kld
+
+def normalize_distribution(dist):
+    return pylab.array(dist, dtype=np.float64) / sum(dist)
+
+def hellinger_distance(dist1, dist2):
+    assert len(dist1) == len(dist2)
+
+    d1 = normalize_distribution(dist1)
+    d2 = normalize_distribution(dist2)
+    
+    d1 **= 0.5
+    d2 **= 0.5
+
+    dist = d1 - d2
+    dist = np.dot(dist, dist)
+    dist /= 2
+    dist **= 0.5
+
+    return dist
+
+def make_dist_frame(df, category, alphas=None, dist_func=pseudo_kld):
+    df2 = df.drop_duplicates(subset=['name', category])
+
+    counts = all_counts(df2, category, alphas)
+    
+    cat1 = []
+    cat2 = []
+    dist_vals = []
+    for val1, val2 in combinations(counts.keys(), 2):
+        counts1 = counts[val1]
+        counts2 = counts[val2]
+        #kld = entropy(counts1, counts2)
+        dist1 = dist_func(counts1, counts2)
+        dist2 = dist_func(counts2, counts1)
+        #kld = jsdiv(counts1, counts2)
+        cat1 += [val1, val2]
+        cat2 += [val2, val1]
+        dist_vals += [dist1, dist2]
+
+    dist_frame = pd.DataFrame()
+    dist_frame[category + '1'] = cat1
+    dist_frame[category + '2'] = cat2
+    dist_frame['distance'] = dist_vals
+
+    return dist_frame
+
+DIST_FUNCS = [pseudo_kld, hellinger_distance]
+DIST_FUNC_NAMES = {pseudo_kld : 'kld', hellinger_distance : 'hellinger'}
+
+def dist_heat(df, category, alphas=None, dist_func=pseudo_kld):
+    dist_frame = make_dist_frame(df, category, alphas, dist_func)
+    dist_frame = dist_frame.pivot(category + '1', category + '2', 'distance')
+    pylab.figure()
+    ax = sns.heatmap(dist_frame)
+    pylab.savefig('%s/%s_heat_%s.pdf' % (OUTDIR, DIST_FUNC_NAMES[dist_func], category), format='pdf')
+    pylab.close()
+
+def kld_heat(df, category, alphas=None):
+    return dist_heat(df, category, alphas=alphas, dist_func=pseudo_kld)
+
+def hellinger_heat(df, category, alphas=None):
+    return dist_heat(df, category, alphas=alphas, dist_func=hellinger_distance)
+
+def dist_heats(df, categories, dist_funcs, alphas=None):
+    for category in categories:
+        for dist_func in dist_funcs:
+            dist_heat(df, category, alphas=alphas, dist_func=dist_func)
+
 def alphas_heat(df, categories):
     for cat1, cat2 in combinations(categories, 2):
-        df2 = df.groupby([cat1, cat2], as_index=False).agg({'alpha' : pylab.mean})
+        df2 = df.drop_duplicates(subset=['name', cat1, cat2])
+        df2 = df2.groupby([cat1, cat2], as_index=False).agg({'alpha' : pylab.mean})
         data = df2.pivot(cat1, cat2, 'alpha')
         pylab.figure()
         ax = sns.heatmap(data, vmin=0, vmax=1)
@@ -64,9 +209,10 @@ def swarm_alphas(df, identifiers):
     alpha_distribution(df, identifiers, sns.swarmplot, 'swarm')
 
 def scatter_dists(df):
-    neural_dist = df['neural_dist']
-    centroid_dist = df['centroid_dist']
-    random_dist = df['random_dist']
+    df2 = df.drop_duplicates(subset='name')
+    neural_dist = df2['neural_dist']
+    centroid_dist = df2['centroid_dist']
+    random_dist = df2['random_dist']
     
     assert len(neural_dist) == len(centroid_dist) == len(random_dist)
 
@@ -87,7 +233,8 @@ def scatter_dists(df):
     pylab.close()
 
 def alphas_hist(df):
-    alphas = list(df['alpha'])
+    df2 = df.drop_duplicates(subset='name')
+    alphas = list(df2['alpha'])
     weights = pylab.ones_like(alphas) / len(alphas)
     pylab.hist(alphas, range=(0, 1), weights=weights)
     curr_ax = pylab.gca()
@@ -95,8 +242,9 @@ def alphas_hist(df):
     pylab.savefig('%s/alphas_hist.pdf' % OUTDIR, format='pdf')
 
 def neuron_types_hist(df):
+    df2 = df.drop_duplicates(subset='name')
     pylab.figure()
-    for neuron_type, group in df.groupby('neuron_type'):
+    for neuron_type, group in df2.groupby('neuron_type'):
         alphas = list(group['alpha'])
         weights = pylab.ones_like(alphas) / len(alphas)
         pylab.hist(alphas, alpha=0.5, label=neuron_type,\
@@ -117,18 +265,16 @@ def get_df():
 
 def main():
     df = get_df()
-    #print df
+    if TEST_NEW_FUNCTION:
+        return None
+    
     os.system('mkdir -p stats')
-    #print df['species']
     scatter_dists(df)
-    categories = ['species', 'cell_type', 'region', 'neuron_type']
-    #cluster_alphas(df, categories)
-    boxplot_alphas(df, categories)
-    #violin_alphas(df, categories)
-    #swarm_alphas(df, categories)
+    boxplot_alphas(df, CATEGORIES)
     alphas_hist(df)
     neuron_types_hist(df)
-    alphas_heat(df, categories)
+    alphas_heat(df, CATEGORIES)
+    dist_heats(df, CATEGORIES, DIST_FUNCS)
 
 if __name__ == '__main__':
     main()
