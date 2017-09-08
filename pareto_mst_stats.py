@@ -8,8 +8,9 @@ from scipy.stats import pearsonr, spearmanr
 
 def size_correlation(df):
     print "---------------size-alpha correlation----------------"
-    corr1 = pearsonr(df['points'], df['alpha'])
-    corr2 = spearmanr(df['points'], df['alpha'])
+    df2 = df.drop_duplicates(subset='name')
+    corr1 = pearsonr(df['points'], df2['alpha'])
+    corr2 = spearmanr(df['points'], df2['alpha'])
     print "pearson correlation: " + str(corr1) 
     print "spearman correlation: " + str(corr2)
 
@@ -23,24 +24,26 @@ def category_correlation(df, category):
         print unique_val, coef, pval
 
 def categories_correlations(df):
+    df2 = df.drop_duplicates(subset='name')
     for category in ['species', 'region', 'cell_type']:
         print category
         print '--------------------------------'
-        category_correlation(df, category)
+        category_correlation(df2, category)
 
 def basic_stats(df):
-    total_trials = df['trials'].sum()
-    total_successes = df['successes'].sum()
+    df2 = df.drop_duplicates(subset='name')
+    total_trials = df2['trials'].sum()
+    total_successes = df2['successes'].sum()
     print "p-value", float(total_successes) / total_trials
-    print "neural to centroid ratio", infmean(df['neural_dist'] / df['centroid_dist'])
-    print "neural to random ratio", infmean(df['neural_dist'] / df['random_dist'])
+    print "neural to centroid ratio", infmean(df2['neural_dist'] / df2['centroid_dist'])
+    print "neural to random ratio", infmean(df2['neural_dist'] / df2['random_dist'])
 
-    print "dominate percentage", float(df['dominates'].sum()) / df['comparisons'].sum()
-    df2 = df[df['neuron_type'] != 'axon']
-    print "dendrite dominate percentage", float(df2['dominates'].sum()) / df2['comparisons'].sum()
+    print "dominate percentage", float(df2['dominates'].sum()) / df2['comparisons'].sum()
+    df3 = df2[df2['neuron_type'] != 'axon']
+    print "dendrite dominate percentage", float(df3['dominates'].sum()) / df3['comparisons'].sum()
 
-    df2 = df[df['neural_dist'] < df['centroid_dist']]
-    print "beats centroid", float(df2['neural_dist'].count()) / float(df['neural_dist'].count())
+    df4 = df2[df2['neural_dist'] < df2['centroid_dist']]
+    print "beats centroid", float(df4['neural_dist'].count()) / float(df2['neural_dist'].count())
 
 def infmean(arr):
     return pylab.mean(masked_invalid(arr))
@@ -56,7 +59,8 @@ def metadata(df):
     print len(df['region'].unique())
 
 def neuron_type_alphas(df):
-    for neuron_type, group in df.groupby('neuron_type'):
+    df2 = df.drop_duplicates(subset='name')
+    for neuron_type, group in df2.groupby('neuron_type'):
         print neuron_type, pylab.mean(group['alpha'])
 
 def main():
