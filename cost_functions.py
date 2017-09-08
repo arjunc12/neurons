@@ -1,4 +1,17 @@
 import networkx as nx
+from neuron_utils import point_dist
+
+def graph_normalize_functions(G):
+    opt_mst_cost = best_mst_cost(G)
+    opt_sat_cost = best_satellite_cost(G)
+
+    mst_func = make_normalize_function(opt_mst_cost)
+    sat_func = make_normalize_function(opt_sat_cost)
+
+    return mst_func, sat_func
+
+def make_normalize_function(opt_cost):
+    return lambda cost : normalize_cost(cost, opt_cost)
 
 def normalize_cost(cost, opt_cost):
     return 1 - (opt_cost / cost)
@@ -39,10 +52,9 @@ def graph_costs(G):
     return mcost, scost
 
 def best_mst_cost(G):
-    sorted_edges = sorted(G.edges(), key= lambda x : G[x[0]][x[1]]['length'])
-    mst_edges = kruskal(G.nodes(), sorted_edges)
+    mst = nx.minimum_spanning_tree(G, weight='length')
     best_cost = 0
-    for u, v in mst_edges:
+    for u, v in mst.edges_iter():
         best_cost += G[u][v]['length']
     return best_cost
 
