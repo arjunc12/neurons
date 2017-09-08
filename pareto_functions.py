@@ -376,6 +376,15 @@ def pareto_prim_sandbox(G, alpha, axon=False):
 
     return pareto_mst
 
+def alpha_to_beta(alpha, opt_mcost, opt_scost):
+    assert alpha > 0
+    assert alpha < 1
+    num = 2 * alpha * opt_mcost
+    denom = (1 - alpha) * opt_scost
+    frac = num / denom
+    frac **= 0.5
+    return 1 + frac
+
 def initialize_khuller(mst):
     root = mst.graph['root']
     mst.node[root]['parent'] = None
