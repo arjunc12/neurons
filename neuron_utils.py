@@ -1,7 +1,5 @@
 import matplotlib as mpl
 mpl.use('agg')
-import urllib2
-import json
 from sys import argv
 import networkx as nx
 import pylab
@@ -211,40 +209,16 @@ def point_dist(p1, p2):
         x1, x2 = p1[i], p2[i]
         sq_dist += (x1 - x2) ** 2
     return sq_dist ** 0.5
-
-def neuron_info(neuron_file):
-    assert neuron_file[-4:] == '.swc'
-    neuron = neuron_file[:-4]
-    if neuron[-4:] == '.CNG':
-        neuron = neuron[:-4]
-    url = 'http://neuromorpho.org:8081/neuron/query/neuron_name&=&' + neuron
-    data = urllib2.urlopen(url)
-    data = json.load(data)
-    data = data['data']
-    if len(data) == 0:
-        return None
-    data = data[0]
-    
-    species = data['species']
-    lab = data['archive_name']
-    region = data['region1']
-    class1 = data['class1']
-    cell_type = class1
-    if class1 == 'interneuron':
-        class2 = data['class2']
-        if class2 != None and class2 != '':
-            cell_type = class2
-    
-    return cell_type, species, region, lab
-   
+ 
 def sort_neighbors(G):
     for u in G.nodes_iter():
         G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
     G.graph['sorted'] = True
 
 def main():
-    neuron_file = argv[1]
-    print map(str, neuron_info(neuron_file))
+    #neuron_file = argv[1]
+    #print map(str, neuron_info(neuron_file))
+    pass
 
 if __name__ == '__main__':
     main()
