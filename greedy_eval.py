@@ -107,6 +107,10 @@ def greedy_eval_stats():
     df = pd.read_csv('greedy_eval.csv', names=['num_points', 'alpha',\
                                                'mcost', 'scost',\
                                                'opt_mcost', 'opt_scost'])
+
+    print "total trials"
+    print len(df['alpha']) / len(df['alpha'].unique())
+
     df['cost'] = (df['alpha'] * df['mcost']) + ((1 - df['alpha']) * df['scost'])
     df['opt_cost'] = (df['alpha'] * df['opt_mcost']) + ((1 - df['alpha']) * df['opt_scost'])
     
