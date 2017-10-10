@@ -15,8 +15,8 @@ colnames1 = c('name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha'
              'neural_dist', 'centroid_dist', 'random_dist', 'trials', 
              'successes', 'comparisons', 'dominates')
 df1 = read.csv('pareto_mst.csv', col.names=colnames1)
-print(df1$cell_type == df1$cell_type[3541])
-df = df1[df1$cell_type != df1$cell_type[3541],]
+#print(df1$cell_type == df1$cell_type[3541])
+#df = df1[df1$cell_type != df1$cell_type[3541],]
 
 df1$neuron_type = str_sub(df1$name, -1, -1)
 
@@ -33,7 +33,7 @@ df$mcost_hat = mcost_hat
 print(cor(df$alpha, df$mcost_resid))
 
 df$density = df$mcost / df$volume
-print(cor(df$alpha, df$volume))
+print(cor(df$alpha, df$density))
 
 model2 = lm(alpha~cell_type * species * region, data=df)
 print(anova(model2))
