@@ -29,6 +29,9 @@ def graph_costs(G):
 
     queue = [root]
     visited = set()
+
+    mcosts = []
+    scosts = []
     while len(queue) > 0:
         curr = queue.pop(0)
         
@@ -39,15 +42,22 @@ def graph_costs(G):
         for child in G.neighbors(curr):
             if child != parent[curr]:
                 length = G[curr][child]['length']
-                mcost += length
+                #mcost += length
+                mcosts.append(length)
                 child_droot = length + droot[curr]
                 droot[child] = child_droot
-                scost += child_droot
+                #scost += child_droot
+                scosts.append(child_droot)
                 parent[child] = curr
                 queue.append(child)
 
     if len(visited) < G.number_of_nodes():
         scost = float("inf") # graph is not connected
+
+    assert len(visited) == G.number_of_nodes()
+
+    mcost = sum(sorted(mcosts))
+    scost = sum(sorted(scosts))
 
     return mcost, scost
 
@@ -68,18 +78,48 @@ def best_satellite_cost(G):
     best_cost = 0
     root = G.graph['root']
     root_coord = G.node[root]['coord']
-    for u in G.nodes_iter():
-        best_cost += point_dist(root_coord, G.node[u]['coord'])
-    return best_cost
+    costs = []
+    for u in G.nodes():
+        if u == root:
+            continue
+        cost = point_dist(root_coord, G.node[u]['coord'])
+        #best_cost += cost
+        costs.append(cost)
+    #return best_cost
+    return sum(sorted(costs))
+    #return KahanSum(costs)
 
 def satellite_cost(G):
     root = G.graph['root']
     total_cost = 0
-    for u in G.nodes_iter():
+    costs = []
+    for u in G.nodes():
         if u == root:
             continue
         if nx.has_path(G, root, u):
-            total_cost += nx.shortest_path_length(G, root, u, weight='length')
+            droot = nx.shortest_path_length(G, root, u, weight='length')
+            #total_cost += droot
+            costs.append(droot)
         else:
-            total_cost += float("inf")
-    return total_cost
+            #total_cost += float("inf")
+            costs.append(float("inf"))
+    
+    #return total_cost
+    return sum(sorted(costs))
+    #return KahanSum(costs)
+
+def centroid_mst_costs(G):
+    root = G.graph['root']
+    centroidp = centroid(G)
+    root_cdist = point_dist(root, centroidp)
+
+    mcost = root_cdist
+    scost = 0
+    
+    for point in points:
+        if point != root:
+            cdist = point_dist(point, centroidp)
+            mcost += cdist
+            scost += cdist + root_cdist
+
+    return mcost, scost
