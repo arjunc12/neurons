@@ -5,6 +5,9 @@ import pandas as pd
 import networkx as nx
 from neuron_utils import *
 from collections import defaultdict
+import numpy as np
+import pylab
+from graph_utils import is_tree
 
 MAX_SEGMENTS = float("inf")
 
@@ -24,13 +27,27 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
     for i, pos in enumerate(trace_pos):
         if i + 1 > MAX_SEGMENTS:
             break
-        df = pd.read_csv(pos)
-        df.sort_values(by='ID', inplace=True)
-        rows = list(df.iterrows())
-        for j in xrange(len(rows)):
-            index1, row1 = rows[j]
+        
+        num_lines = num_lines = sum(1 for line in open(pos)) - 1
+        pos_file = open(pos)
+        coords = []
+        k = 0
+        for row in pos_file:
+            if k == 0:
+                k += 1
+                continue
+            row = row.split(',')
+            x = float(row[0])
+            y = float(row[1])
+            z = float(row[2])
+            coord = (x, y, z)
+            coord_id = int(row[-2])
+            coords.append((coord_id, coord))
+
+        coords = sorted(coords)
+        prev_coord = None
+        for j, (coord_id, new_coord) in enumerate(coords):
             id1 = None
-            new_coord = (row1['Position X'], row1['Position Y'], row1['Position Z'])
             if new_coord in coord_ids:
                 id1 = coord_ids[new_coord]
             else:
@@ -42,17 +59,19 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
                 start_counts[new_coord] += 1
                 start_ids.append(id1)
             else:
-                index2, row2 = rows[j - 1]
-                prev_coord = (row2['Position X'], row2['Position Y'], row2['Position Z'])
+                assert prev_coord != None
                 id2 = coord_ids[prev_coord]
                 if id1 != id2:
                     G.add_edge(id1, id2)
                     G[id1][id2]['length'] = point_dist(G.node[id1]['coord'], G.node[id2]['coord'])
 
-                if j == len(rows) - 1:
+                if j == len(coords) - 1:
                     end_ids.append(id1)
             
             nodeid += 1
+            prev_coord = new_coord
+
+        pos_file.close()
 
     root_coord =  max(start_counts.keys(), key = (lambda x : start_counts[x]))
     root_id = coord_ids[root_coord]
@@ -71,7 +90,6 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
                 if dist < closest_dist:
                     closest_dist = dist
                     closest_end = end_id
-            #print G.node[start_id]['coord'], G.node[closest_end]['coord']
             G.add_edge(start_id, closest_end)
             G[start_id][closest_end]['length'] = closest_dist
 
@@ -82,7 +100,6 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
         if G.graph['root'] not in component:
             isolated_nodes += component
 
-    #G.remove_nodes_from(isolated_nodes)
 
     for u, v in G.edges():
         if u == v:
