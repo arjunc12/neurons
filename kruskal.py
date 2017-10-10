@@ -1,7 +1,7 @@
 import networkx as nx
 from random import shuffle, random, choice
 from collections import defaultdict
-from neuron_utils import is_tree
+from graph_utils import is_tree
 
 def makes_cycle(u, v, node_to_forest):
     f1 = node_to_forest[u]
