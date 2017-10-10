@@ -3,12 +3,14 @@ library(stringr)
 
 getICCs <- function(df)
 {
-    print('cell type')
-    print(ICCbare(x=cell_type, y=alpha, data=df))
-    print('species')
-    print(ICCbare(x=species, y=alpha, data=df))
-    print('region')
-    print(ICCbare(x=region, y=alpha, data=df))  
+    for (cat in c("cell_type", "species", "region"))
+    {
+        df2 = unique(df, by=c("name", cat))
+        df2$count = ave(df2$alpha, df2[,cat], FUN=length)
+        df2 = df2[df2$count > 25,]
+        print(cat)
+        print(ICCbare(x=cat, y=alpha, data=df2))
+    }
 }
 
 colnames = c('name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',
