@@ -13,7 +13,8 @@ import pandas as pd
 MIN_POINTS = 8
 MAX_POINTS = 50
 
-COLNAMES = ['num_points', 'time1', 'time2'] #, 'comparisons', 'dominates']
+#COLNAMES = ['num_points', 'time1', 'time2']
+COLNAMES = ['num_points', 'time1', 'time2', 'comparisons', 'successes']
 
 def runtimes_stats():
     df = pd.read_csv('test_runtimes.csv', names=COLNAMES)
@@ -31,6 +32,8 @@ def runtimes_stats():
     pylab.ylabel('rumtime (minutes)')
     pylab.savefig('test_runtimes/runtimes.pdf', format='pdf')
     pylab.close()
+
+    print float(pylab.nansum(df['successes'])) / float(pylab.nansum(df['comparisons']))
 
 def time_function(G, alpha, pareto_func):
     start = time()
@@ -68,9 +71,8 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
             times2 = []
 
             delta = 0.01
-            comparisons = 0
-            dominates = 0
-            for alpha in pylab.arange(delta, 1, delta):
+            alphas = pylab.arange(delta, 1, delta)
+            for alpha in alphas:
                 print "alpha", alpha
                 mcost1, scost1, time1 = time_function(G, alpha, pareto_prim)
 
@@ -91,9 +93,28 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
 
             genetic_runtime = (genetic_end - genetic_start) / 60.0
 
+            comparisons = 0
+            successes = 0
             for mcost2, scost2, T in genetic_trees:
                 mcost2 = normalize_mcost(mcost2)
                 scost2 = normalize_scost(scost2)
+
+                successful_tree = False
+                for i in xrange(len(alphas)):
+                    alpha = alphas[i]
+                    mcost1 = mcosts1[i]
+                    scost1 = scosts1[i]
+
+                    cost1 = pareto_cost(mcost1, scost1, alpha)
+                    cost2 = pareto_cost(mcost2, scost2, alpha)
+
+                    if cost2 <= cost1:
+                        successful_tree = True
+                        break
+
+                comparisons += 1
+                if successful_tree:
+                    successes += 1
                 
                 mcosts2.append(mcost2)
                 scosts2.append(scost2)
@@ -113,7 +134,7 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
             
             pylab.close()
 
-            write_items = [num_points, greedy_runtime, genetic_runtime]
+            write_items = [num_points, greedy_runtime, genetic_runtime, comparisons, successes]
             
             write_items = map(str, write_items)
             write_items = ', '.join(write_items)
