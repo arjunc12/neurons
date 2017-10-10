@@ -5,24 +5,7 @@ import networkx as nx
 import pylab
 import numpy as np
 from itertools import combinations
-
-def complete_graph(G):
-    H = G.copy()
-    H.remove_edges_from(H.edges())
-    for u, v in combinations(H.nodes(), 2):
-        H.add_edge(u, v)
-        H[u][v]['length'] = point_dist(H.node[u]['coord'], H.node[v]['coord'])
-    return H
-
-def is_tree(G):
-    if G.number_of_edges() != G.number_of_nodes() - 1:
-        print "wrong number of edges"
-        print "edges", G.number_of_edges(), "nodes", G.number_of_nodes()
-        return False
-    if not nx.is_connected(G):
-        print "not connected"
-        return False
-    return True
+from scipy.spatial.distance import euclidean
 
 def pareto_cost(mcost, scost, alpha):
     # alpha = 0 minimizes satellite cost
@@ -39,7 +22,7 @@ def centroid(G):
     for u in G.nodes_iter():
         point = G.node[u]['coord']
         assert len(point) == len(root_coord)
-        if point != root:
+        if u != root:
             centroid += point
     centroid /= G.number_of_nodes() - 1
     return centroid
@@ -100,6 +83,7 @@ def get_neuron_points(filename, dim='3D'):
                         #P2Coord[root] = (float(cols[2]),float(cols[3]))
                     else:
                         assert False
+                    #G.node[root]['coord'] = pylab.array(coord)
                     G.node[root]['coord'] = coord
                     G.graph['root'] = root
 
@@ -120,6 +104,7 @@ def get_neuron_points(filename, dim='3D'):
                         assert False
                     G.add_edge(u, v)
                     
+                    #G.node[v]['coord'] = pylab.array(coord)
                     G.node[v]['coord'] = coord
                     
                     G[u][v]['length'] = point_dist(G.node[u]['coord'], G.node[v]['coord'])
@@ -203,17 +188,49 @@ def viz_tree(G, name, outdir='figs'):
     pylab.close()
 
 def point_dist(p1, p2):
+    '''
+    '''
     assert len(p1) == len(p2)
     sq_dist = 0
     for i in xrange(len(p1)):
         x1, x2 = p1[i], p2[i]
         sq_dist += (x1 - x2) ** 2
     return sq_dist ** 0.5
- 
+    '''
+    '''
+    #return euclidean(p1, p2)
+    #return np.linalg.norm(p1 - p2)
+
+def node_dist(G, u, v):
+    p1 = G.node[u]['coord']
+    p2 = G.node[v]['coord']
+    return point_dist(p1, p2)
+
+def root_dist(G, u):
+    assert 'root' in G.graph
+    return node_dist(G, u, G.graph['root'])
+
 def sort_neighbors(G):
     for u in G.nodes_iter():
         G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
     G.graph['sorted'] = True
+
+def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
+    best_dist = float("inf")
+    best_index = None
+
+    assert len(pareto_mcosts) == len(pareto_scosts)
+
+    for i in xrange(len(pareto_mcosts)):
+        pareto_mcost = pareto_mcosts[i]
+        pareto_scost = pareto_scosts[i]
+
+        dist = point_dist((pareto_mcost, pareto_scost), (mcost, scost))
+        if dist < best_dist:
+            best_dist = dist
+            best_index = i
+
+    return best_dist, best_index 
 
 def main():
     #neuron_file = argv[1]
