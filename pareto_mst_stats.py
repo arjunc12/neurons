@@ -1,6 +1,6 @@
 from collections import defaultdict
 import pandas as pd
-import pareto_mst_plots
+from pareto_mst_plots import get_df, CATEGORIES, add_count_col
 import neuron_density
 import pylab
 from numpy.ma import masked_invalid
@@ -34,6 +34,7 @@ def basic_stats(df):
     df2 = df.drop_duplicates(subset='name')
     total_trials = df2['trials'].sum()
     total_successes = df2['successes'].sum()
+    print total_successes, total_trials
     print "p-value", float(total_successes) / total_trials
     print "neural to centroid ratio", infmean(df2['neural_dist'] / df2['centroid_dist'])
     print "neural to random ratio", infmean(df2['neural_dist'] / df2['random_dist'])
@@ -49,23 +50,27 @@ def infmean(arr):
     return pylab.mean(masked_invalid(arr))
 
 def metadata(df):
-    print "unique species"
-    print len(df['species'].unique())
-    
-    print "unique cell types"
-    print len(df['cell_type'].unique())
+    print "unique neurons"
+    print len(df['name'].unique())
 
-    print "unique brain regions"
-    print len(df['region'].unique())
+    for category in CATEGORIES:
+        print "unique " + category
+        print len(df[category].unique())
+        df2 = df.drop_duplicates(subset=['name', category])
+        df2 = add_count_col(df2, category)
+        f = open(category + '.txt', 'w')
+        with pd.option_context('display.max_rows', None, 'display.max_columns', 3):
+            print >> f,  df2
+        f.close()
 
 def neuron_type_alphas(df):
-    df2 = df.drop_duplicates(subset='name')
+    df2 = df.drop_duplicates(subset=['name', 'neuron_type'])
     for neuron_type, group in df2.groupby('neuron_type'):
         print neuron_type, pylab.mean(group['alpha'])
 
 def main():
     fname = 'pareto_mst.csv'
-    df = pareto_mst_plots.get_df()
+    df = get_df()
     metadata(df)
     neuron_type_alphas(df)
     basic_stats(df)
