@@ -1,5 +1,6 @@
 import os
-from neuron_utils import get_neuron_points, viz_tree, is_tree
+from neuron_utils import get_neuron_points, viz_tree
+from graph_utils import is_tree
 from sys import argv
 
 BUILDER_EXE = 'neuronbuilder2'
