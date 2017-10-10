@@ -53,24 +53,24 @@ def add_path(G, KT, T_sat, u):
         add_path(G, KT, T_sat, parent)
         relax(G, KT, parent, u)
 
-def DFS(G, KT, T_span, T_sat, u, alpha):
+def DFS(G, KT, T_span, T_sat, u, beta):
     root = KT.graph['root']
-    if KT.node[u]['droot'] > alpha * nx.shortest_path_length(T_sat, root, u, weight='length'):
+    if KT.node[u]['droot'] > beta * nx.shortest_path_length(T_sat, root, u, weight='length'):
         add_path(G, KT, T_sat, u)
 
     for v in T_span.neighbors(u):
         if v != T_span.node[u]['parent']:
             relax(G, KT, u, v)
-            DFS(G, KT, T_span, T_sat, v, alpha)
+            DFS(G, KT, T_span, T_sat, v, beta)
 
 
-def khuller(G, T_span, T_sat, alpha):
-    assert alpha > 1
+def khuller(G, T_span, T_sat, beta):
+    assert beta > 1
     initialize_parents(T_span)
     initialize_parents(T_sat)
     KT = T_span.copy()
     initialize(KT)
-    DFS(G, KT, T_span, T_sat, G.graph['root'], alpha)
+    DFS(G, KT, T_span, T_sat, G.graph['root'], beta)
     KT.remove_edges_from(G.edges())
     for u in KT.nodes_iter():
         if u != KT.graph['root']:
@@ -83,45 +83,37 @@ def khuller(G, T_span, T_sat, alpha):
     assert KT.number_of_edges() == KT.number_of_nodes() - 1
     return KT
 
-def main():
-    '''
+def khuller_test_graph():
     G = nx.Graph()
     root = (0, 0)
-    points = [root, (0, 0.1), (0.001, 0.2), (0.2, 0), (1, 1), (2, 2.000001), (2, 2.1), (2.1, 2), (0.1001, 0.1)]
-    for p1, p2 in combinations(points, 2):
-        G.add_edge(p1, p2)
-        G[p1][p2]['length'] = (((p1[0] - p2[0]) ** 2) + ((p1[1] - p2[1]) ** 2)) ** 0.5
+    G.add_node(root)
+    G.graph['root'] = root
+    G.node[root]['coord'] = (0, 0)
 
-    T_sat = nx.Graph()
-    for u in G.nodes_iter():
-        if u != root:
-            T_sat.add_edge(u, root)
-            T_sat[u][root]['length'] = (((u[0] - root[0]) ** 2) + ((u[1] - root[1]) ** 2)) ** 0.5
+    for i in xrange(1, 11):
+        coord1 = (1, 2 + i)
+        coord2 = (-1, 2 + i)
+        G.add_node(coord1)
+        G.node[coord1]['coord'] = coord1
+        G.add_node(coord2)
+        G.node[coord2]['coord'] = (-1, 2 + i)
 
-    T_span = nx.minimum_spanning_tree(G, weight='length')
-    for H in [G, T_span, T_sat]:
-        H.graph['root'] = root
-    '''
+    return complete_graph(G)
 
-    graphs = get_neuron_points(TEST_NEURON)
-    G = graphs[0]
-    assert is_tree(G)
-    print "making graph"
-    G = complete_graph(G)
-    print "getting satellite tree"
+def main():
+    G = khuller_test_graph()
     T_sat = satellite_tree(G)
-    print "getting spanning tree"
-    T_span = nx.minimum_spanning_tree(G, weight='length')
+    opt_scost = satellite_cost(T_sat)
+    T_span = min_spanning_tree(G)
+    opt_mcost = mst_cost(T_span)
 
-    for beta in np.arange(0.01, 0.99, 0.01):
-        print beta
-        alpha = 1.0 / (1 - beta)
+    alpha = float(argv[1])
+    beta = alpha_to_beta(alpha, opt_mcost, opt_scost)
+    print beta
 
-        KT = khuller(G, T_span, T_sat, alpha)
-        #print sorted(map(lambda x : tuple(sorted(x)), KT.edges()))
-        print "satellite cost", satellite_cost(KT)
-        print "mst cost", mst_cost(KT)
-
+    KT = khuller(G, T_span, T_sat, beta)
+    for u, v in sorted(KT.edges_iter()):
+        print KT.node[u]['coord'], KT.node[v]['coord']
 
 if __name__ == '__main__':
     main()
