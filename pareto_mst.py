@@ -16,89 +16,14 @@ from pareto_functions import *
 from kruskal import *
 from neuron_builder import build_neuron
 from random_graphs import random_mst
+from graph_utils import *
 
-SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported', 'interneuron-specific_interneuron']
+SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported']
 
 VIZ_TREES = False
 MIN_NODES = 0
 MAX_NODES = 3000
 NO_CONTINUE = False
-
-def centroid_mst(G):
-    cent_mst = G.copy()
-    cent_mst.remove_edges_from(G.edges())
-    
-    centroidp = centroid(G)
-    cent_mst.add_node('centroid')
-    cent_mst.node['centroid']['label'] = 'centroid'
-    cent_mst.node['centroid']['coord'] = centroidp
-    for u in G.nodes_iter():
-        cent_mst.add_edge(u, 'centroid')
-        cent_mst[u]['centroid']['length'] = point_dist(cent_mst.node[u]['coord'], centroidp)
-    return cent_mst
-
-def centroid_mst_costs(G):
-    root = G.graph['root']
-    centroidp = centroid(G)
-    root_cdist = point_dist(root, centroidp)
-
-    mcost = root_cdist
-    scost = 0
-    
-    for point in points:
-        if point != root:
-            cdist = point_dist(point, centroidp)
-            mcost += cdist
-            scost += cdist + root_cdist
-
-    return mcost, scost
-
-def points_to_graph(points):
-    point_graph = nx.Graph()
-    for p1, p2 in combinations(points, 2):
-        point_graph.add_edge(p1, p2)
-        length = point_dist(p1, p2)
-        point_graph[p1][p2]['length'] = length
-    return point_graph
-
-def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
-    best_dist = float("inf")
-    best_index = None
-
-    assert len(pareto_mcosts) == len(pareto_scosts)
-
-    for i in xrange(len(pareto_mcosts)):
-        pareto_mcost = pareto_mcosts[i]
-        pareto_scost = pareto_scosts[i]
-
-        dist = point_dist((pareto_mcost, pareto_scost), (mcost, scost))
-        if dist < best_dist:
-            best_dist = dist
-            best_index = i
-
-    return best_dist, best_index 
-
-def non_continue_subgraph(G):
-    H = G.copy()
-    root = H.graph['root']
-    for u in G.nodes_iter():
-        if G.node[u]['label'] == 'continue':
-            H.remove_node(u)
-    H = complete_graph(H)
-    return H
-
-def graph_to_points(G, root, P2Coord, cont=False):
-    points = []
-    for u in G.nodes_iter():
-        degree = len(G.neighbors(u))
-        if (u == root) or (u != root and degree != 2) or cont:
-            points.append(P2Coord[u])
-    return points
-
-def init_lengths(G):
-    for u, v in G.edges_iter():
-        p1, p2 = G.node[u]['coord'], G.node[v]['coord']
-        G[u][v]['length'] = point_dist(p1, p2)
 
 def pareto_drawings(filename, name, outdir='drawings'): 
     G = get_neuron_points(filename)
@@ -313,6 +238,125 @@ def pareto_plot(G, name, cell_type, species, region, lab, outdir='figs',\
     #pylab.scatter([rand_mcost], [rand_scost], c='m', marker='*', linewidths=15)
     #pylab.plot([rand_mcost, rand_closem], [rand_scost, rand_closes], c='m', linestyle='-')
 
+def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
+    if not is_tree(G):
+        print "not a tree"
+        return None
+
+    assert G.number_of_nodes() > 0
+   
+    print "making graph"
+    point_graph = None
+    if NO_CONTINUE:
+        point_graph = non_continue_subgraph(G)
+    else:
+        point_graph = complete_graph(G)
+    print point_graph.number_of_nodes(), "points"
+   
+    sat_tree = satellite_tree(point_graph)
+    span_tree = nx.minimum_spanning_tree(point_graph, weight='length')
+    
+    opt_scost = float(satellite_cost(sat_tree))
+    normalize_scost = lambda cost : normalize_cost(cost, opt_scost)
+    opt_mcost = float(mst_cost(span_tree))
+    normalize_mcost = lambda cost : normalize_cost(cost, opt_mcost)
+    
+    mcosts1 = []
+    scosts1 = []
+    
+    mcosts2 = []
+    scosts2 = []
+
+    mcosts3 = []
+    scosts3 = []
+
+    delta = 0.01
+    alphas = np.arange(0, 1 + delta, delta)
+    print "sorting neighbors"
+    sort_neighbors(point_graph)
+
+    for i, alpha in enumerate(alphas):
+        print "alpha", alpha
+        pareto_tree1 = None
+        pareto_tree2 = None
+        if alpha == 0:
+            pareto_tree1 = pareto_tree2 = sat_tree
+            pareto_tree3 = sat_tree
+        elif alpha == 1:
+            pareto_tree1 = pareto_tree2 = span_tree
+            pareto_tree3 = span_tree
+        else:
+            pareto_tree1 = pareto_prim(point_graph, alpha, axon=axon)
+            beta = alpha_to_beta(alpha, opt_mcost, opt_scost)
+            pareto_tree2 = khuller(point_graph, span_tree, sat_tree, beta)
+            pareto_tree3 = pareto_steiner(point_graph, alpha, axon=axon)
+
+        assert is_tree(pareto_tree1)
+        assert is_tree(pareto_tree2)
+        assert is_tree(pareto_tree3)
+
+        if (alpha != 0 and alpha != 1 and i % 5 == 0) and viz_trees:
+            viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
+        
+        mcost1, scost1 = graph_costs(pareto_tree1)
+        mcost1 = normalize_mcost(mcost1)
+        scost1 = normalize_scost(scost1)
+       
+        mcost2, scost2 = graph_costs(pareto_tree2)
+        mcost2 = normalize_mcost(mcost2)
+        scost2 = normalize_scost(scost2)
+        
+        mcost3, scost3 = graph_costs(pareto_tree3)
+        mcost3 = normalize_mcost(mcost3)
+        scost3 = normalize_scost(scost3)
+        
+        mcosts1.append(mcost1)
+        scosts1.append(scost1)
+       
+        mcosts2.append(mcost2)
+        scosts2.append(scost2)
+
+        mcosts3.append(mcost3)
+        scosts3.append(scost3)
+        
+
+    pylab.figure()
+    pylab.plot(mcosts1, scosts1, c = 'b')
+    pylab.scatter(mcosts1, scosts1, c='b', label='prim')
+    
+    pylab.plot(mcosts2, scosts2, c = 'k')
+    pylab.scatter(mcosts2, scosts2, c='k', label='khuller')
+    
+    pylab.plot(mcosts3, scosts3, c = 'r')
+    pylab.scatter(mcosts3, scosts3, c='r', label='steiner')
+    
+    pylab.xlabel('spanning tree cost')
+    pylab.ylabel('satellite cost')
+    
+    neural_mcost = normalize_mcost(mst_cost(G))
+    neural_scost  = normalize_scost(satellite_cost(G))
+
+    centroid_tree = centroid_mst(point_graph)
+
+    centroid_mcost = normalize_mcost(mst_cost(centroid_tree))
+    centroid_scost = normalize_scost(satellite_cost(centroid_tree))
+    
+
+    pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+', linewidths=15, label='centroid mst')
+
+    #pylab.axhline(opt_scost)
+    #pylab.axvline(opt_mcost)
+
+    #pylab.legend()
+
+    pylab.savefig('%s/pareto_front_%s.pdf' % (outdir, name), format='pdf')
+    pylab.close()
+
+    viz_tree(G, name + str('_neural'), outdir=outdir) 
+    viz_tree(sat_tree, name + str('_sat'), outdir=outdir)
+    viz_tree(span_tree, name + str('_mst'), outdir=outdir)
+    viz_tree(centroid_tree, name + '_centroid', outdir=outdir) 
+
 def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES):
     #directory = 'neuromorpho'
     directory = 'datasets'
@@ -361,8 +405,7 @@ def imaris_plots():
                     imfiles.append('imaris/' + subdir + '/' + fname)
             G = read_imaris(imfiles, viz=False)
             outdir = 'imaris/' + subdir
-            pareto_plot(G, subdir, None, None, None, None, outdir,\
-                        output=False, viz_trees=True, compare=True)
+            pareto_plot_imaris(G, subdir, outdir, viz_trees=True)
 
 
 def neuron_builder_plots(rmin=0.5, rmax=1.5, rstep=0.01, num_iters=10):
