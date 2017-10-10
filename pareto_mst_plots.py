@@ -28,22 +28,39 @@ PSEUDOCOUNT = 0.0001
 
 CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type']
 
+MIN_COUNT = 25
+
+def add_count_col(df, categories):
+    return df.groupby(categories).size().reset_index(name='count')
+
+def remove_small_counts(df, categories):
+    df2 = add_count_col(df, categories)
+    df2 = pd.merge(df, df2)
+    df2 = df2[df2['count'] >= MIN_COUNT]
+    return df2
+
 def alpha_counts(df, category, cat_value, alphas=None):
     alpha_values = df['alpha'][df[category] == cat_value]
+    alpha_values = pylab.array(alpha_values)
+    alpha_values = np.around(alpha_values, decimals=2)
     alpha_values = list(alpha_values)
+    alpha_values = map(lambda x : round(x, 2), alpha_values)
     
+    if alphas == None:
+        delta = 0.01
+        alphas = pylab.arange(0, 1 + delta, delta)
+        alphas = list(alphas)
+        alphas = map(lambda x : round(x, 2), alphas)
+        
     counts_dict = defaultdict(int)
     for alpha_value in alpha_values:
         counts_dict[alpha_value] += 1
 
     counts = []
-    if alphas == None:
-        delta = 0.01
-        alphas = pylab.arange(0, 1 + delta, delta)
     for alpha in alphas:
         count = counts_dict[alpha]
         counts.append(count)
-
+    
     return counts
 
 def all_counts(df, category, alphas=None):
@@ -117,6 +134,7 @@ def hellinger_distance(dist1, dist2):
 
 def make_dist_frame(df, category, alphas=None, dist_func=pseudo_kld):
     df2 = df.drop_duplicates(subset=['name', category])
+    df2 = remove_small_counts(df2, category)
 
     counts = all_counts(df2, category, alphas)
     
@@ -141,7 +159,8 @@ def make_dist_frame(df, category, alphas=None, dist_func=pseudo_kld):
 
     return dist_frame
 
-DIST_FUNCS = [pseudo_kld, hellinger_distance]
+#DIST_FUNCS = [pseudo_kld, hellinger_distance]
+DIST_FUNCS = [hellinger_distance]
 DIST_FUNC_NAMES = {pseudo_kld : 'kld', hellinger_distance : 'hellinger'}
 
 def dist_heat(df, category, alphas=None, dist_func=pseudo_kld):
@@ -149,6 +168,8 @@ def dist_heat(df, category, alphas=None, dist_func=pseudo_kld):
     dist_frame = dist_frame.pivot(category + '1', category + '2', 'distance')
     pylab.figure()
     ax = sns.heatmap(dist_frame)
+    ax.tick_params(labelsize=5, axis='x')
+    ax.tick_params(labelsize=5, axis='y')
     pylab.savefig('%s/%s_heat_%s.pdf' % (OUTDIR, DIST_FUNC_NAMES[dist_func], category), format='pdf')
     pylab.close()
 
@@ -166,6 +187,7 @@ def dist_heats(df, categories, dist_funcs, alphas=None):
 def alphas_heat(df, categories):
     for cat1, cat2 in combinations(categories, 2):
         df2 = df.drop_duplicates(subset=['name', cat1, cat2])
+        df2 = remove_small_counts(df2, [cat1, cat2])
         df2 = df2.groupby([cat1, cat2], as_index=False).agg({'alpha' : pylab.mean})
         data = df2.pivot(cat1, cat2, 'alpha')
         pylab.figure()
@@ -188,12 +210,13 @@ def cat_to_num(categories):
         cat_nums.append(cat_map[category])
     return cat_nums
 
-def alpha_distribution(df, identifiers, plot_func, plot_descriptor):
-    for identifier in identifiers:
+def alpha_distribution(df, categories, plot_func, plot_descriptor):
+    for category in categories:
+        df2 = remove_small_counts(df, category)
         pylab.figure()
-        dist_plot = plot_func(x='alpha', y=identifier, data=df, orient='h')
+        dist_plot = plot_func(x='alpha', y=category, data=df2, orient='h')
         dist_plot.tick_params(labelsize=10, axis='y')
-        pylab.savefig('%s/%s_alphas_%s.pdf' % (OUTDIR, identifier, plot_descriptor), format='pdf')
+        pylab.savefig('%s/%s_alphas_%s.pdf' % (OUTDIR, category, plot_descriptor), format='pdf')
         pylab.close()
 
 def cluster_alphas(df, identifiers):
