@@ -1,5 +1,5 @@
 import networkx as nx
-from neuron_utils import point_dist, pareto_cost, sort_neighbors
+from neuron_utils import *
 from kruskal import kruskal
 from random_graphs import random_mst
 from itertools import combinations
@@ -12,6 +12,10 @@ from collections import defaultdict
 from prufer import *
 from enumerate_trees import find_all_spanning_trees
 from random_graphs import random_point_graph
+from steiner_midpoint import *
+from sys import argv
+from scipy.spatial.distance import euclidean
+from graph_utils import *
 
 POP_SIZE = 400
 GENERATIONS = 20000
@@ -61,7 +65,7 @@ def crossover_trees(seq1, seq2):
 def mutate_tree(seq1, mutation_prob=MUTATION_PROB):
     if random() < MUTATION_PROB:
         idx = randint(0, len(seq1) - 1)
-        new_digit = randint(0, 9)
+        new_digit = randint(0, len(seq1))
         seq1[idx] = new_digit
 
 def seq_to_tree(seq, G):
@@ -184,6 +188,7 @@ def pareto_prim(G, alpha, axon=False):
     H.add_node(root)
     H.graph['root'] = root
     H.node[root]['droot'] = 0
+    H.node[root]['coord'] = G.node[root]['coord']
    
     graph_mcost = 0
     graph_scost = 0
@@ -258,7 +263,10 @@ def pareto_prim(G, alpha, axon=False):
 
         assert 'droot' in H.node[u]
         H.node[v]['droot'] = H.node[u]['droot'] + G[u][v]['length']
-        
+        H.node[v]['coord'] = G.node[v]['coord']
+
+        check_dists(H)
+ 
         '''
         if 'droot' in H.node[u]:
             H.node[v]['droot'] = H.node[u]['droot'] + G[u][v]['length']
@@ -269,7 +277,7 @@ def pareto_prim(G, alpha, axon=False):
         '''
 
         closest_neighbors[u].remove(v)
-        closest_neighbors[v].append(u)
+        closest_neighbors[v].remove(u)
    
     pareto_mst = G.copy()
     pareto_mst.remove_edges_from(G.edges())
@@ -366,7 +374,7 @@ def pareto_prim_sandbox(G, alpha, axon=False):
         H.node[v]['droot'] = H.node[u]['droot'] + G[u][v]['length']
         
         closest_neighbors[u].remove(v)
-        closest_neighbors[v].append(u)
+        closest_neighbors[v].remove(u)
    
     pareto_mst = G.copy()
     pareto_mst.remove_edges_from(G.edges())
@@ -375,6 +383,183 @@ def pareto_prim_sandbox(G, alpha, axon=False):
         pareto_mst[u][v]['length'] = G[u][v]['length']
 
     return pareto_mst
+
+def pareto_steiner(G, alpha, axon=False):
+    root = G.graph['root']
+    if 'sorted' not in G.graph:
+        sort_neighbors(G)
+
+    H = nx.Graph()
+   
+    H.add_node(root)
+    H.graph['root'] = root
+    H.node[root]['droot'] = 0
+    H.node[root]['parent'] = None
+    root_coord = G.node[root]['coord']
+    H.node[root]['coord'] = root_coord
+   
+    graph_mcost = 0
+    graph_scost = 0
+
+    closest_neighbors = {}
+    for u in G.nodes_iter():
+        closest_neighbors[u] = G.node[u]['close_neighbors'][:]
+
+    unpaired_neighbors = []
+    candidate_nodes = defaultdict(list)
+
+    node_index = max(G.nodes()) + 1
+
+    dist_error = 0
+
+    steps = 0
+    while steps < G.number_of_nodes():
+        best_edge = None
+        best_cost = float("inf")
+
+        candidate_edges = []
+        for u in H.nodes():
+            if axon and (u == H.graph['root']) and (H.degree(u) > 0):
+                continue
+
+            assert 'droot' in H.node[u]
+             
+            invalid_neighbors = []
+            closest_neighbor = None
+            for i in xrange(len(closest_neighbors[u])):
+                v = closest_neighbors[u][i]
+                if H.has_node(v):
+                    invalid_neighbors.append(v)
+                else:
+                    closest_neighbor = v
+                    break
+
+            for n in invalid_neighbors:
+                closest_neighbors[u].remove(n)
+
+            if closest_neighbor != None:
+                candidate_edges.append((u, closest_neighbor))
+                candidate_nodes[closest_neighbor].append(u)
+
+        for u, v in candidate_edges:
+            p1 = H.node[u]['coord']
+            p2 = G.node[v]['coord']
+            length = point_dist(p1, p2)
+            
+            mcost = length
+
+            scost = 0
+            
+            assert H.has_node(u)
+            scost += length + H.node[u]['droot']
+
+            
+            cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
+            
+            if cost < best_cost:
+                best_edge = (u, v)
+                best_cost = cost
+        if best_edge == None:
+            break
+        u, v = best_edge
+
+        p1 = H.node[u]['coord']
+        p2 = p1
+        w = H.node[u]['parent']
+        midpoint = p1
+        choice = 1
+        if w != None:
+            p1 = H.node[u]['coord']
+            p2 = H.node[w]['coord']
+            p3 = G.node[v]['coord']
+
+            midpoint, choice = best_midpoint_approx(p1, p2, p3, alpha)
+
+        out_node = v
+        in_node = None
+        steiner = False
+        if choice == 1:
+            in_node = u
+        elif choice == 2:
+            in_node = w
+        else:
+            assert choice == 3
+            assert w != None
+            
+            p1 = H.node[u]['coord']
+            p2 = H.node[w]['coord']
+
+            steiner = True
+            midpoint_node = node_index
+            in_node = midpoint_node
+            node_index += 1
+
+            init_dist = H.node[u]['droot']
+            init_length = H[u][w]['length']
+
+            H.add_node(midpoint_node)
+            H.node[midpoint_node]['coord'] = midpoint  
+
+            H.remove_edge(u, w) 
+            H.add_edge(midpoint_node, w)
+            H.add_edge(u, midpoint_node)
+            
+            H[midpoint_node][w]['length'] = point_dist(midpoint, p2)
+            H[u][midpoint_node]['length'] = point_dist(p1, midpoint)
+
+            H.node[u]['parent'] = midpoint_node
+            H.node[midpoint_node]['parent'] = w
+
+            midpoint_dist = H[midpoint_node][w]['length'] + H.node[w]['droot']
+            H.node[midpoint_node]['droot'] = midpoint_dist
+
+            H.node[u]['droot'] = H[u][midpoint_node]['length'] + H.node[midpoint_node]['droot']
+
+            midpoint_neighbors = []
+            for u in G.nodes():
+                if not H.has_node(u):
+                    p1 = H.node[midpoint_node]['coord']
+                    p2 = G.node[u]['coord']
+                    dist = point_dist(p1, p2)
+                    midpoint_neighbors.append((dist, u))
+
+            midpoint_neighbors = sorted(midpoint_neighbors)
+            closest_neighbors[midpoint_node] = []
+            for dist, neighbor in midpoint_neighbors:
+                closest_neighbors[midpoint_node].append(neighbor)
+
+
+        H.add_node(out_node)
+        H.node[out_node]['coord'] = G.node[out_node]['coord']
+        H.add_edge(in_node, out_node)
+        H.node[out_node]['parent'] = in_node
+        in_coord = H.node[in_node]['coord']
+        out_coord = H.node[out_node]['coord']
+        H[in_node][out_node]['length'] = point_dist(in_coord, out_coord)
+
+        assert 'droot' in H.node[in_node]
+        H.node[out_node]['droot'] = H.node[in_node]['droot'] + H[in_node][out_node]['length']
+       
+        if True:
+            if out_node in closest_neighbors[in_node]:
+                closest_neighbors[in_node].remove(out_node)
+            if in_node in closest_neighbors[out_node]:
+                closest_neighbors[out_node].remove(in_node)
+
+        steps += 1
+
+
+    assert is_tree(H)
+    for u in G.nodes():
+        assert H.has_node(u)
+
+    pareto_mst = G.copy()
+    pareto_mst.remove_edges_from(G.edges())
+    for u, v in H.edges():
+        pareto_mst.add_edge(u, v)
+        pareto_mst[u][v]['length'] = H[u][v]['length']
+
+    return H
 
 def alpha_to_beta(alpha, opt_mcost, opt_scost):
     assert alpha > 0
@@ -452,48 +637,26 @@ def pareto_brute_force(G, alpha, trees=None):
 
     return best_tree
 
-def main():
-    G = random_point_graph(15)
+def centroid_mst(G):
+    cent_mst = G.copy()
+    cent_mst.remove_edges_from(G.edges())
     
-    sat_tree = satellite_tree(G)
-    span_tree = nx.minimum_spanning_tree(G, weight='length')
-           
-    opt_scost = float(satellite_cost(sat_tree))
-    normalize_scost = lambda cost : normalize_cost(cost, opt_scost)
-    opt_mcost = float(mst_cost(span_tree))
-    normalize_mcost = lambda cost : normalize_cost(cost, opt_mcost)
+    centroidp = centroid(G)
+    cent_mst.add_node('centroid')
+    cent_mst.node['centroid']['label'] = 'centroid'
+    cent_mst.node['centroid']['coord'] = centroidp
+    for u in G.nodes_iter():
+        cent_mst.add_edge(u, 'centroid')
+        cent_mst[u]['centroid']['length'] = point_dist(cent_mst.node[u]['coord'], centroidp)
+    return cent_mst
 
-    mcosts1  = []
-    scosts1 = []
-
-    sort_neighbors(G)
-
-    delta = 0.01
-    alphas = pylab.arange(delta, 1, delta)
-    for alpha in alphas:
-        print alpha
-        pareto_mst = pareto_prim(G, alpha)
-        mcost1, scost1 = graph_costs(pareto_mst)
-        mcost1 = normalize_mcost(mcost1)
-        scost1 = normalize_scost(scost1)
-        mcosts1.append(mcost1)
-        scosts1.append(scost1)
-
-    best_trees = pareto_genetic(G)
-    mcosts2 = []
-    scosts2 = []
-    for mcost2, scost2, tree in best_trees:
-        mcost2 = normalize_mcost(mcost2)
-        scost2 = normalize_scost(scost2)
-        mcosts2.append(mcost2)
-        scosts2.append(scost2)
-
-    pylab.figure()
-    pylab.plot(mcosts1, scosts1, c='b')
-    pylab.scatter(mcosts1, scosts1, c='b')
-    pylab.scatter(mcosts2, scosts2, c='r')
-    pylab.savefig('genetic.pdf')
-    pylab.close()
+def main():
+    alpha = float(argv[1])
+    G = random_point_graph(20)
+    mst = pareto_prim(G, alpha)
+    steiner = pareto_steiner(G, alpha)
+    print graph_costs(mst)
+    print graph_costs(steiner)
 
 if __name__ == '__main__':
     main()
