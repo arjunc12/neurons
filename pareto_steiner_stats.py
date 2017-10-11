@@ -5,7 +5,7 @@ import pylab
 from numpy.ma import masked_invalid
 from scipy.stats import pearsonr, spearmanr
 
-OUTDIR = 'stats'
+OUTDIR = 'steiner_stats'
 
 '''
 COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'alpha', 'neural_dist',\
@@ -24,6 +24,17 @@ PSEUDOCOUNT = 0.0001
 CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type']
 
 MIN_COUNT = 25
+
+MIN_POINTS = 100
+
+def get_df():
+    fname = 'pareto_steiner.csv'
+    df = pd.read_csv(fname, names=COLUMNS, skipinitialspace=True)
+    df = df[df['points'] >= MIN_POINTS]
+    df['neuron_type'] = df['name'].str[-1]
+    df['neuron_type'] = df['neuron_type'].astype(int)
+    df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
+    return df
 
 def add_count_col(df, categories):
     return df.groupby(categories).size().reset_index(name='count')
@@ -273,14 +284,6 @@ def neuron_types_hist(df):
     pylab.savefig('%s/neuron_types_hist.pdf' % OUTDIR, format='pdf')
     pylab.close()
 
-def get_df():
-    fname = 'pareto_mst.csv'
-    df = pd.read_csv(fname, names=COLUMNS, skipinitialspace=True)
-    df['neuron_type'] = df['name'].str[-1]
-    df['neuron_type'] = df['neuron_type'].astype(int)
-    df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
-    return df
-
 def size_correlation(df):
     print "---------------size-alpha correlation----------------"
     df2 = df.drop_duplicates(subset='name')
@@ -314,9 +317,9 @@ def basic_stats(df):
     print "neural to centroid ratio", infmean(df2['neural_dist'] / df2['centroid_dist'])
     print "neural to random ratio", infmean(df2['neural_dist'] / df2['random_dist'])
 
-    print "dominate percentage", float(df2['dominates'].sum()) / df2['comparisons'].sum()
-    df3 = df2[df2['neuron_type'] != 'axon']
-    print "dendrite dominate percentage", float(df3['dominates'].sum()) / df3['comparisons'].sum()
+    #print "dominate percentage", float(df2['dominates'].sum()) / df2['comparisons'].sum()
+    #df3 = df2[df2['neuron_type'] != 'axon']
+    #print "dendrite dominate percentage", float(df3['dominates'].sum()) / df3['comparisons'].sum()
 
     df4 = df2[df2['neural_dist'] < df2['centroid_dist']]
     print "beats centroid", float(df4['neural_dist'].count()) / float(df2['neural_dist'].count())
