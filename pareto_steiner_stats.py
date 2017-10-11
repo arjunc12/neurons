@@ -13,7 +13,7 @@ COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'alpha', 'neural_dis
             'dominates']
 '''
 COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',\
-           'neural_dist', 'centroid_dist', 'random_dist', 'trials', 'successes',]
+           'neural_dist', 'centroid_dist', 'random_dist', 'trials', 'successes']
 
 NEURON_TYPE_LABELS = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite'}
 
