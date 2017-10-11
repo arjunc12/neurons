@@ -35,3 +35,11 @@ tracings/*
 neuron_builder/*
 
 *.swc
+
+figs/*
+
+imaris/*
+
+steiner_figs/*
+
+steiner_imaris/*
