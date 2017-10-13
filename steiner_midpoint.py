@@ -1,6 +1,7 @@
 import numpy as np
 from neuron_utils import point_dist, pareto_cost
 from sys import argv
+from itertools import combinations
 
 def slope_vector(p1, p2):
     assert len(p1) == len(p2)
@@ -20,7 +21,7 @@ def delta_point(p1, slope, t):
     p2 = []
     assert len(p1) == len(slope)
     for i in xrange(len(p1)):
-        p2.append(p1[i] + t + slope[i])
+        p2.append(p1[i] + t * slope[i])
     return p2
     '''
     '''
@@ -59,7 +60,7 @@ def best_midpoint_approx(p1, p2, p3, alpha):
     while dt < 1: 
         #p4 = delta_point(p1, slope, dt)
         p4 = delta_point(p1, slope, float(dt))
-
+        
         cost = midpoint_cost(p2, p3, p4, alpha)
         if cost < best_cost:
             best_cost = cost
@@ -88,12 +89,22 @@ def best_midpoint_approx(p1, p2, p3, alpha):
 
     return best_midpoint, choice
 
+def colinearity_error(p1, p2, p3):
+    distances = []
+    points = [p1, p2, p3]
+    for point1, point2 in combinations(points, 2):
+        dist = point_dist(point1, point2)
+        distances.append(dist)
+    assert len(distances) == 3
+    distances = sorted(distances)
+    return distances[2] - distances[0] - distances[1]
+
 def main():
-    p1 = (1, 1, 1)
-    p2 = (10, 11, 12)
-    p3 = (3, 5, 7)
-    alpha = float(argv[1])
-    print optimal_midpoint_approx(p1, p2, p3, alpha)
+    p1 = (90.6442, 124.812, 37.7338)
+    p2 = (91.0655, 125.712, 38.1902)
+    p3 = (88.1991, 132.374, 36.3267)
+    alpha = 0.95
+    print best_midpoint_approx(p1, p2, p3, alpha)
 
 if __name__ == '__main__':
     main()
