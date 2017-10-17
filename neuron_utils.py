@@ -121,6 +121,8 @@ def initialize_lengths(G):
         G[u][v]['length'] = point_dist(p1, p2)
 
 def get_label(G, u):
+    if 'label' in G.node[u] and 'label' not in ['root', 'tip', 'branch', 'continue']:
+        return G.node[u]['label']
     if u == G.graph['root']: 
         return "root"
     elif G.degree(u) == 1: 
@@ -155,7 +157,7 @@ def viz_tree(G, name, outdir='figs'):
             node_size.append(350)
         elif label in ['branch', 'tip']:
             node_color.append('green')
-            node_size.append(100)
+            node_size.append(20)
         elif label == "continue":
             node_color.append('brown')
             #node_size.append(250)   
@@ -169,6 +171,9 @@ def viz_tree(G, name, outdir='figs'):
         elif label == 'isolated_end':
             node_color.append('blue')
             node_size.append(100)
+        elif label == 'steiner_point':
+            node_color.append('blue')
+            node_size.append(20)
         else:
             assert False
 
