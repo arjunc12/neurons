@@ -100,11 +100,15 @@ def colinearity_error(p1, p2, p3):
     return distances[2] - distances[0] - distances[1]
 
 def main():
-    p1 = (90.6442, 124.812, 37.7338)
-    p2 = (91.0655, 125.712, 38.1902)
-    p3 = (88.1991, 132.374, 36.3267)
-    alpha = 0.95
-    print best_midpoint_approx(p1, p2, p3, alpha)
+    #p1 = (90.6442, 124.812, 37.7338)
+    #p2 = (91.0655, 125.712, 38.1902)
+    #p3 = (88.1991, 132.374, 36.3267)
+    p1 = (0, 0)
+    p2 = (0, 1)
+    p3 = (0.5, 0.5)
+    alpha = 0.001
+    print best_midpoint_approx(p1, p2, p3, alpha, droot=0)
+    print best_midpoint_approx(p1, p2, p3, alpha, droot=10000)
 
 if __name__ == '__main__':
     main()
