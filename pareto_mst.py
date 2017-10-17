@@ -267,8 +267,6 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     mcosts2 = []
     scosts2 = []
 
-    mcosts3 = []
-    scosts3 = []
 
     delta = 0.01
     alphas = np.arange(0, 1 + delta, delta)
@@ -289,11 +287,9 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
             pareto_tree1 = pareto_prim(point_graph, alpha, axon=axon)
             beta = alpha_to_beta(alpha, opt_mcost, opt_scost)
             pareto_tree2 = khuller(point_graph, span_tree, sat_tree, beta)
-            pareto_tree3 = pareto_steiner(point_graph, alpha, axon=axon)
 
         assert is_tree(pareto_tree1)
         assert is_tree(pareto_tree2)
-        assert is_tree(pareto_tree3)
 
         if (alpha != 0 and alpha != 1 and i % 5 == 0) and viz_trees:
             viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
@@ -305,20 +301,12 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
         mcost2, scost2 = graph_costs(pareto_tree2)
         mcost2 = normalize_mcost(mcost2)
         scost2 = normalize_scost(scost2)
-        
-        mcost3, scost3 = graph_costs(pareto_tree3)
-        mcost3 = normalize_mcost(mcost3)
-        scost3 = normalize_scost(scost3)
-        
+         
         mcosts1.append(mcost1)
         scosts1.append(scost1)
        
         mcosts2.append(mcost2)
-        scosts2.append(scost2)
-
-        mcosts3.append(mcost3)
-        scosts3.append(scost3)
-        
+        scosts2.append(scost2) 
 
     pylab.figure()
     pylab.plot(mcosts1, scosts1, c = 'b')
