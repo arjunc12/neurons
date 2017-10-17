@@ -89,11 +89,15 @@ def best_satellite_cost(G):
     return sum(sorted(costs))
     #return KahanSum(costs)
 
-def satellite_cost(G):
+def satellite_cost(G, relevant_nodes=None):
     root = G.graph['root']
     total_cost = 0
     costs = []
-    for u in G.nodes():
+    if relevant_nodes == None:
+        relevant_nodes = G.nodes()
+    for u in relevant_nodes:
+        if not G.has_node(u):
+            continue
         if u == root:
             continue
         if nx.has_path(G, root, u):
