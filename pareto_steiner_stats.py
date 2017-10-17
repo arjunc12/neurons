@@ -4,6 +4,10 @@ import neuron_density
 import pylab
 from numpy.ma import masked_invalid
 from scipy.stats import pearsonr, spearmanr
+import os
+import seaborn as sns
+from itertools import combinations
+import numpy as np
 
 OUTDIR = 'steiner_stats'
 
@@ -27,6 +31,8 @@ MIN_COUNT = 25
 
 MIN_POINTS = 100
 
+LOG_DIST = False
+
 def get_df():
     fname = 'pareto_steiner.csv'
     df = pd.read_csv(fname, names=COLUMNS, skipinitialspace=True)
@@ -34,6 +40,7 @@ def get_df():
     df['neuron_type'] = df['name'].str[-1]
     df['neuron_type'] = df['neuron_type'].astype(int)
     df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
+
     return df
 
 def add_count_col(df, categories):
@@ -239,10 +246,10 @@ def swarm_alphas(df, identifiers):
 
 def scatter_dists(df):
     df2 = df.drop_duplicates(subset='name')
-    neural_dist = df2['neural_dist']
-    centroid_dist = df2['centroid_dist']
-    random_dist = df2['random_dist']
-    
+    neural_dist = pylab.array(df2['neural_dist'])
+    centroid_dist = pylab.array(df2['centroid_dist'])
+    random_dist = pylab.array(df2['random_dist'])
+
     assert len(neural_dist) == len(centroid_dist) == len(random_dist)
 
     order = pylab.argsort(neural_dist)
@@ -347,13 +354,23 @@ def neuron_type_alphas(df):
         print neuron_type, pylab.mean(group['alpha'])
 
 def main():
-    fname = 'pareto_mst.csv'
+    fname = 'pareto_steiner.csv'
     df = get_df()
     metadata(df)
     neuron_type_alphas(df)
     basic_stats(df)
     #categories_correlations(df)
     size_correlation(df)
+    if TEST_NEW_FUNCTION:
+        return None
+    
+    os.system('mkdir -p steiner_stats')
+    scatter_dists(df)
+    boxplot_alphas(df, CATEGORIES)
+    alphas_hist(df)
+    neuron_types_hist(df)
+    alphas_heat(df, CATEGORIES)
+    dist_heats(df, CATEGORIES, DIST_FUNCS)
 
 if __name__ == '__main__':
     main()
