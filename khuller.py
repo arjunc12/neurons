@@ -4,7 +4,6 @@ from itertools import combinations
 import numpy as np
 from cost_functions import *
 from neuron_utils import *
-from pareto_functions import *
 
 TEST_NEURON = 'datasets/bipolar/rat/neocortex/markram/RP140319-CHC-3-IDA.CNG.swc'
 
