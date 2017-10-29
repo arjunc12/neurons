@@ -27,11 +27,9 @@ NO_CONTINUE = False
 def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
                             outdir='steiner_figs', output=True,\
                             viz_trees=VIZ_TREES, axon=False):
-    if not (nx.is_connected(G) and G.number_of_edges() == G.number_of_nodes() - 1):
-        print "not a tree"
-        return None
-
     assert G.number_of_nodes() > 0
+
+    assert is_tree(G)
    
     print "making graph"
     point_graph = None
@@ -58,20 +56,23 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
 
     delta = 0.01
     alphas = np.arange(delta, 1, delta)
+    #alphas = [0.99]
     print "sorting neighbors"
     sort_neighbors(point_graph)
 
-    comparisons = 0
-    dominates = 0
+    khuller_comparisons = 0
+    khuller_dominates = 0
 
     os.system("mkdir -p %s" % outdir)
 
     for i, alpha in enumerate(alphas):
         print "alpha", alpha
-        pareto_tree = pareto_steiner(point_graph, alpha, axon=axon)
+        #pareto_tree = pareto_steiner(point_graph, alpha, axon=axon)
+        pareto_tree = pareto_steiner_sandbox(point_graph, alpha, axon=axon)
             
         assert is_tree(pareto_tree)
-        mcost, scost = graph_costs(pareto_tree)
+        mcost = mst_cost(pareto_tree)
+        scost = satellite_cost(pareto_tree, relevant_nodes=point_graph.nodes())
         cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
         if scost < opt_scost:
             print scost, opt_scost, opt_scost - scost
@@ -86,6 +87,17 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
         mcosts.append(mcost)
         scosts.append(scost)
         costs.append(cost)
+       
+        '''
+        pareto_tree2 = pareto_khuller(point_graph, alpha, span_tree, sat_tree)
+        assert is_tree(pareto_tree2)
+        mcost2, scost2 = graph_costs(pareto_tree2)
+        cost2 = pareto_cost(mcost=mcost2, scost=scost2, alpha=alpha)
+
+        khuller_comparisons += 1
+        if cost <= cost2:
+            khuller_dominates += 1
+        '''
 
     min_mcost = min(mcosts)
     max_mcost = max(mcosts)
@@ -110,6 +122,8 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     #neural_mcost = normalize_mcost(mst_cost(G))
     #neural_scost  = normalize_scost(satellite_cost(G))
     neural_mcost, neural_scost = graph_costs(G)
+    norm_neural_mcost = normalize_mcost(neural_mcost)
+    norm_neural_scost = normalize_scost(neural_scost)
 
     neural_dist, neural_index = pareto_dist(mcosts, scosts, neural_mcost,\
                                             neural_scost)
@@ -118,11 +132,12 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     neural_alpha = alphas[neural_index]
 
     neural_dist2, neural_index2 = pareto_dist(normalized_mcosts,\
-                                              normalized_scosts, neural_mcost,\
-                                              neural_scost)
-    neural_alpha2 = alphas[neural_index]
+                                              normalized_scosts,\
+                                              norm_neural_mcost,\
+                                              norm_neural_scost)
+    neural_alpha2 = alphas[neural_index2]
 
-    assert neural_alpha == neural_alpha2
+    #assert neural_alpha == neural_alpha2
 
     pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x', linewidths=15, label='neural')
 
@@ -131,35 +146,63 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     #centroid_mcost = normalize_mcost(mst_cost(centroid_tree))
     #centroid_scost = normalize_scost(satellite_cost(centroid_tree))
     centroid_mcost, centroid_scost = graph_costs(centroid_tree)
+    norm_centroid_mcost = normalize_mcost(centroid_mcost)
+    norm_centroid_scost = normalize_scost(centroid_scost)
     
     centroid_dist, centroid_index = pareto_dist(mcosts, scosts, centroid_mcost, centroid_scost)
     centroid_closem = mcosts[centroid_index]
     centroid_closes = scosts[centroid_index]
     centroid_alpha = alphas[centroid_index]
 
+    centroid_dist2, centroid_index2 = pareto_dist(normalized_mcosts,\
+                                                  normalized_scosts,\
+                                                  norm_centroid_mcost,\
+                                                  norm_centroid_scost)
+    centroid_alpha2 = alphas[centroid_index2]
+
+    #assert centroid_alpha == centroid_alpha2
+
+    #centroid_ratio = centroid_dist / neural_dist
+    
+
     pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+', linewidths=15, label='centroid mst')
     #pylab.plot([centroid_mcost, centroid_closem], [centroid_scost, centroid_closes], c='g', linestyle='--')
 
     ntrials = 20
     successes = 0
-    total_rand_dist = 0.0
+    total_rand_dist = 0
+    total_rand_dist2 = 0
     rand_mcosts = []
     rand_scosts = []
     for i in xrange(ntrials):
         rand_mst = random_mst(point_graph)
         
-        rand_mcost = normalize_mcost(mst_cost(rand_mst))
-        rand_scost = normalize_scost(satellite_cost(rand_mst))
+        rand_mcost, rand_scost = graph_costs(rand_mst)
+        
         rand_mcosts.append(rand_mcost)
         rand_scosts.append(rand_scost)
         
         rand_dist, rand_index = pareto_dist(mcosts, scosts, rand_mcost, rand_scost)
-        total_rand_dist += rand_dist
         rand_closem = mcosts[rand_index]
         rand_closes = scosts[rand_index]
         rand_alpha = alphas[rand_index]
-        if rand_dist < neural_dist:
+       
+        norm_rand_mcost = normalize_mcost(rand_mcost)
+        norm_rand_scost = normalize_scost(rand_scost)
+        rand_dist2, rand_index2 = pareto_dist(normalized_mcosts,\
+                                              normalized_scosts,\
+                                              norm_rand_mcost,\
+                                              norm_rand_scost)
+        rand_alpha2 = alphas[rand_index2]
+
+        #assert rand_alpha == rand_alpha2
+        
+        if rand_dist2 < neural_dist2:
             successes += 1
+
+        total_rand_dist += rand_dist
+        total_rand_dist2 += rand_dist2
+
 
     pylab.scatter(rand_mcosts, rand_scosts, c='m', marker='o', label='random mst')
 
@@ -172,13 +215,20 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     viz_tree(centroid_tree, name + '_centroid', outdir=outdir) 
 
     mean_rand_dist = total_rand_dist / ntrials
+    mean_rand_dist2 = total_rand_dist2 / ntrials
+
+    #rand_ratio = mean_rand_dist / neural_dist
    
     f = open('pareto_steiner.csv', 'a')
     if output:
         write_items = [name, cell_type, species, region, lab, point_graph.number_of_nodes()]
+        #write_items.append(neural_alpha2)
         write_items.append(neural_alpha)
         write_items += [neural_dist, centroid_dist, mean_rand_dist]
+        #write_items += [neural_dist2, centroid_dist2, mean_rand_dist]
+        #write_items += [neural_dist, centroid_ratio, rand_ratio]
         write_items += [ntrials, successes]
+        #write_items += [khuller_comparisons, khuller_dominates]
         write_items = map(str, write_items)
         write_items = ', '.join(write_items)
         f.write('%s\n' % write_items)
@@ -206,6 +256,9 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     mcosts2 = []
     scosts2 = []
 
+    mcosts3 = []
+    scosts3 = []
+
     delta = 0.01
     alphas = np.arange(delta, 1, delta)
     print "sorting neighbors"
@@ -216,45 +269,101 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     sat_tree = satellite_tree(point_graph)
     opt_scost = float(satellite_cost(sat_tree))
     span_tree = nx.minimum_spanning_tree(point_graph, weight='length')
+    opt_mcost = float(mst_cost(span_tree))
+
+    mst_comparisons = 0
+    mst_dominates = 0
+
+    khuller_comparisons = 0
+    khuller_dominates = 0
+
+    root = G.graph['root']
 
     for i, alpha in enumerate(alphas):
         print "alpha", alpha
         pareto_tree1 = pareto_steiner(point_graph, alpha, axon=axon)
+        #pareto_tree1 = pareto_steiner_sandbox(point_graph, alpha, axon=axon)
         assert is_tree(pareto_tree1)
-        mcost1, scost1 = graph_costs(pareto_tree1)
+        mcost1 = float(mst_cost(pareto_tree1))
+        scost1 = float(satellite_cost(pareto_tree1, relevant_nodes=point_graph.nodes()))
+        cost1 = pareto_cost(mcost=mcost1, scost=scost1, alpha=alpha)
+        
+        if scost1 < opt_scost:
+            print scost1, opt_scost, opt_scost - scost1
+            print "dist error", dist_error(pareto_tree1)
+            print "scost error", scost_error(pareto_tree1)
         assert scost1 >= opt_scost
 
 
-        if (i % 5 == 0) and viz_trees:
+        if False and (i % 5 == 0) and viz_trees:
             viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
         
         pareto_tree2 = pareto_prim(point_graph, alpha, axon=axon) 
+
+        '''
+        label_points(pareto_tree1)
+        label_points(pareto_tree2)
+        viz_tree(pareto_tree1, name + '_steiner' + str(alpha), outdir='debug_steiner')
+        viz_tree(pareto_tree2, name + '_mst' + str(alpha), outdir='debug_steiner')
+        '''
+
         assert is_tree(pareto_tree2)
         mcost2, scost2 = graph_costs(pareto_tree2)
-         
+        cost2 = pareto_cost(mcost=mcost2, scost=scost2, alpha=alpha)
+        
+        pareto_tree3 = pareto_khuller(point_graph, alpha, span_tree, sat_tree)
+        assert is_tree(pareto_tree3)
+        mcost3, scost3 = graph_costs(pareto_tree3)
+        cost3 = pareto_cost(mcost=mcost3, scost=scost3, alpha=alpha)
+
+        assert pareto_tree2.number_of_nodes() == pareto_tree3.number_of_nodes()
+
+        '''
+        print "steiner", mcost1, scost1, cost1
+        print "prim   ", mcost2, scost2, cost2
+        print "khuller", mcost3, scost3, cost3
+        '''
+
         mcosts1.append(mcost1)
         scosts1.append(scost1)
        
         mcosts2.append(mcost2)
         scosts2.append(scost2) 
 
+        mcosts3.append(mcost3)
+        scosts3.append(scost3)
+ 
+        mst_comparisons += 1
+        if cost1 <= cost2:
+            mst_dominates += 1
 
-    min_mcost = min(mcosts1 + mcosts2)
-    max_mcost = max(mcosts1 + mcosts2)
+        khuller_comparisons += 1
+        if cost1 <= cost3:
+            khuller_dominates += 1
+
+    outfile = open('steiner_imaris.csv', 'a')
+    write_items = [mst_comparisons, mst_dominates,\
+                   khuller_comparisons, khuller_dominates]
+    write_items = map(str, write_items)
+    write_items = ', '.join(write_items)
+    outfile.write('%s\n' % write_items)
+
+    outfile.write('khuller dominated by steiner, ' + str(prop_dominated(mcosts1, scosts1, mcosts3, scosts3)) + '\n')
+    outfile.write('steiner dominated by khuller, ' + str(prop_dominated(mcosts3, scosts3, mcosts1, scosts1)) + '\n')
+    outfile.write('mst dominated by steiner, ' + str(prop_dominated(mcosts1, scosts1, mcosts2, scosts2)) + '\n')
+    outfile.write('steiner dominated by mst, ' + str(prop_dominated(mcosts2, scosts2, mcosts1, scosts1)) + '\n')
+
+    outfile.close()
+    
+    min_mcost = min(mcosts1 + mcosts2 + mcosts3)
+    max_mcost = max(mcosts1 + mcosts2 + mcosts3)
     #min_scost = min(scosts1 + scosts2)
     min_scost = opt_scost
-    max_scost = max(scosts1 + scosts2)
+    max_scost = max(scosts1 + scosts2 + scosts3)
 
     normalize_scost = make_normalize_function(min_scost)
     normalize_mcost = make_normalize_function(min_mcost)
 
-    '''
-    norm_mcosts1 = pylab.array(mcosts1) / max_mcost
-    norm_scosts1 = pylab.array(scosts1) / max_scost
-
-    norm_mcosts2 = pylab.array(mcosts2) / max_mcost
-    norm_scosts2 = pylab.array(scosts2) / max_scost
-    '''
 
     norm_mcosts1 = normalize_mcost(pylab.array(mcosts1))
     norm_scosts1 = normalize_scost(pylab.array(scosts1))
@@ -262,30 +371,53 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     norm_mcosts2 = normalize_mcost(pylab.array(mcosts2))
     norm_scosts2 = normalize_scost(pylab.array(scosts2))
 
+    norm_mcosts3 = normalize_mcost(pylab.array(mcosts3))
+    norm_scosts3 = normalize_scost(pylab.array(scosts3))
+
+    '''
     pylab.figure()
-    pylab.plot(norm_mcosts1, norm_scosts1, c = 'b')
-    pylab.scatter(norm_mcosts1, norm_scosts1, c='b', label='steiner')
+    pylab.plot(norm_mcosts1, norm_scosts1, c = 'r')
+    pylab.scatter(norm_mcosts1, norm_scosts1, c='r', label='steiner')
     
-    pylab.plot(norm_mcosts2, norm_scosts2, c = 'k')
-    pylab.scatter(norm_mcosts2, norm_scosts2, c='k', label='mst')
+    pylab.plot(norm_mcosts2, norm_scosts2, c = 'b')
+    pylab.scatter(norm_mcosts2, norm_scosts2, c='b', label='mst')
+
+    pylab.plot(norm_mcosts3, norm_scosts3, c='k')
+    pylab.scatter(norm_mcosts3, norm_scosts3, c='k', label='khuller')
      
     pylab.xlabel('spanning tree cost')
     pylab.ylabel('satellite cost')
+    '''
+
+    pylab.figure()
+    pylab.plot(mcosts1, scosts1, c = 'b')
+    pylab.scatter(mcosts1, scosts1, c='b', label='steiner')
     
-    #neural_mcost = normalize_mcost(mst_cost(G))
-    #neural_scost  = normalize_scost(satellite_cost(G))
+    pylab.plot(mcosts2, scosts2, c = 'r')
+    pylab.scatter(mcosts2, scosts2, c='r', label='mst')
+
+    pylab.plot(mcosts3, scosts3, c='k')
+    pylab.scatter(mcosts3, scosts3, c='k', label='khuller')
+     
+    pylab.xlabel('spanning tree cost')
+    pylab.ylabel('satellite cost')
+
     neural_mcost, neural_scost = graph_costs(G)
-    #neural_mcost /= max_mcost
-    #neural_scost /= max_scost
-    pylab.scatter([normalize_mcost(neural_mcost)], [normalize_scost(neural_scost)], c='r', marker='x', linewidths=15, label='neural')
+    
+    norm_neural_mcost = normalize_mcost(neural_mcost)
+    norm_neural_Scost = normalize_scost(neural_scost)
+    
+    #pylab.scatter([norm_neural_mcost], [norm_neural_scost], c='r', marker='x', linewidths=15, label='neural')
+    pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x', linewidths=15, label='neural')
 
     centroid_tree = centroid_mst(point_graph)
-    #centroid_mcost = normalize_mcost(mst_cost(centroid_tree))
-    #centroid_scost = normalize_scost(satellite_cost(centroid_tree))
     centroid_mcost, centroid_scost = graph_costs(centroid_tree)
-    #centroid_mcost /= max_mcost
-    #centroid_scost /= max_scost
-    pylab.scatter([normalize_mcost(centroid_mcost)], [normalize_scost(centroid_scost)], c='g', marker='+', linewidths=15, label='centroid')
+
+    norm_centroid_mcost = normalize_mcost(centroid_mcost)
+    norm_centroid_scost = normalize_scost(centroid_scost)
+
+    #pylab.scatter([norm_centroid_mcost)], [norm_centroid_scost], c='g', marker='+', linewidths=15, label='centroid')
+    pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+', linewidths=15, label='centroid')
 
     pylab.savefig('%s/pareto_front_%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
@@ -336,8 +468,13 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES):
                                 continue
 
 def imaris_plots():
+    os.system('rm -f steiner_imaris.csv')
+    i = 0
     for subdir in os.listdir('imaris'):
         if os.path.isdir('imaris/' + subdir):
+            i += 1
+            if i != 1:
+                pass
             imfiles = []
             for fname in os.listdir('imaris/' + subdir):
                 if 'Position' in fname:
@@ -435,16 +572,18 @@ def main():
     debug = args.debug
 
     if debug:
-        cell_type = 'principal_cell'
-        species = 'giraffe'
-        region = 'neocortex'
-        lab = 'Jacobs'
-        name = '185-2-24dk0'
-        neuron = '185-2-24dk.CNG.swc'
+        cell_type = 'bipolar'
+        species = 'human'
+        region = 'retina'
+        lab = 'kantor'
+        name = 'humret_FMB_40x_5'
+        neuron = name + '.CNG.swc'
+        graph_number = 1
+        name += str(graph_number)
         filename = 'datasets/%s/%s/%s/%s/%s' % (cell_type, species, region, lab, neuron)
 
         graphs = get_neuron_points(filename)
-        G = graphs[0]
+        G = graphs[graph_number]
 
         pareto_plot_neuromorpho(G, name, cell_type, species, region, lab)
 
