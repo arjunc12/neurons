@@ -17,7 +17,12 @@ def neuron_info(neuron_file):
     url = 'http://neuromorpho.org/api/neuron/query/neuron_name/' + neuron
     data = urllib2.urlopen(url)
     data = json.load(data)
-    data = data['_embedded']['neuronResources']
+    if '_embedded' not in data:
+        return None
+    data = data['_embedded']
+    if 'neuronResources' not in data:
+        return None
+    data = data['neuronResources']
     if len(data) == 0:
         return None
     data = data[0]
