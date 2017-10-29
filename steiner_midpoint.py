@@ -82,12 +82,19 @@ def best_midpoint_approx(p1, p2, p3, alpha):
         best_midpoint = p2
         choice = 2
 
-    '''
-    print "midpoint"
-    print map(type, best_midpoint)
-    '''
-
     return best_midpoint, choice
+
+def steiner_points(p1, p2, npoints=10):
+    slope = slope_vector(p1, p2)
+    delta = 1.0 / (npoints + 1)
+    dt = delta
+    midpoints = []
+    while dt < 1:
+        p3 = delta_point(p1, slope, dt)
+        midpoints.append(tuple(p3))
+        dt += delta
+
+    return midpoints
 
 def colinearity_error(p1, p2, p3):
     distances = []
@@ -100,15 +107,9 @@ def colinearity_error(p1, p2, p3):
     return distances[2] - distances[0] - distances[1]
 
 def main():
-    #p1 = (90.6442, 124.812, 37.7338)
-    #p2 = (91.0655, 125.712, 38.1902)
-    #p3 = (88.1991, 132.374, 36.3267)
-    p1 = (0, 0)
-    p2 = (0, 1)
-    p3 = (0.5, 0.5)
-    alpha = 0.001
-    print best_midpoint_approx(p1, p2, p3, alpha, droot=0)
-    print best_midpoint_approx(p1, p2, p3, alpha, droot=10000)
+    p1 = (0, 0, 0)
+    p2 = (1, 1, 1)
+    print steiner_points(p1, p2)
 
 if __name__ == '__main__':
     main()
