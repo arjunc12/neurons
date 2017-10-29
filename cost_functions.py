@@ -1,6 +1,33 @@
 import networkx as nx
 from neuron_utils import point_dist
 
+def partially_dominates(costs1, costs2):
+    assert len(costs1) == len(costs2)
+    strict = False
+    for i in xrange(len(costs1)):
+        cost1, cost2 = costs1[i], costs2[i]
+        if cost1 > cost2:
+            return False
+        elif cost1 < cost2:
+            strict = True
+
+    return strict
+
+def prop_dominated(mcosts1, scosts1, mcosts2, scosts2):
+    assert len(mcosts1) == len(scosts1)
+    assert len(mcosts2) == len(scosts2)
+    comparisons = 0
+    dominated = 0
+    for i in xrange(len(mcosts2)):
+        comparisons += 1
+        costs2 = (mcosts2[i], scosts2[i])
+        for j in xrange(len(mcosts1)):
+            costs1 = (mcosts1[j], scosts1[j])
+            if partially_dominates(costs1, costs2):
+                dominated += 1
+                break
+    return comparisons, dominated
+
 def graph_normalize_functions(G):
     opt_mst_cost = best_mst_cost(G)
     opt_sat_cost = best_satellite_cost(G)
@@ -100,7 +127,9 @@ def satellite_cost(G, relevant_nodes=None):
             continue
         if u == root:
             continue
-        if nx.has_path(G, root, u):
+        if 'droot' in G.node[u]:
+            costs.append(G.node[u]['droot'])
+        elif nx.has_path(G, root, u):
             droot = nx.shortest_path_length(G, root, u, weight='length')
             #total_cost += droot
             costs.append(droot)
@@ -127,3 +156,16 @@ def centroid_mst_costs(G):
             scost += cdist + root_cdist
 
     return mcost, scost
+
+def main():
+    mcosts1 = [1, 1, 0, 100]
+    scosts1 = [3, 4, 0, 100]
+
+    mcosts2 = [0, 2]
+    scosts2 = [2, 10]
+
+    print prop_dominated(mcosts1, scosts1, mcosts2, scosts2)
+    print prop_dominated(mcosts2, scosts2, mcosts1, scosts1)
+
+if __name__ == '__main__':
+    main()
