@@ -3,7 +3,7 @@ import pandas as pd
 import neuron_density
 import pylab
 from numpy.ma import masked_invalid
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import pearsonr, spearmanr, binom_test, ttest_1samp
 import os
 import seaborn as sns
 from itertools import combinations
@@ -29,7 +29,7 @@ CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type']
 
 MIN_COUNT = 25
 
-MIN_POINTS = 100
+MIN_POINTS = 50
 
 LOG_DIST = False
 
@@ -321,15 +321,26 @@ def basic_stats(df):
     total_successes = df2['successes'].sum()
     print total_successes, total_trials
     print "p-value", float(total_successes) / total_trials
-    print "neural to centroid ratio", infmean(df2['neural_dist'] / df2['centroid_dist'])
-    print "neural to random ratio", infmean(df2['neural_dist'] / df2['random_dist'])
+
+    df3 = df2[(df2['centroid_dist'] > 0) & (df2['random_dist'] > 0)]
+    centroid_ratio = df3['neural_dist'] / df3['centroid_dist']
+    random_ratio = df3['neural_dist'] / df3['random_dist']
+    print "neural to centroid ratio", pylab.mean(centroid_ratio)
+    print ttest_1samp(centroid_ratio, 1)
+    print "neural to random ratio", pylab.mean(random_ratio)
+    print ttest_1samp(random_ratio, 1)
 
     #print "dominate percentage", float(df2['dominates'].sum()) / df2['comparisons'].sum()
     #df3 = df2[df2['neuron_type'] != 'axon']
     #print "dendrite dominate percentage", float(df3['dominates'].sum()) / df3['comparisons'].sum()
 
     df4 = df2[df2['neural_dist'] < df2['centroid_dist']]
-    print "beats centroid", float(df4['neural_dist'].count()) / float(df2['neural_dist'].count())
+    centroid_trials = df2['neural_dist'].count()
+    centroid_successes = df4['neural_dist'].count()
+    assert centroid_trials >= centroid_successes
+    print "beats centroid"
+    print centroid_successes / float(centroid_trials)
+    print binom_test(centroid_successes, centroid_trials)
 
 def infmean(arr):
     return pylab.mean(masked_invalid(arr))
@@ -343,6 +354,7 @@ def metadata(df):
         print len(df[category].unique())
         df2 = df.drop_duplicates(subset=['name', category])
         df2 = add_count_col(df2, category)
+        df2 = df2[df2['count'] >= 25]
         f = open(category + '.txt', 'w')
         with pd.option_context('display.max_rows', None, 'display.max_columns', 3):
             print >> f,  df2
