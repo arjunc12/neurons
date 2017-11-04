@@ -66,7 +66,7 @@ def get_neuron_points(filename, dim='3D'):
                 assert len(cols) == 7
 
                 if not (cols[1] == "1" or cols[1] == arbor_type): continue
-                
+ 
                 if cols[6] == "-1":
                     if root != -1: assert False # duplicate root.
 
@@ -108,10 +108,11 @@ def get_neuron_points(filename, dim='3D'):
                     G.node[v]['coord'] = coord
                     
                     G[u][v]['length'] = point_dist(G.node[u]['coord'], G.node[v]['coord'])
-
-        assert 'root' in G.graph
-        label_points(G)
-        graphs.append(G)
+        
+        if G.number_of_nodes() > 0:
+            assert 'root' in G.graph
+            label_points(G)
+            graphs.append(G)
 
     return graphs
 
