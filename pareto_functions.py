@@ -475,8 +475,9 @@ def pareto_steiner(G, alpha, axon=False):
             H.add_edge(n1, n2)
             H[n1][n2]['length'] = node_dist(H, n1, n2)
             assert 'droot' in H.node[n1]
-            H.node[n2]['droot'] = H[n2][n1]['length'] + H.node[n1]['droot']
             H.node[n2]['parent'] = n1
+            #H.node[n2]['droot'] = H[n2][n1]['length'] + H.node[n1]['droot']
+            H.node[n2]['droot'] = node_dist(H, n2, u) + H.node[u]['droot']
 
         #closest_neighbors[u].remove(v)
         #closest_neighbors[v].remove(u)
