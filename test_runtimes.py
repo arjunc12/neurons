@@ -15,7 +15,6 @@ from scipy.stats import binom_test
 MIN_POINTS = 8
 MAX_POINTS = 50
 
-row1 = [49, 0.267063609759, 0.0332715233167, 0.0706351995468, 1.9472718358, 99, 80, 99, 99, 400, 400]
 COLNAMES = ['num_points', 'steiner_runtime', 'prim_runtime', 'khuller_runtime',\
             'genetic_runtime', 'prim_comparisons', 'prim_dominated',\
             'khuller_comparisons', 'khuller_dominated', 'genetic_comparisons',\
