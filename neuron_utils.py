@@ -113,6 +113,8 @@ def get_neuron_points(filename, dim='3D'):
             assert 'root' in G.graph
             label_points(G)
             graphs.append(G)
+        else:
+            graphs.append(None)
 
     return graphs
 
