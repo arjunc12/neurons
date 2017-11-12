@@ -523,15 +523,12 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES, cell_types=None,
             continue
         if cell_types != None and cell_type not in cell_types:
             continue
-        print "cell type", cell_type
         for species in os.listdir(directory + '/' + cell_type):
             if animal_species != None and species not in animal_species:
                 continue
-            print "species", species
             for region in os.listdir(directory + '/' + cell_type + '/' + species):
                 if regions != None and region not in regions:
                     continue
-                print "region", region
                 for lab in os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region):
                     for neuron in os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
                         filename = directory + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron
@@ -545,6 +542,8 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES, cell_types=None,
                             continue
 
                         for i, G in enumerate(graphs):
+                            if G == None:
+                                continue
                             if not (min_nodes <= G.number_of_nodes() <= max_nodes):
                                 print "wrong nodes", G.number_of_nodes()
                                 continue
