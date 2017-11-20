@@ -3,6 +3,7 @@ import neuron_density
 import numpy as np
 import pandas as pd
 import pylab
+from stats_utils import *
 
 def biggest_outliers(df, category, ycol='density'):
     resid_col = ycol + '_resid'
@@ -43,22 +44,6 @@ def cat_to_color(cat_values):
     colors = pylab.array(colors)
     #colors /= max(colors)
     return colors
-
-def add_regression_cols(df, xcol, ycol, xtransform=None, ytransform=None):
-    x = df[xcol]
-    y = df[ycol]
-    if xtransform != None:
-        x = xtransform(x)
-    if ytransform != None:
-        y = ytransform(y)
-
-    a, b = np.polyfit(x, y, 1)
-
-    yhat = a * x + b
-    yresid = y - yhat
-
-    df[ycol + '_hat'] = yhat
-    df[ycol + '_resid'] = yresid
 
 def make_alpha_plots(df):
     pylab.figure()
