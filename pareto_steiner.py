@@ -485,8 +485,10 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     #pylab.plot(mcosts3, scosts3, c='k')
     #pylab.scatter(mcosts3, scosts3, c='k', label='khuller')
      
-    pylab.xlabel('spanning tree cost')
-    pylab.ylabel('satellite cost')
+    #pylab.xlabel('steiner tree cost')
+    #pylab.ylabel('satellite cost')
+    pylab.xlabel('writing cost')
+    pylab.ylabel('conduction delay')
 
     neural_mcost, neural_scost = graph_costs(G)
     
