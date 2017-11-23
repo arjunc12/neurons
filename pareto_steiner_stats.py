@@ -8,6 +8,10 @@ import os
 import seaborn as sns
 from itertools import combinations
 import numpy as np
+from scipy.stats import entropy
+from numpy.linalg import norm
+import numpy as np
+from stats_utils import *
 
 OUTDIR = 'steiner_stats'
 
@@ -31,7 +35,8 @@ CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type']
 
 MIN_COUNT = 25
 
-MIN_POINTS = 100
+MIN_POINTS = 50
+MAX_POINTS = float("inf")
 
 LOG_DIST = True
 
@@ -56,7 +61,7 @@ def get_df():
             print point
             print df.ix[i]
     df['points'] = df['points'].astype(int)
-    df = df[df['points'] >= MIN_POINTS]
+    df = df[(df['points'] >= MIN_POINTS) & (df['points']  <= MAX_POINTS)]
     df['neuron_type'] = df['name'].str[-1]
     df['neuron_type'] = df['neuron_type'].astype(int)
     df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
@@ -105,27 +110,11 @@ def all_counts(df, category, alphas=None):
 
     return counts
 
-def jsdiv(P, Q):
-    """
-    Compute the Jensen-Shannon divergence between two probability distributions.
-    Input
-    -----
-    P, Q : array-like
-    Probability distributions of equal length that sum to 1
-    """
-        
-    P = np.array(P).astype(float)
-    P /= float(sum(P))
-    Q = np.array(Q).astype(float)
-    Q /= float(sum(Q))
-
-
-    M = 0.5 * (P + Q)
-
-    def _kldiv(A, B):
-        return np.sum([v for v in A * np.log2(A/B) if not np.isnan(v)])
-
-    return 0.5 * (_kldiv(P, M) +_kldiv(Q, M))
+def JSD(P, Q):
+    _P = P / norm(P, ord=1)
+    _Q = Q / norm(Q, ord=1)
+    _M = 0.5 * (_P + _Q)
+    return 0.5 * (entropy(_P, _M) + entropy(_Q, _M))
 
 def pseudo_kld(counts1, counts2):
     assert len(counts1) == len(counts2)
@@ -150,6 +139,12 @@ def pseudo_kld(counts1, counts2):
 
 def normalize_distribution(dist):
     return pylab.array(dist, dtype=np.float64) / sum(dist)
+
+def total_variation_distance(dist1, dist2):
+    d1 = normalize_distribution(dist1)
+    d2 = normalize_distribution(dist2)
+
+    return np.abs(d1 - d2).max()
 
 def hellinger_distance(dist1, dist2):
     assert len(dist1) == len(dist2)
@@ -195,8 +190,9 @@ def make_dist_frame(df, category, alphas=None, dist_func=pseudo_kld):
     return dist_frame
 
 #DIST_FUNCS = [pseudo_kld, hellinger_distance]
-DIST_FUNCS = [hellinger_distance]
-DIST_FUNC_NAMES = {pseudo_kld : 'kld', hellinger_distance : 'hellinger'}
+DIST_FUNCS = [hellinger_distance, JSD, total_variation_distance]
+DIST_FUNC_NAMES = {pseudo_kld : 'kld', hellinger_distance : 'hellinger',\
+                   JSD : 'jsd', total_variation_distance: 'tvd'}
 
 def dist_heat(df, category, alphas=None, dist_func=pseudo_kld):
     dist_frame = make_dist_frame(df, category, alphas, dist_func)
@@ -213,6 +209,9 @@ def kld_heat(df, category, alphas=None):
 
 def hellinger_heat(df, category, alphas=None):
     return dist_heat(df, category, alphas=alphas, dist_func=hellinger_distance)
+
+def jsd_heat(df, category, alphas=None):
+    return dist_heat(df, category, alphas=alphas, dist_func=JSD)
 
 def dist_heats(df, categories, dist_funcs, alphas=None):
     for category in categories:
@@ -278,31 +277,53 @@ def violin_alphas(df, identifiers):
 def swarm_alphas(df, identifiers):
     alpha_distribution(df, identifiers, sns.swarmplot, 'swarm')
 
-def category_dists(df, categories, norm=False):
-    for category in categories:
-        df2 = df.drop_duplicates(subset=['name', category])
-        df2 = remove_small_counts(df2, category)
-        dist_col = ''
-        if norm:
-            dist_col += 'norm_'
-        dist_col += 'neural_dist'
-        df2 = df2[[category, dist_col]]
-        cat_vals = []
-        cat_means = []
-        for cat_val, group in df2.groupby(category):
-            cat_vals.append(cat_val)
-            cat_means.append(pylab.mean(group[dist_col]))
-        order = pylab.argsort(cat_means)
-        cat_vals = pylab.array(cat_vals)
-        sorted_vals = cat_vals[order]
-        pylab.figure()
-        dist_plot = sns.barplot(x=category, y=dist_col, data=df2, order=sorted_vals)
-        pylab.xticks(rotation=90, size=5)
+def category_dists_barplot(df, category, name, dist_col='neural_dist'):
+    df = df[[category, dist_col]]
+    cat_vals = []
+    cat_means = []
+    for cat_val, group in df.groupby(category):
+        cat_vals.append(cat_val)
+        cat_means.append(pylab.mean(group[dist_col]))
+    order = pylab.argsort(cat_means)
+    cat_vals = pylab.array(cat_vals)
+    sorted_vals = cat_vals[order]
+    pylab.figure()
+    dist_plot = sns.barplot(x=category, y=dist_col, data=df, order=sorted_vals)
+    pylab.xticks(rotation=90, size=5)
+    if name == None:
         name = '%s/' % OUTDIR
         if norm:
             name += 'norm_'
         name += 'pareto_dists_' + category + '.pdf'
-        pylab.savefig(name, format='pdf')
+    pylab.savefig(name + '_' + category + '.pdf', format='pdf')
+    
+
+def category_dists(df, categories, norm=False):
+    regression_df = df[['name', 'points', 'neural_dist']]
+    regression_df = regression_df.drop_duplicates(subset='name')
+    add_regression_cols(regression_df, 'points', 'neural_dist')
+    regression_df['neural_dist_resid2'] = regression_df['neural_dist_resid'] ** 2
+    for category in categories:
+        df2 = df.drop_duplicates(subset=['name', category])
+        df2 = remove_small_counts(df2, category)
+        
+        dist_col = ''
+        if norm:
+            dist_col += 'norm_'
+        dist_col += 'neural_dist'
+        
+        name = '%s/' % OUTDIR
+        if norm:
+            name += 'norm_'
+        name += 'pareto_dists'
+
+        category_dists_barplot(df2, category, name, dist_col)
+
+        df3 = regression_df.merge(df2, on='name')
+        dist_col += '_resid2'
+        name += '_regression'
+        category_dists_barplot(df3, category, name, dist_col)
+
 
 def scatter_dists(df):
     df2 = df.drop_duplicates(subset='name')
@@ -416,6 +437,12 @@ def size_correlation(df):
     corr2 = spearmanr(df2['points'], df2['alpha'])
     print "pearson correlation: " + str(corr1) 
     print "spearman correlation: " + str(corr2)
+    for name, group in df2.groupby('neuron_type'):
+        print name
+        corr1 = pearsonr(group['points'], group['alpha'])
+        corr2 = spearmanr(group['points'], group['alpha'])
+        print "pearson correlation: " + str(corr1) 
+        print "spearman correlation: " + str(corr2)
 
 def category_correlation(df, category):
     alphas = df['alpha']
@@ -495,19 +522,43 @@ def neuron_type_alphas(df):
         #print mannwhitneyu(dist1, dist2, alternative='two-sided')
         print ks_2samp(dist1, dist2)
 
+def size_dist_correlation(df):
+    df2 = df.drop_duplicates(subset='name')
+    df2 = df2[df2['neural_dist'] >= 1]
+    points = df2['points']
+    dists = df2['neural_dist']
+    points = pylab.log10(points)
+    dists = pylab.log10(dists) 
+    print "---------size vs. dist correlation--------"
+    print pearsonr(points, dists)
+    print spearmanr(points, dists)
+
+    add_regression_cols(df2, 'points', 'neural_dist', xtransform=pylab.log10,\
+                        ytransform=pylab.log10)
+
+    pylab.figure()
+    pylab.scatter(points, dists)
+    x = points
+    y = df2['neural_dist_hat']
+    order = pylab.argsort(x)
+    x = x[order]
+    y = y[order]
+    pylab.plot(x, y, c='g')
+    pylab.savefig('%s/size_dist.pdf' % OUTDIR, format='pdf')
+    pylab.close()
+
+
 def main():
-    fname = 'pareto_steiner.csv'
     df = get_df()
+    if TEST_NEW_FUNCTION:
+        category_dists(df, CATEGORIES, norm=False)
+        return None
+    
+    size_correlation(df)
     metadata(df)
     neuron_type_alphas(df)
     basic_stats(df)
     #categories_correlations(df)
-    size_correlation(df)
-    if TEST_NEW_FUNCTION:
-        for norm in [True, False]:
-            category_dists(df, CATEGORIES, norm=norm)
-        return None
-    
     os.system('mkdir -p steiner_stats')
     scatter_dists(df)
     boxplot_alphas(df, CATEGORIES)
@@ -516,6 +567,7 @@ def main():
     alphas_heat(df, CATEGORIES)
     dist_heats(df, CATEGORIES, DIST_FUNCS)
     category_dists(df, CATEGORIES, norm=False)
+    size_dist_correlation(df)
 
     filtered_df = get_filtered_df(df)
     filtered_df.to_csv('pareto_steiner_filtered.csv', index=False)
