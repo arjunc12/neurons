@@ -146,6 +146,7 @@ def viz_tree(G, name, outdir='figs'):
     root = G.graph['root']
     node_size,node_color = [],[]
     pos = {}    
+    label_points(G)
     for u in G:
         coord = G.node[u]['coord']
         pos[u] = (coord[0], coord[1])
@@ -158,9 +159,12 @@ def viz_tree(G, name, outdir='figs'):
         if label == "root":
             node_color.append('black')
             node_size.append(350)
-        elif label in ['branch', 'tip']:
+        elif label == 'tip':
             node_color.append('green')
             node_size.append(20)
+        elif label == 'branch':
+            node_color.append('green')
+            node_size.append(5)
         elif label == "continue":
             node_color.append('brown')
             #node_size.append(250)   
@@ -176,7 +180,7 @@ def viz_tree(G, name, outdir='figs'):
             node_size.append(100)
         elif label == 'steiner_point':
             node_color.append('blue')
-            node_size.append(20)
+            node_size.append(5)
         else:
             assert False
 
