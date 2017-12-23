@@ -5,49 +5,53 @@ import networkx as nx
 import pylab
 import numpy as np
 from itertools import combinations
-from scipy.spatial.distance import euclidean
+from steiner_midpoint import slope_vector, delta_point
+from numpy.random import exponential
+from dist_functions import *
 
-def pareto_cost(mcost, scost, alpha):
-    # alpha = 0 minimizes satellite cost
-    # alpha = 1 minimizes spanning tree cost
-    mcost *= alpha
-    scost *= (1 - alpha)
-    cost = mcost + scost
-    return cost 
+SYNAPSE_RATE = 1
 
-def centroid(G):
-    root = G.graph['root']
-    root_coord = G.node[root]['coord']
-    centroid = np.zeros(len(root_coord))
-    for u in G.nodes_iter():
-        point = G.node[u]['coord']
-        assert len(point) == len(root_coord)
-        if u != root:
-            centroid += point
-    centroid /= G.number_of_nodes() - 1
-    return centroid
-
-def new_synapse_points(coord1, coord2, dist=1):
+def new_synapse_points(coord1, coord2, rate=SYNAPSE_RATE):
+    slope_vec = slope_vector(coord1, coord2)
+    max_dist = point_dist(coord1, coord2)
+    dist = 0
+    done = False
+    beta = 1.0 / rate
     new_points = []
-    pass
+    while not done:
+        d = exponential(beta)
+        if d == 0:
+            continue
+        dist += d
+        if dist >= max_dist:
+            done = True
+        else:
+            new_point = delta_point(coord1, slope_vec, d)
+            new_points.append(new_point)
     return new_points
 
-def add_synapses(G, dist=1):
-    latest_node = max(G.nodes())
+def add_synapses(G, rate=SYNAPSE_RATE):
+    G.graph['synapses'] = []
+    next_node = max(G.nodes()) + 1
     for u, v in G.edges():
-        new_points = add_synapse_points(G.node[u]['coord'], G.node[v]['coord'])
+        new_points = new_synapse_points(G.node[u]['coord'], G.node[v]['coord'],\
+                                        rate=rate)
         new_nodes = []
-        for new_point in new_point:
-            new_node = latest_node + 1
-            new_nodes.append(new_node)
-            G.add_node(new_node)
-            G.node[new_node]['coord'] = new_point
-            latest_node = new_node
-
-        new_nodes = [u] + new_nodes + [y]
-        for i in xrange(len(new_nodes) - 1):
-            x, y = new_nodes[i], new_nodes[i + 1]
-            pass
+        for new_point in new_points:
+            new_nodes.append(next_node)
+            G.add_node(next_node)
+            G.node[next_node]['coord'] = new_point
+            G.node[next_node]['label'] = 'synapse'
+            G.graph['synapses'].append(next_node)
+            next_node += 1
+       
+        segment_nodes = [u] + new_nodes + [v]
+        G.remove_edge(u, v)
+        for i in xrange(len(segment_nodes) - 1):
+            n1 = segment_nodes[i]
+            n2 = segment_nodes[i + 1]
+            G.add_edge(n1, n2)
+            G[n1][n2]['length'] = node_dist(G, n1, n2)
 
 def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
@@ -112,6 +116,7 @@ def get_neuron_points(filename, dim='3D'):
         if G.number_of_nodes() > 0:
             assert 'root' in G.graph
             label_points(G)
+            add_synapses(G)
             graphs.append(G)
         else:
             graphs.append(None)
@@ -159,12 +164,15 @@ def viz_tree(G, name, outdir='figs'):
         if label == "root":
             node_color.append('black')
             node_size.append(350)
-        elif label == 'tip':
-            node_color.append('green')
-            node_size.append(20)
-        elif label == 'branch':
+        elif label == 'synapse':
             node_color.append('green')
             node_size.append(5)
+        elif label == 'tip':
+            node_color.append('blue')
+            node_size.append(20)
+        elif label == 'branch':
+            node_color.append('blue')
+            node_size.append(8)
         elif label == "continue":
             node_color.append('brown')
             #node_size.append(250)   
@@ -178,11 +186,13 @@ def viz_tree(G, name, outdir='figs'):
         elif label == 'isolated_end':
             node_color.append('blue')
             node_size.append(100)
-        elif label == 'steiner_point':
+        elif label == 'steiner_midpoint':
             node_color.append('blue')
-            node_size.append(5)
+            node_size.append(1)
         else:
+            print label
             assert False
+
 
     nx.draw(G,pos=pos,arrows=False,with_labels=False,node_size=node_size,node_color=node_color,edge_color="brown",width=4,font_size=12,font_color='red',font_weight='bold')
     #nx.draw(G,pos=pos,arrows=False,with_labels=False,node_size=15,font_size=12,font_color='red',font_weight='bold')
@@ -199,50 +209,6 @@ def viz_tree(G, name, outdir='figs'):
     pylab.savefig("%s/%s.pdf" % (outdir, name))
     pylab.close()
 
-def point_dist(p1, p2):
-    '''
-    '''
-    assert len(p1) == len(p2)
-    sq_dist = 0
-    for i in xrange(len(p1)):
-        x1, x2 = p1[i], p2[i]
-        sq_dist += (x1 - x2) ** 2
-    return sq_dist ** 0.5
-    '''
-    '''
-    #return euclidean(p1, p2)
-    #return np.linalg.norm(p1 - p2)
-
-def node_dist(G, u, v):
-    p1 = G.node[u]['coord']
-    p2 = G.node[v]['coord']
-    return point_dist(p1, p2)
-
-def root_dist(G, u):
-    assert 'root' in G.graph
-    return node_dist(G, u, G.graph['root'])
-
-def sort_neighbors(G):
-    for u in G.nodes_iter():
-        G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
-    G.graph['sorted'] = True
-
-def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
-    best_dist = float("inf")
-    best_index = None
-
-    assert len(pareto_mcosts) == len(pareto_scosts)
-
-    for i in xrange(len(pareto_mcosts)):
-        pareto_mcost = pareto_mcosts[i]
-        pareto_scost = pareto_scosts[i]
-
-        dist = point_dist((pareto_mcost, pareto_scost), (mcost, scost))
-        if dist < best_dist:
-            best_dist = dist
-            best_index = i
-
-    return best_dist, best_index 
 
 def main():
     #neuron_file = argv[1]
