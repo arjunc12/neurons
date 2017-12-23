@@ -478,7 +478,8 @@ def pareto_steiner(G, alpha, axon=False):
             H.node[n2]['parent'] = n1
             #H.node[n2]['droot'] = H[n2][n1]['length'] + H.node[n1]['droot']
             H.node[n2]['droot'] = node_dist(H, n2, u) + H.node[u]['droot']
-            H.node[n2]['label'] = 'steiner_midpoint'
+            if not G.has_node(n2):
+                H.node[n2]['label'] = 'steiner_midpoint'
 
         #closest_neighbors[u].remove(v)
         #closest_neighbors[v].remove(u)
@@ -696,6 +697,18 @@ def pareto_brute_force(G, alpha, trees=None):
             best_tree = tree
 
     return best_tree
+
+def centroid(G):
+    root = G.graph['root']
+    root_coord = G.node[root]['coord']
+    centroid = np.zeros(len(root_coord))
+    for u in G.nodes_iter():
+        point = G.node[u]['coord']
+        assert len(point) == len(root_coord)
+        if u != root:
+            centroid += point
+    centroid /= G.number_of_nodes() - 1
+    return centroid
 
 def centroid_mst(G):
     cent_mst = G.copy()

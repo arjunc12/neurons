@@ -1,6 +1,14 @@
 import networkx as nx
 from neuron_utils import point_dist
 
+def pareto_cost(mcost, scost, alpha):
+    # alpha = 0 minimizes satellite cost
+    # alpha = 1 minimizes spanning tree cost
+    mcost *= alpha
+    scost *= (1 - alpha)
+    cost = mcost + scost
+    return cost 
+
 def partially_dominates(costs1, costs2):
     assert len(costs1) == len(costs2)
     strict = False

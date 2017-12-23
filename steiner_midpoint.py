@@ -1,7 +1,7 @@
 import numpy as np
-from neuron_utils import point_dist, pareto_cost
 from sys import argv
 from itertools import combinations
+from dist_functions import *
 
 def slope_vector(p1, p2):
     assert len(p1) == len(p2)
