@@ -1,8 +1,8 @@
 library(ICC)
 library(stringr)
 
-MIN_COUNT = 25
-MIN_POINTS = 100
+MIN_COUNT = 10
+MIN_POINTS = 50
 
 getICCs <- function(df)
 {
