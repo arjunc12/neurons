@@ -12,6 +12,7 @@ from scipy.stats import entropy
 from numpy.linalg import norm
 import numpy as np
 from stats_utils import *
+import argparse
 
 OUTDIR = 'steiner_stats'
 
@@ -33,9 +34,9 @@ PSEUDOCOUNT = 0.0001
 
 CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type']
 
-MIN_COUNT = 25
+MIN_COUNT = 100
 
-MIN_POINTS = 50
+MIN_POINTS = 100
 MAX_POINTS = float("inf")
 
 LOG_DIST = True
@@ -51,9 +52,8 @@ def remove_small_counts(df, categories):
     df2 = df2[df2['count'] >= MIN_COUNT]
     return df2
 
-def get_df():
-    fname = 'pareto_steiner.csv'
-    df = pd.read_csv(fname, names=COLUMNS, skipinitialspace=True)
+def get_df(data_file='pareto_steiner.csv'):
+    df = pd.read_csv(data_file, names=COLUMNS, skipinitialspace=True)
     for i, point in enumerate(list(df['points'])):
         try:
             x = int(point)
@@ -194,14 +194,15 @@ DIST_FUNCS = [hellinger_distance, JSD, total_variation_distance]
 DIST_FUNC_NAMES = {pseudo_kld : 'kld', hellinger_distance : 'hellinger',\
                    JSD : 'jsd', total_variation_distance: 'tvd'}
 
-def dist_heat(df, category, alphas=None, dist_func=pseudo_kld):
+def dist_heat(df, category, alphas=None, dist_func=pseudo_kld, outdir=OUTDIR):
     dist_frame = make_dist_frame(df, category, alphas, dist_func)
     dist_frame = dist_frame.pivot(category + '1', category + '2', 'distance')
     pylab.figure()
     ax = sns.heatmap(dist_frame, vmin=0, vmax=1)
-    ax.tick_params(labelsize=5, axis='x')
-    ax.tick_params(labelsize=5, axis='y')
-    pylab.savefig('%s/%s_heat_%s.pdf' % (OUTDIR, DIST_FUNC_NAMES[dist_func], category), format='pdf')
+    ax.tick_params(labelsize=20, axis='x', rotation=90)
+    ax.tick_params(labelsize=20, axis='y', rotation=0)
+    pylab.savefig('%s/%s_heat_%s.pdf' % (outdir, DIST_FUNC_NAMES[dist_func], category),
+                   format='pdf', bbox_inches='tight')
     pylab.close()
 
 def kld_heat(df, category, alphas=None):
@@ -213,12 +214,12 @@ def hellinger_heat(df, category, alphas=None):
 def jsd_heat(df, category, alphas=None):
     return dist_heat(df, category, alphas=alphas, dist_func=JSD)
 
-def dist_heats(df, categories, dist_funcs, alphas=None):
+def dist_heats(df, categories, dist_funcs, alphas=None, outdir=OUTDIR):
     for category in categories:
         for dist_func in dist_funcs:
-            dist_heat(df, category, alphas=alphas, dist_func=dist_func)
+            dist_heat(df, category, alphas=alphas, dist_func=dist_func, outdir=outdir)
 
-def alphas_heat(df, categories):
+def alphas_heat(df, categories, outdir=OUTDIR):
     for cat1, cat2 in combinations(categories, 2):
         df2 = df.drop_duplicates(subset=['name', cat1, cat2])
         df2 = remove_small_counts(df2, [cat1, cat2])
@@ -226,7 +227,9 @@ def alphas_heat(df, categories):
         data = df2.pivot(cat1, cat2, 'alpha')
         pylab.figure()
         ax = sns.heatmap(data, vmin=0, vmax=1)
-        pylab.savefig('%s/%s_%s_alphas_heat.pdf' % (OUTDIR, cat1, cat2), format='pdf')
+        pylab.xticks(rotation=90, size=20)
+        pylab.savefig('%s/%s_%s_alphas_heat.pdf' % (outdir, cat1, cat2),\
+                      format='pdf', bbox_inches='tight')
         pylab.close()
 
 def cat_to_num(categories):
@@ -244,7 +247,7 @@ def cat_to_num(categories):
         cat_nums.append(cat_map[category])
     return cat_nums
 
-def alpha_distribution(df, categories, plot_func, plot_descriptor):
+def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=OUTDIR):
     for category in categories:
         df2 = df.drop_duplicates(subset=['name', category])
         df2 = remove_small_counts(df2, category)
@@ -262,22 +265,23 @@ def alpha_distribution(df, categories, plot_func, plot_descriptor):
         pylab.figure()
         dist_plot = plot_func(x='alpha', y=category, data=df2, orient='h', order=order)
         dist_plot.tick_params(labelsize=10, axis='y')
-        pylab.savefig('%s/%s_alphas_%s.pdf' % (OUTDIR, category, plot_descriptor), format='pdf')
+        pylab.savefig('%s/%s_alphas_%s.pdf' % (outdir, category, plot_descriptor),
+                       format='pdf', bbox_inches='tight')
         pylab.close()
 
-def cluster_alphas(df, identifiers):
-    alpha_distribution(df, identifiers, sns.stripplot, 'cluster')
+def cluster_alphas(df, identifiers, outdir=OUTDIR):
+    alpha_distribution(df, identifiers, sns.stripplot, 'cluster', outdir=outdir)
 
-def boxplot_alphas(df, identifiers):
-    alpha_distribution(df, identifiers, sns.boxplot, 'box')
+def boxplot_alphas(df, identifiers, outdir=OUTDIR):
+    alpha_distribution(df, identifiers, sns.boxplot, 'box', outdir=outdir)
 
-def violin_alphas(df, identifiers):
-    alpha_distribution(df, identifiers, sns.violinplot, 'violin')
+def violin_alphas(df, identifiers, outdir=OUTDIR):
+    alpha_distribution(df, identifiers, sns.violinplot, 'violin', outdir=outdir)
 
-def swarm_alphas(df, identifiers):
-    alpha_distribution(df, identifiers, sns.swarmplot, 'swarm')
+def swarm_alphas(df, identifiers, outdir=OUTDIR):
+    alpha_distribution(df, identifiers, sns.swarmplot, 'swarm', outdir=outdir)
 
-def category_dists_barplot(df, category, name, dist_col='neural_dist'):
+def category_dists_barplot(df, category, name, dist_col='neural_dist', outdir=OUTDIR):
     df = df[[category, dist_col]]
     cat_vals = []
     cat_means = []
@@ -289,16 +293,17 @@ def category_dists_barplot(df, category, name, dist_col='neural_dist'):
     sorted_vals = cat_vals[order]
     pylab.figure()
     dist_plot = sns.barplot(x=category, y=dist_col, data=df, order=sorted_vals)
-    pylab.xticks(rotation=90, size=5)
+    pylab.xticks(rotation=90, size=20)
     if name == None:
-        name = '%s/' % OUTDIR
+        name = '%s/' % outdir
         if norm:
             name += 'norm_'
         name += 'pareto_dists_' + category + '.pdf'
-    pylab.savefig(name + '_' + category + '.pdf', format='pdf')
+    pylab.savefig(name + '_' + category + '.pdf', format='pdf',\
+                  bbox_inches='tight')
     
 
-def category_dists(df, categories, norm=False):
+def category_dists(df, categories, norm=False, outdir=OUTDIR):
     regression_df = df[['name', 'points', 'neural_dist']]
     regression_df = regression_df.drop_duplicates(subset='name')
     add_regression_cols(regression_df, 'points', 'neural_dist')
@@ -317,15 +322,15 @@ def category_dists(df, categories, norm=False):
             name += 'norm_'
         name += 'pareto_dists'
 
-        category_dists_barplot(df2, category, name, dist_col)
+        category_dists_barplot(df2, category, name, dist_col, outdir=outdir)
 
         df3 = regression_df.merge(df2, on='name')
         dist_col += '_resid2'
         name += '_regression'
-        category_dists_barplot(df3, category, name, dist_col)
+        category_dists_barplot(df3, category, name, dist_col, outdir=outdir)
 
 
-def scatter_dists(df):
+def scatter_dists(df, outdir=OUTDIR):
     df2 = df.drop_duplicates(subset='name')
     for neuron_type, group in df2.groupby('neuron_type'):
         print neuron_type, pylab.mean(group['neural_dist']), '+/-', pylab.std(group['neural_dist'], ddof=1)
@@ -371,11 +376,11 @@ def scatter_dists(df):
     ylab += 'distance'
     pylab.ylabel(ylab)
     #pylab.title('Distance to Pareto Front') 
-    pylab.legend(loc='lower right')
-    pylab.savefig('%s/pareto_dists.pdf' % OUTDIR, format='pdf')
+    pylab.legend(loc='upper right')
+    pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf', bbox_inches='tight')
     pylab.close()
 
-def alphas_hist(df, norm=False):
+def alphas_hist(df, norm=False, outdir=OUTDIR):
     df2 = df.drop_duplicates(subset='name')
     alpha_col = ''
     if norm:
@@ -389,14 +394,14 @@ def alphas_hist(df, norm=False):
     curr_ax.set_ylim((0, 1))
     pylab.xlabel('alpha')
     pylab.ylabel('proportion')
-    name = OUTDIR + '/'
+    name = outdir + '/'
     if norm:
         name += 'norm_'
     name += 'alphas_hist.pdf'
-    pylab.savefig(name, format='pdf')
+    pylab.savefig(name, format='pdf', bbox_inches='tight')
     pylab.close()
 
-def neuron_types_hist(df, norm=False):
+def neuron_types_hist(df, norm=False, outdir=OUTDIR):
     df2 = df.drop_duplicates(subset='name')
     pylab.figure()
     alphas = []
@@ -422,11 +427,11 @@ def neuron_types_hist(df, norm=False):
     curr_ax.set_ylim((0, 1))
     pylab.xlabel('alpha')
     pylab.ylabel('proportion')
-    name = OUTDIR + '/'
+    name = outdir + '/'
     if norm:
         name += 'norm_'
     name += 'neuron_types_hist.pdf'
-    pylab.savefig(name, format='pdf')
+    pylab.savefig(name, format='pdf', bbox_inches='tight')
     pylab.close()
 
 def size_correlation(df):
@@ -522,7 +527,7 @@ def neuron_type_alphas(df):
         #print mannwhitneyu(dist1, dist2, alternative='two-sided')
         print ks_2samp(dist1, dist2)
 
-def size_dist_correlation(df):
+def size_dist_correlation(df, outdir=OUTDIR):
     df2 = df.drop_duplicates(subset='name')
     df2 = df2[df2['neural_dist'] >= 1]
     points = df2['points']
@@ -544,12 +549,19 @@ def size_dist_correlation(df):
     x = x[order]
     y = y[order]
     pylab.plot(x, y, c='g')
-    pylab.savefig('%s/size_dist.pdf' % OUTDIR, format='pdf')
+    pylab.savefig('%s/size_dist.pdf' % outdir, format='pdf', bbox_inches='tight')
     pylab.close()
 
 
 def main():
-    df = get_df()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--data_file', default='pareto_steiner.csv')
+    parser.add_argument('-o', '--outdir', default=OUTDIR)
+    args = parser.parse_args()
+    data_file = args.data_file
+    assert data_file[-4:] == '.csv'
+    outdir = args.outdir
+    df = get_df(data_file=data_file)
     if TEST_NEW_FUNCTION:
         category_dists(df, CATEGORIES, norm=False)
         return None
@@ -559,18 +571,19 @@ def main():
     neuron_type_alphas(df)
     basic_stats(df)
     #categories_correlations(df)
-    os.system('mkdir -p steiner_stats')
-    scatter_dists(df)
-    boxplot_alphas(df, CATEGORIES)
-    alphas_hist(df, norm=False)
-    neuron_types_hist(df, norm=False)
-    alphas_heat(df, CATEGORIES)
-    dist_heats(df, CATEGORIES, DIST_FUNCS)
-    category_dists(df, CATEGORIES, norm=False)
-    size_dist_correlation(df)
+    os.system('mkdir -p %s' % outdir)
+    scatter_dists(df, outdir=outdir)
+    boxplot_alphas(df, CATEGORIES, outdir=outdir)
+    alphas_hist(df, norm=False, outdir=outdir)
+    neuron_types_hist(df, norm=False, outdir=outdir)
+    alphas_heat(df, CATEGORIES, outdir=outdir)
+    dist_heats(df, CATEGORIES, DIST_FUNCS, outdir=outdir)
+    category_dists(df, CATEGORIES, norm=False, outdir=outdir)
+    size_dist_correlation(df, outdir=outdir)
 
     filtered_df = get_filtered_df(df)
-    filtered_df.to_csv('pareto_steiner_filtered.csv', index=False)
+    prefix = outdir[-4:]
+    filtered_df.to_csv('%s_filtered.csv' % prefix, index=False)
 
 if __name__ == '__main__':
     main()
