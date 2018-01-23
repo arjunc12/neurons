@@ -8,51 +8,75 @@ from itertools import combinations
 from steiner_midpoint import slope_vector, delta_point
 from numpy.random import exponential
 from dist_functions import *
+from graph_utils import is_tree
 
-SYNAPSE_RATE = 0.1
+SYNAPSE_RATE = 1.8661051308416368
 
 def new_synapse_points(coord1, coord2, rate=SYNAPSE_RATE, offset=0):
+    #assert 0 <= offset <= rate
     slope_vec = slope_vector(coord1, coord2)
-    #max_dist = point_dist(coord1, coord2)
-    length = point_dist(coord1, coord2)
-    npoints = int((length - offset) / rate)
-    new_offset = (length - offset) - (npoints * rate)
-    assert 0 <= new_offset <= rate
-    new_offset = rate - new_offset
-    assert 0 <= new_offset <= rate
-    dist = 0
-    beta = 1.0 / rate
+    max_dist = point_dist(coord1, coord2)
+    total_dist = offset
+    dists = []
+    while total_dist < max_dist:
+        dists.append(total_dist)
+        dist = exponential(rate)
+        total_dist += dist
+    new_offset = total_dist - max_dist
     new_points = []
-    d = offset / length
-    for i in xrange(npoints):
+    for dist in dists:
+        assert 0 <= dist <= max_dist
+        d = dist / max_dist
         new_point = delta_point(coord1, slope_vec, d)
         new_points.append(new_point)
-        d += rate / length
-    return new_points
+    return new_points, new_offset
 
 def add_synapses(G, rate=SYNAPSE_RATE):
-    G.graph['synapses'] = []
+    H = G.copy()
+    assert is_tree(H)
+    root = H.graph['root']
+    stack = [root]
+    offsets = {}
+    offsets[root] = 0
+    visited = set()
+    H.graph['synapses'] = []
     next_node = max(G.nodes()) + 1
-    for u, v in G.edges():
-        new_points = new_synapse_points(G.node[u]['coord'], G.node[v]['coord'],\
-                                        rate=rate)
-        new_nodes = []
-        for new_point in new_points:
-            new_nodes.append(next_node)
-            G.add_node(next_node)
-            G.node[next_node]['coord'] = new_point
-            G.node[next_node]['label'] = 'synapse'
-            G.graph['synapses'].append(next_node)
-            next_node += 1
+    while len(stack) > 0:
+        curr = stack.pop()
+        visited.add(curr)
+        for n in H.neighbors(curr):
+            if n in visited:
+                continue
 
-        segment_nodes = [u] + new_nodes + [v]
-        G.remove_edge(u, v)
-        for i in xrange(len(segment_nodes) - 1):
-            n1 = segment_nodes[i]
-            n2 = segment_nodes[i + 1]
-            G.add_edge(n1, n2)
-            G[n1][n2]['length'] = node_dist(G, n1, n2)
-            print G[n1][n2]['length']
+            coord1 = H.node[curr]['coord']
+            coord2 = H.node[n]['coord']
+            offset = offsets[curr]
+            new_points, new_offset = new_synapse_points(coord1, coord2,\
+                                                        rate=rate,\
+                                                        offset=offset)
+            
+            new_nodes = []
+            for new_point in new_points:
+                new_nodes.append(next_node)
+                H.add_node(next_node)
+                H.node[next_node]['coord'] = new_point
+                H.node[next_node]['label'] = 'synapse'
+                H.graph['synapses'].append(next_node)
+                next_node += 1
+
+            segment_nodes = [curr] + new_nodes + [n]
+            H.remove_edge(curr, n)
+            for i in xrange(len(segment_nodes) - 1):
+                n1 = segment_nodes[i]
+                n2 = segment_nodes[i + 1]
+                H.add_edge(n1, n2)
+                H[n1][n2]['length'] = node_dist(H, n1, n2)
+
+            stack.append(n)
+            offsets[n] = new_offset
+
+    print len(H.graph['synapses']), 'synapses'
+    return H
 
 def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
@@ -170,14 +194,14 @@ def viz_tree(G, name, outdir='figs'):
             node_size.append(15)
         elif label == 'tip':
             node_color.append('blue')
-            node_size.append(20)
+            node_size.append(10)
         elif label == 'branch':
             node_color.append('blue')
             node_size.append(10)
         elif label == "continue":
-            node_color.append('blue')
+            node_color.append('brown')
             #node_size.append(250)   
-            node_size.append(10)   
+            node_size.append(1)
         elif label == 'centroid':
             node_color.append('purple')
             node_size.append(250)
@@ -188,7 +212,7 @@ def viz_tree(G, name, outdir='figs'):
             node_color.append('blue')
             node_size.append(100)
         elif label == 'steiner_midpoint':
-            node_color.append('blue')
+            node_color.append('brown')
             node_size.append(1)
         else:
             print label
