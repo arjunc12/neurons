@@ -29,7 +29,7 @@ def sort_neighbors(G):
         G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
     G.graph['sorted'] = True
 
-def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
+def pareto_dist_l2(pareto_mcosts, pareto_scosts, mcost, scost):
     best_dist = float("inf")
     best_index = None
 
@@ -44,4 +44,26 @@ def pareto_dist(pareto_mcosts, pareto_scosts, mcost, scost):
             best_dist = dist
             best_index = i
 
-    return best_dist, best_index 
+    return best_dist, best_index
+
+def pareto_dist_scale(pareto_mcosts, pareto_scosts, mcost, scost):
+    assert len(pareto_mcosts) == len(pareto_scosts)
+    best_scale = float("inf")
+    best_index = None
+
+    for i in xrange(len(pareto_mcosts)):
+        pareto_mcost = pareto_mcosts[i]
+        assert pareto_mcost >= 0
+        if pareto_mcost == 0:
+            continue
+        pareto_scost = pareto_scosts[i]
+        assert pareto_scost >= 0
+        if pareto_scost == 0:
+            continue
+        mcost_scale = mcost / pareto_mcost
+        scost_scale = scost / pareto_scost
+        scale = max(mcost_scale, scost_scale)
+        if scale < best_scale:
+            best_scale = scale
+            best_index = i
+    return best_scale, best_index
