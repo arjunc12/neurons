@@ -358,6 +358,7 @@ def pareto_steiner(G, alpha, axon=False):
     H.node[root]['parent'] = None
     root_coord = G.node[root]['coord']
     H.node[root]['coord'] = root_coord
+    H.node[root]['label'] = 'root'
     added_nodes = 1
 
     in_nodes = set()
@@ -442,6 +443,7 @@ def pareto_steiner(G, alpha, axon=False):
         assert not H.has_node(v)
         H.add_node(v)
         H.node[v]['coord'] = G.node[v]['coord']
+        H.node[v]['label'] = 'synapse'
         in_nodes.add(v)
         out_nodes.remove(v)
 
