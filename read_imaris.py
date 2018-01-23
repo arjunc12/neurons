@@ -8,6 +8,7 @@ from collections import defaultdict
 import numpy as np
 import pylab
 from graph_utils import is_tree
+import argparse
 
 MAX_SEGMENTS = float("inf")
 
@@ -16,6 +17,7 @@ VIZ_TREE = False
 def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
     nodeid = 0
     G = nx.Graph()
+    G.graph['synapses'] = []
     start_counts = defaultdict(int)
     coord_ids = {}
     
@@ -55,6 +57,7 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
                 coord_ids[new_coord] = id1
             G.add_node(id1)
             G.node[id1]['coord'] = new_coord
+            G.node[id1]['label'] = 'synapse'
             if j == 0:
                 start_counts[new_coord] += 1
                 start_ids.append(id1)
@@ -120,9 +123,19 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
     print G.number_of_nodes()
     print G.number_of_edges()
     print nx.is_connected(G)
+
+    f = open('imaris_lengths.csv', 'a')
+    edge_lengths = []
+    for u, v in G.edges_iter():
+        length = G[u][v]['length']
+        edge_lengths.append(length)
+        f.write('%s, %f\n' % (outname, length))
+    f.close()
+    print "mean edge length", pylab.mean(edge_lengths)
+
     return G
 
-def main():
+def draw_imaris():
     for i, neuron in enumerate(os.listdir('imaris')):
         print neuron
         if os.path.isdir('imaris/%s' % neuron):
@@ -131,6 +144,34 @@ def main():
                 if 'Position' in fname:
                     trace_pos.append('imaris/%s/%s' % (neuron, fname))
             read_imaris(trace_pos, viz=True, outname=neuron)
+
+def plot_edge_lengths():
+    df = pd.read_csv('imaris_lengths.csv', names = ['neuron', 'length'])
+    pylab.hist(df['length'])
+    pylab.savefig('imaris/imaris_lengths.pdf', format='pdf')
+    pylab.close()
+    mu = pylab.mean(df['length'])
+    sigma2 = pylab.var(df['length'], ddof=1)
+    l = 1.0 / mu
+    l2 = l ** 2
+    print "mean", mu
+    print "lambda", l
+    print 'variance', sigma2
+    print 'var-hat', 1.0 / l2
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--draw', action='store_true')
+    parser.add_argument('-l', '--lengths', action='store_true')
+
+    args = parser.parse_args()
+    draw = args.draw
+    lengths = args.lengths
+
+    if draw or not lengths:
+        draw_imaris()
+    else:
+        plot_edge_lengths()
 
 if __name__ == '__main__':
     main()
