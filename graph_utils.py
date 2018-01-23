@@ -1,6 +1,6 @@
 import networkx as nx
 from itertools import combinations
-from neuron_utils import point_dist
+from dist_functions import point_dist
 
 def complete_graph(G):
     H = G.copy()
