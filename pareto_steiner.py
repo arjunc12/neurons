@@ -17,15 +17,25 @@ from kruskal import *
 from neuron_builder import build_neuron
 from random_graphs import random_mst
 import math
+import seaborn as sns
 
 SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported']
 
-VIZ_TREES = False
+VIZ_TREES = True
 MIN_NODES = 0
 MAX_NODES = 3000
 NO_CONTINUE = False
 
 LOG_PLOT = True
+
+FIGS_DIR = 'steiner_figs'
+
+# DIST_FUNC = pareto_dist_l2
+DIST_FUNC = pareto_dist_scale
+
+NEUROMORPHO_TRIALS = 1
+#NEUROMORPHO_TRIALS = 10
+
 def ceil_power_of_10(n):
     exp = math.log(n, 10)
     exp = math.ceil(exp)
@@ -44,11 +54,11 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     assert is_tree(G)
    
     print "making graph"
-    point_graph = None
-    if NO_CONTINUE:
-        point_graph = non_continue_subgraph(G)
-    else:
-        point_graph = complete_graph(G)
+    synapses = G.graph['synapses']
+    points = synapses + [G.graph['root']]
+    point_graph = G.subgraph(points)
+    point_graph = complete_graph(point_graph)
+
     print point_graph.number_of_nodes(), "points"
 
     sat_tree = satellite_tree(point_graph)
@@ -90,7 +100,7 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
         #check_dists(pareto_tree)
 
         if (i % 5 == 0) and viz_trees:
-            viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
+            viz_tree(pareto_tree, name + '-' + str(alpha), outdir=outdir)
         
         mcosts.append(mcost)
         scosts.append(scost)
@@ -124,10 +134,12 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
 
 # ---------------------------------------
     
-    neural_mcost, neural_scost = graph_costs(G)
+    #neural_mcost, neural_scost = graph_costs(G)
+    neural_mcost = mst_cost(G)
+    neural_scost = satellite_cost(G, relevant_nodes=point_graph.nodes())
     
-    neural_dist, neural_index = pareto_dist(mcosts, scosts, neural_mcost,\
-                                            neural_scost)
+    neural_dist, neural_index = DIST_FUNC(mcosts, scosts, neural_mcost,\
+                                          neural_scost)
     neural_closem = mcosts[neural_index] 
     neural_closes = scosts[neural_index]
     neural_alpha = alphas[neural_index]
@@ -139,7 +151,9 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     norm_centroid_mcost = normalize_mcost(centroid_mcost)
     norm_centroid_scost = normalize_scost(centroid_scost)
     
-    centroid_dist, centroid_index = pareto_dist(mcosts, scosts, centroid_mcost, centroid_scost)
+    centroid_dist, centroid_index = DIST_FUNC(mcosts, scosts,\
+                                                   centroid_mcost,\
+                                                   centroid_scost)
     centroid_closem = mcosts[centroid_index]
     centroid_closes = scosts[centroid_index]
     centroid_alpha = alphas[centroid_index]
@@ -150,16 +164,16 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     norm_neural_scost = normalize_scost(neural_scost)
 
 
-    norm_neural_dist, norm_neural_index = pareto_dist(norm_mcosts,\
-                                                      norm_scosts,\
-                                                      norm_neural_mcost,\
-                                                      norm_neural_scost)
+    norm_neural_dist, norm_neural_index = DIST_FUNC(norm_mcosts,\
+                                                    norm_scosts,\
+                                                    norm_neural_mcost,\
+                                                    norm_neural_scost)
     norm_neural_alpha = alphas[norm_neural_index]
 
-    norm_centroid_dist, norm_centroid_index = pareto_dist(norm_mcosts,\
-                                                          norm_scosts,\
-                                                          norm_centroid_mcost,\
-                                                          norm_centroid_scost)
+    norm_centroid_dist, norm_centroid_index = DIST_FUNC(norm_mcosts,\
+                                                        norm_scosts,\
+                                                        norm_centroid_mcost,\
+                                                        norm_centroid_scost)
     norm_centroid_alpha = alphas[norm_centroid_index] 
         
 # ---------------------------------------
@@ -182,7 +196,7 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
         rand_mcosts.append(rand_mcost)
         rand_scosts.append(rand_scost)
         
-        rand_dist, rand_index = pareto_dist(mcosts, scosts, rand_mcost, rand_scost)
+        rand_dist, rand_index = DIST_FUNC(mcosts, scosts, rand_mcost, rand_scost)
         rand_closem = mcosts[rand_index]
         rand_closes = scosts[rand_index]
         rand_alpha = alphas[rand_index]
@@ -191,10 +205,10 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
         norm_rand_scost = normalize_scost(rand_scost)
         norm_rand_mcosts.append(norm_rand_mcost)
         norm_rand_scosts.append(norm_rand_scost)
-        norm_rand_dist, norm_rand_index = pareto_dist(norm_mcosts,\
-                                                      norm_scosts,\
-                                                      norm_rand_mcost,\
-                                                      norm_rand_scost)
+        norm_rand_dist, norm_rand_index = DIST_FUNC(norm_mcosts,\
+                                                    norm_scosts,\
+                                                    norm_rand_mcost,\
+                                                    norm_rand_scost)
         norm_rand_alpha = alphas[norm_rand_index]
 
         
@@ -208,22 +222,23 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
 
 # ---------------------------------------
     pylab.figure()
+    sns.set()
 
     pylab.plot(mcosts, scosts, c = 'b')
     pylab.scatter(mcosts, scosts, c='b', label='greedy steiner')
    
     pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x',\
-                   linewidths=15, label='neural') 
+                   linewidths=60, label='neural', s=175) 
     
     pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+',
-                   linewidths=15, label='centroid mst')
+                   linewidths=60, label='centroid mst', s=175)
         
     pylab.scatter(rand_mcosts, rand_scosts, c='m', marker='o', label='random mst')
     
     #pylab.scatter(rand_mcosts, rand_scosts, c='m', marker='o', label='random mst')
      
-    pylab.xlabel('steiner tree cost')
-    pylab.ylabel('satellite cost')
+    pylab.xlabel('wiring cost')
+    pylab.ylabel('conduction delay')
 
     pylab.xlim(min_mcost - 10, max_mcost + 10)
     pylab.ylim(min_scost - 10, max_scost + 10)
@@ -381,7 +396,7 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
         assert scost1 >= opt_scost
 
 
-        if False and (i % 5 == 0) and viz_trees:
+        if (i % 5 == 0) and viz_trees:
             viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
         
         pareto_tree2 = pareto_prim(point_graph, alpha, axon=axon) 
@@ -476,6 +491,7 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     '''
 
     pylab.figure()
+    sns.set()
     pylab.plot(mcosts1, scosts1, c = 'b')
     pylab.scatter(mcosts1, scosts1, c='b', label='steiner')
     
@@ -487,8 +503,9 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
      
     #pylab.xlabel('steiner tree cost')
     #pylab.ylabel('satellite cost')
-    pylab.xlabel('writing cost')
+    pylab.xlabel('wiring cost')
     pylab.ylabel('conduction delay')
+    
 
     neural_mcost, neural_scost = graph_costs(G)
     
@@ -496,7 +513,13 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     norm_neural_Scost = normalize_scost(neural_scost)
     
     #pylab.scatter([norm_neural_mcost], [norm_neural_scost], c='r', marker='x', linewidths=15, label='neural')
-    pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x', linewidths=15, label='neural')
+    pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x',\
+                  linewidths=60, label='neural', s=175)
+    
+    pylab.legend()
+
+    pylab.savefig('%s/pareto_front_%s.pdf' % (outdir, name), format='pdf')
+    #pylab.close()
 
     centroid_tree = centroid_mst(point_graph)
     centroid_mcost, centroid_scost = graph_costs(centroid_tree)
@@ -505,9 +528,24 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     norm_centroid_scost = normalize_scost(centroid_scost)
 
     #pylab.scatter([norm_centroid_mcost)], [norm_centroid_scost], c='g', marker='+', linewidths=15, label='centroid')
-    #pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+', linewidths=15, label='centroid')
+    pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+',\
+                  linewidths=60, label='centroid', s=175)
 
-    pylab.savefig('%s/pareto_front_%s.pdf' % (outdir, name), format='pdf')
+    neural_dist, neural_index = DIST_FUNC(mcosts1, scosts1, neural_mcost,\
+                                          neural_scost)
+    
+    centroid_dist, centroid_index = DIST_FUNC(mcosts1, scosts1, centroid_mcost,\
+                                              centroid_scost)
+    
+    for scale_factor, color in zip([neural_dist, centroid_dist], ['r', 'g']):
+        x = scale_factor * pylab.array(mcosts1)
+        y = scale_factor * pylab.array(scosts1)
+        pylab.plot(x, y, c=color, linestyle='-')
+        pylab.scatter(x, y, c=color, label='s = %0.2f' % scale_factor)
+
+    pylab.legend()
+
+    pylab.savefig('%s/pareto_front_scaled_%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
 
     viz_tree(G, name + str('_neural'), outdir=outdir) 
@@ -545,12 +583,21 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES, cell_types=None,
 
                         for i, G in enumerate(graphs):
                             if G == None:
-                                continue
+                                continue 
+                            
+
                             if not (min_nodes <= G.number_of_nodes() <= max_nodes):
                                 print "wrong nodes", G.number_of_nodes()
                                 continue
+                            
                             name = neuron[:-8] + str(i)
-                            outdir = 'steiner_figs/%s/%s/%s/%s/%s' % (cell_type, species, region, lab, name)
+                            
+                            
+                            #if not (min_nodes <= len(G.graph['synapses']) + 1 <= max_nodes):
+                                #print "wrong nodes", G.number_of_nodes()
+                                #continue
+
+                            outdir = '%s/%s/%s/%s/%s/%s' % (FIGS_DIR, cell_type, species, region, lab, name)
                             outdir = outdir.replace(' ', '_')
                             os.system('mkdir -p %s' % outdir)
                             if len(os.listdir(outdir)) > 0:
@@ -558,9 +605,21 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES, cell_types=None,
                             print species, lab, neuron
                             axon = i == 0
                             try:
-                                pareto_plot_neuromorpho(G, name, cell_type,\
-                                                        species, region,\
-                                                        lab, outdir, axon=axon)
+                                for i in xrange(NEUROMORPHO_TRIALS):
+                                    #H = add_synapses(G)
+                                    H = G.copy()
+                                    H.graph['synapses'] = []
+                                    for u in H.nodes_iter():
+                                        if u != H.graph['root']:
+                                            H.graph['synapses'].append(u)
+                                    '''
+                                    if not (min_nodes <= len(H.graph['synapses']) + 1 <= max_nodes):
+                                        print "wrong nodes", len(H.graph['synapses'])
+                                        continue
+                                    '''
+                                    pareto_plot_neuromorpho(H, name, cell_type,\
+                                                            species, region,\
+                                                            lab, outdir, axon=axon)
                             except RuntimeError as r:
                                 print r
                                 continue
@@ -632,7 +691,7 @@ def neuron_builder_plots(rmin=0.5, rmax=1.5, rstep=0.01, num_iters=10):
             fname = 'pareto_front%d' % len(os.listdir('neuron_builder'))
             pylab.savefig('%s/%s.pdf' % ('neuron_builder', fname), format='pdf')
 
-            neural_dist, neural_index = pareto_dist(mcosts, scosts, neural_mcost, neural_scost)
+            neural_dist, neural_index = DIST_FUNC(mcosts, scosts, neural_mcost, neural_scost)
             neural_closem = mcosts[neural_index] 
             neural_closes = scosts[neural_index]
 
