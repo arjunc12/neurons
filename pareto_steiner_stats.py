@@ -202,8 +202,9 @@ def dist_heat(df, category, alphas=None, dist_func=pseudo_kld, outdir=OUTDIR):
     ax = sns.heatmap(dist_frame, vmin=0, vmax=1)
     ax.tick_params(axis='x', rotation=90)#, labelsize=20)
     ax.tick_params(axis='y', rotation=0)#, labelsize=20)
+    pylab.tight_layout()
     pylab.savefig('%s/%s_heat_%s.pdf' % (outdir, DIST_FUNC_NAMES[dist_func], category),
-                   format='pdf', bbox_inches='tight')
+                   format='pdf')#, bbox_inches='tight')
     pylab.close()
 
 def kld_heat(df, category, alphas=None):
@@ -229,8 +230,9 @@ def alphas_heat(df, categories, outdir=OUTDIR):
         pylab.figure()
         ax = sns.heatmap(data, vmin=0, vmax=1)
         pylab.xticks(rotation=90)#, size=20)
+        pylab.tight_layout()
         pylab.savefig('%s/%s_%s_alphas_heat.pdf' % (outdir, cat1, cat2),\
-                      format='pdf', bbox_inches='tight')
+                      format='pdf')#, bbox_inches='tight')
         pylab.close()
 
 def cat_to_num(categories):
@@ -266,8 +268,9 @@ def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=OUTDIR
         pylab.figure()
         dist_plot = plot_func(x='alpha', y=category, data=df2, orient='h', order=order)
         #dist_plot.tick_params(axis='y', labelsize=20)
+        pylab.tight_layout()
         pylab.savefig('%s/%s_alphas_%s.pdf' % (outdir, category, plot_descriptor),
-                       format='pdf', bbox_inches='tight')
+                       format='pdf')#, bbox_inches='tight')
         pylab.close()
 
 def cluster_alphas(df, identifiers, outdir=OUTDIR):
@@ -300,8 +303,8 @@ def category_dists_barplot(df, category, name, dist_col='neural_dist', outdir=OU
         if norm:
             name += 'norm_'
         name += 'pareto_dists_' + category + '.pdf'
-    pylab.savefig(name + '_' + category + '.pdf', format='pdf',\
-                  bbox_inches='tight')
+    pylab.tight_layout()
+    pylab.savefig(name + '_' + category + '.pdf', format='pdf')#, bbox_inches='tight')
     
 
 def category_dists(df, categories, norm=False, outdir=OUTDIR):
@@ -378,7 +381,8 @@ def scatter_dists(df, outdir=OUTDIR):
     pylab.ylabel(ylab)
     #pylab.title('Distance to Pareto Front') 
     pylab.legend(loc='upper right')
-    pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf', bbox_inches='tight')
+    pylab.tight_layout()
+    pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf')#, bbox_inches='tight')
     pylab.close()
 
 def alphas_hist(df, norm=False, outdir=OUTDIR):
@@ -399,7 +403,8 @@ def alphas_hist(df, norm=False, outdir=OUTDIR):
     if norm:
         name += 'norm_'
     name += 'alphas_hist.pdf'
-    pylab.savefig(name, format='pdf', bbox_inches='tight')
+    pylab.tight_layout()
+    pylab.savefig(name, format='pdf')#, bbox_inches='tight')
     pylab.close()
 
 def neuron_types_hist(df, norm=False, outdir=OUTDIR):
@@ -432,7 +437,8 @@ def neuron_types_hist(df, norm=False, outdir=OUTDIR):
     if norm:
         name += 'norm_'
     name += 'neuron_types_hist.pdf'
-    pylab.savefig(name, format='pdf', bbox_inches='tight')
+    pylab.tight_layout()
+    pylab.savefig(name, format='pdf')#, bbox_inches='tight')
     pylab.close()
 
 def size_correlation(df):
@@ -551,7 +557,8 @@ def size_dist_correlation(df, outdir=OUTDIR):
     x = x[order]
     y = y[order]
     pylab.plot(x, y, c='g')
-    pylab.savefig('%s/size_dist.pdf' % outdir, format='pdf', bbox_inches='tight')
+    pylab.tight_layout()
+    pylab.savefig('%s/size_dist.pdf' % outdir, format='pdf')#, bbox_inches='tight')
     pylab.close()
 
 
