@@ -32,11 +32,11 @@ TEST_NEW_FUNCTION = False
 
 PSEUDOCOUNT = 0.0001
 
-CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type']
+CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type', 'lab']
 
-MIN_COUNT = 100
+MIN_COUNT = 50
 
-MIN_POINTS = 100
+MIN_POINTS = 10
 MAX_POINTS = float("inf")
 
 LOG_DIST = True
@@ -65,6 +65,7 @@ def get_df(data_file='pareto_steiner.csv'):
     df['neuron_type'] = df['name'].str[-1]
     df['neuron_type'] = df['neuron_type'].astype(int)
     df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
+    df['lab'] = df['lab'].str.lower()
 
     df.drop_duplicates(subset=['name'] + CATEGORIES, inplace=True)
 
@@ -199,8 +200,8 @@ def dist_heat(df, category, alphas=None, dist_func=pseudo_kld, outdir=OUTDIR):
     dist_frame = dist_frame.pivot(category + '1', category + '2', 'distance')
     pylab.figure()
     ax = sns.heatmap(dist_frame, vmin=0, vmax=1)
-    ax.tick_params(labelsize=20, axis='x', rotation=90)
-    ax.tick_params(labelsize=20, axis='y', rotation=0)
+    ax.tick_params(axis='x', rotation=90)#, labelsize=20)
+    ax.tick_params(axis='y', rotation=0)#, labelsize=20)
     pylab.savefig('%s/%s_heat_%s.pdf' % (outdir, DIST_FUNC_NAMES[dist_func], category),
                    format='pdf', bbox_inches='tight')
     pylab.close()
@@ -227,7 +228,7 @@ def alphas_heat(df, categories, outdir=OUTDIR):
         data = df2.pivot(cat1, cat2, 'alpha')
         pylab.figure()
         ax = sns.heatmap(data, vmin=0, vmax=1)
-        pylab.xticks(rotation=90, size=20)
+        pylab.xticks(rotation=90)#, size=20)
         pylab.savefig('%s/%s_%s_alphas_heat.pdf' % (outdir, cat1, cat2),\
                       format='pdf', bbox_inches='tight')
         pylab.close()
@@ -264,7 +265,7 @@ def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=OUTDIR
 
         pylab.figure()
         dist_plot = plot_func(x='alpha', y=category, data=df2, orient='h', order=order)
-        dist_plot.tick_params(labelsize=10, axis='y')
+        #dist_plot.tick_params(axis='y', labelsize=20)
         pylab.savefig('%s/%s_alphas_%s.pdf' % (outdir, category, plot_descriptor),
                        format='pdf', bbox_inches='tight')
         pylab.close()
@@ -293,7 +294,7 @@ def category_dists_barplot(df, category, name, dist_col='neural_dist', outdir=OU
     sorted_vals = cat_vals[order]
     pylab.figure()
     dist_plot = sns.barplot(x=category, y=dist_col, data=df, order=sorted_vals)
-    pylab.xticks(rotation=90, size=20)
+    pylab.xticks(rotation=90)#, size=20)
     if name == None:
         name = '%s/' % outdir
         if norm:
@@ -469,6 +470,7 @@ def basic_stats(df):
     df2 = df.drop_duplicates(subset='name')
     total_trials = df2['trials'].sum()
     total_successes = df2['successes'].sum()
+    print "random tree successes"
     print total_successes, total_trials
     print "p-value", float(total_successes) / total_trials
 
