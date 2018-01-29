@@ -45,3 +45,7 @@ steiner_figs/*
 steiner_imaris/*
 
 paper_plots.txt
+
+boutons/*
+
+NLMorphologyConverter
