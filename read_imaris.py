@@ -79,6 +79,7 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
     root_coord =  max(start_counts.keys(), key = (lambda x : start_counts[x]))
     root_id = coord_ids[root_coord]
     G.graph['root'] = root_id
+    G.node[root_id]['label'] = 'root'
 
     for start_id in start_ids:
         if start_id != root_id:

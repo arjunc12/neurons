@@ -1,8 +1,9 @@
 import pandas as pd
-from scipy.stats import ttest_ind
+from scipy.stats import ttest_ind, ks_2samp
 from pareto_steiner_stats import get_df
 import argparse
 from itertools import combinations
+import pylab
 
 def test_cat_vals(df, category, vals):
     df2 = df.drop_duplicates(subset='name')
@@ -13,7 +14,8 @@ def test_cat_vals(df, category, vals):
         sample2 = alphas[df2[category] == val2]
         degf = len(sample1) + len(sample2) - 2
         print val1, val2, len(sample1), len(sample2), degf
-        print ttest_ind(sample1, sample2, equal_var=False)
+        print "t test", ttest_ind(sample1, sample2, equal_var=False)
+        print "ks test", ks_2samp(sample1, sample2)
 
 def main():
     parser = argparse.ArgumentParser()

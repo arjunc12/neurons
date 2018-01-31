@@ -12,6 +12,29 @@ from graph_utils import is_tree
 
 SYNAPSE_RATE = 1.8661051308416368
 
+def truncate_graph(G):
+    remove_nodes = set()
+    queue = [G.graph['root']]
+    new_root = None
+    while len(queue) > 0:
+        assert len(queue) == 1
+        curr = queue.pop()
+        degree = 0
+        descendants = []
+        for u in G.neighbors(curr):
+            if u not in remove_nodes:
+                degree += 1
+                descendants.append(u)
+        if degree <= 1:
+            queue += descendants
+            remove_nodes.add(curr)
+        else:
+            done = True
+            new_root = curr
+
+    G.remove_nodes_from(remove_nodes)
+    G.graph['root'] = new_root
+
 def new_synapse_points(coord1, coord2, rate=SYNAPSE_RATE, offset=0):
     #assert 0 <= offset <= rate
     slope_vec = slope_vector(coord1, coord2)
@@ -146,6 +169,18 @@ def get_neuron_points(filename, dim='3D'):
         else:
             graphs.append(None)
 
+    if graphs[0] != None:
+        G = graphs[0].copy()
+        truncate_graph(G)
+        if G.number_of_nodes() > 0:
+            assert 'root' in G.graph
+            label_points(G)
+            graphs.append(G)
+        else:
+            graphs.append(None)
+    else:
+        graphs.append(None)
+
     return graphs
 
 def initialize_lengths(G):
@@ -238,7 +273,18 @@ def viz_tree(G, name, outdir='figs'):
 def main():
     #neuron_file = argv[1]
     #print map(str, neuron_info(neuron_file))
-    pass
+    G = nx.Graph()
+    for i in xrange(1, 11):
+        G.add_edge(i - 1, i)
+    print G.nodes()
+    print G.edges()
+    for j in xrange(11, 20):
+        pass
+        #G.add_edge(10, j)
+    G.graph['root'] = 0
+    truncate_graph(G)
+    print G.nodes()
+    print G.edges()
 
 if __name__ == '__main__':
     main()

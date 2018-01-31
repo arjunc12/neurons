@@ -1,9 +1,10 @@
-import pareto_mst_plots
+import pareto_steiner_stats
 import neuron_density
 import numpy as np
 import pandas as pd
 import pylab
 from stats_utils import *
+from scipy.stats import pearsonr, spearmanr
 
 def biggest_outliers(df, category, ycol='density'):
     resid_col = ycol + '_resid'
@@ -46,13 +47,54 @@ def cat_to_color(cat_values):
     return colors
 
 def make_alpha_plots(df):
+    alpha = df['alpha']
+    density = df['density']
+    log_density = np.log10(density)
+    density_resid = df['density_resid']
+
     pylab.figure()
-    pylab.subplot(2, 1, 1)
-    pylab.scatter(df['alpha'], np.log10(df['density']))
-    pylab.subplot(2, 1, 2)
-    pylab.scatter(df['alpha'], df['density_resid'])
+    neuron_types = df['neuron_type'].unique()
+    nrows = 3
+    ncols = len(neuron_types) + 1
+    enum_items = zip([density, log_density, density_resid],\
+                     ['density', 'log-density', 'density residual'])
+    for i, (y, label) in enumerate(enum_items):
+        print "all neurons"
+        #print label, pearsonr(alpha, y)
+        print label, spearmanr(alpha, y)
+        
+        index1 = (i * ncols) + 1
+        pylab.subplot(nrows, ncols, index1)
+        pylab.scatter(alpha, y)
+        pylab.ylabel(label)
+        if i == 0:
+            pylab.gca().set_title('all neurons')
+        if i == len(enum_items) - 1:
+            pylab.xlabel('alpha')
+
+        for j, neuron_type in enumerate(neuron_types):
+            x2 = alpha[df['neuron_type'] == neuron_type]
+            y2 = y[df['neuron_type'] == neuron_type]
+            print neuron_type
+            #print label, pearsonr(x2, y2)
+            print label, spearmanr(x2, y2)
+            index2 = index1 + j + 1
+            pylab.subplot(nrows, ncols, index2)
+            pylab.scatter(x2, y2)
+            if i == 0:
+                pylab.gca().set_title(neuron_type)
+            if i == len(enum_items) - 1:
+                pylab.xlabel('alpha')
+    
+    pylab.tight_layout()
+
     pylab.savefig('neuron_density/alpha_resid.pdf', format='pdf')
     pylab.close()
+
+    #print pearsonr(alpha, density)
+    #print pearsonr(alpha, log_density)
+    #print pearsonr(alpha, density_resid)
+
 
 def sorted_points(df, col1, col2):
     idx = pylab.argsort(df[col1])
@@ -90,15 +132,13 @@ def make_density_plot(df, hue=None, outliers=None):
     pylab.close()
 
 def main():
-    pareto_mst_df = pareto_mst_plots.get_df()
-    pareto_mst_df = pareto_mst_df[pareto_mst_df['cell_type'] != 'principal_cell']
-    pareto_mst_df = pareto_mst_df[pareto_mst_df['neuron_type'] != 'axon']
-    
+    pareto_steiner_df = pareto_steiner_stats.get_df()
+
     neuron_density_df = neuron_density.get_df()
     neuron_density_df.drop('points', axis=1, inplace=True)
     #neuron_density_df.drop_duplicates(subset='name', inplace=True)
 
-    df = pd.merge(pareto_mst_df, neuron_density_df, on='name')
+    df = pd.merge(pareto_steiner_df, neuron_density_df, on='name')
     df.drop_duplicates(subset='name', inplace=True)
     #print df[df['species'] == 'rabbit']
     df['density'] = df['mcost'] / df['volume']
@@ -108,12 +148,15 @@ def main():
     #print df['region'].unique()
 
     add_regression_cols(df, 'mcost', 'density', np.log10, np.log10)
+    
+    '''
     for hue in [None, 'cell_type', 'species', 'region']:
         outliers = None
         if hue != None:
             outliers = biggest_outliers(df, hue)
             print hue, outliers
         make_density_plot(df, hue=hue, outliers=outliers)
+    '''
     
     make_alpha_plots(df)
 

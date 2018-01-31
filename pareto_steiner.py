@@ -18,6 +18,7 @@ from neuron_builder import build_neuron
 from random_graphs import random_mst
 import math
 import seaborn as sns
+from collections import defaultdict
 
 SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported']
 
@@ -35,6 +36,8 @@ DIST_FUNC = pareto_dist_scale
 
 NEUROMORPHO_TRIALS = 1
 #NEUROMORPHO_TRIALS = 10
+
+NEUROMORPHO_PADDING = 500
 
 def ceil_power_of_10(n):
     exp = math.log(n, 10)
@@ -99,8 +102,9 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
         assert scost >= opt_scost
         #check_dists(pareto_tree)
 
-        if (i % 5 == 0) and viz_trees:
-            viz_tree(pareto_tree, name + '-' + str(alpha), outdir=outdir)
+        if (i % 5 == 4) and viz_trees:
+            viz_tree(pareto_tree, '%s-%0.2f' % (name, alpha), outdir=outdir)
+            #viz_tree(pareto_tree, name + '-' + str(alpha), outdir=outdir)
         
         mcosts.append(mcost)
         scosts.append(scost)
@@ -240,8 +244,8 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     pylab.xlabel('wiring cost')
     pylab.ylabel('conduction delay')
 
-    pylab.xlim(min_mcost - 10, max_mcost + 10)
-    pylab.ylim(min_scost - 10, max_scost + 10)
+    pylab.xlim(min_mcost - NEUROMORPHO_PADDING, max_mcost + NEUROMORPHO_PADDING)
+    pylab.ylim(min_scost - NEUROMORPHO_PADDING, max_scost + NEUROMORPHO_PADDING)
     
     pylab.savefig('%s/pareto_front_%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
@@ -292,14 +296,21 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
      
     pylab.scatter(norm_rand_mcosts, norm_rand_scosts, c='m', marker='o', label='random mst')
     
-    pylab.xlabel('steiner tree cost')
-    pylab.ylabel('satellite cost')
+    pylab.xlabel('wiring cost')
+    pylab.ylabel('conduction delay')
     
     pylab.savefig('%s/norm_pareto_front_%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
     
 # ---------------------------------------
 
+    for u in G.nodes():
+        for H in [G, sat_tree, span_tree, centroid_tree]:
+            assert H.has_node(u)
+            if u == G.graph['root']:
+                H.node[u]['label'] = 'root'
+            else:
+                H.node[u]['label'] = 'synapse'
     viz_tree(G, name + str('_neural'), outdir=outdir) 
     viz_tree(sat_tree, name + str('_sat'), outdir=outdir)
     viz_tree(span_tree, name + str('_mst'), outdir=outdir)
@@ -362,6 +373,7 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
 
     delta = 0.01
     alphas = np.arange(delta, 1, delta)
+    alpas = np.append(alphas, [1])
     print "sorting neighbors"
     sort_neighbors(point_graph)
 
@@ -380,6 +392,8 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
 
     root = G.graph['root']
 
+    costs_file = open('steiner_imaris.csv', 'a')
+
     for i, alpha in enumerate(alphas):
         print "alpha", alpha
         pareto_tree1 = pareto_steiner(point_graph, alpha, axon=axon)
@@ -395,9 +409,11 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
             print "scost error", scost_error(pareto_tree1)
         assert scost1 >= opt_scost
 
+        costs_file.write('%s, %f, %f, %f\n' % (name, alpha, mcost1, scost1))
 
-        if (i % 5 == 0) and viz_trees:
-            viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
+        if (i % 5 == 4) and viz_trees:
+            viz_tree(pareto_tree1, '%s-%0.2f' % (name, alpha), outdir=outdir)
+            #viz_tree(pareto_tree1, name + '-' + str(alpha), outdir=outdir)
         
         pareto_tree2 = pareto_prim(point_graph, alpha, axon=axon) 
 
@@ -442,6 +458,9 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
         if cost1 <= cost3:
             khuller_dominates += 1
 
+    costs_file.close()
+
+    '''
     outfile = open('steiner_imaris.csv', 'a')
     write_items = [mst_comparisons, mst_dominates,\
                    khuller_comparisons, khuller_dominates]
@@ -455,6 +474,7 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     outfile.write('steiner dominated by mst, ' + str(prop_dominated(mcosts2, scosts2, mcosts1, scosts1)) + '\n')
 
     outfile.close()
+    '''
     
     min_mcost = min(mcosts1 + mcosts2 + mcosts3)
     max_mcost = max(mcosts1 + mcosts2 + mcosts3)
@@ -558,19 +578,19 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES, cell_types=None,
     #directory = 'neuromorpho'
     directory = 'datasets'
     i = 0
-    for cell_type in os.listdir(directory):
+    for cell_type in shuffle(os.listdir(directory)):
         if cell_type in SKIP_TYPES:
             continue
         if cell_types != None and cell_type not in cell_types:
             continue
-        for species in os.listdir(directory + '/' + cell_type):
+        for species in shuffle(os.listdir(directory + '/' + cell_type)):
             if animal_species != None and species not in animal_species:
                 continue
-            for region in os.listdir(directory + '/' + cell_type + '/' + species):
+            for region in shuffle(os.listdir(directory + '/' + cell_type + '/' + species)):
                 if regions != None and region not in regions:
                     continue
-                for lab in os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region):
-                    for neuron in os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
+                for lab in shuffle(os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region)):
+                    for neuron in shuffle(os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab)):
                         filename = directory + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron
                         
                         if neuron[-8:] != ".CNG.swc": 
@@ -709,6 +729,25 @@ def neuron_builder_plots(rmin=0.5, rmax=1.5, rstep=0.01, num_iters=10):
             outfile.write('%s\n' % write_items)
             outfile.close()
 
+def boutons_plots():
+    groups = defaultdict(list)
+    for fname in os.listdir('boutons/swc_files'):
+        group = fname[:-5]
+        num = fname[-5]
+        groups[group].append(num)
+    
+    for group in groups:
+        G = None
+        for num in groups[group]:
+            fname = 'boutons/swc_files/' + group + num + '.swc'
+            graphs = get_neuron_points(fname)
+            H = graphs[0]
+            if G == None:
+                G = H
+            else:
+                G = nx.disjoint_union(G, H)
+        viz_tree(G, group, 'boutons/drawings')
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-min_nodes', type=int, default=MIN_NODES)
@@ -722,6 +761,7 @@ def main():
     parser.add_argument('-s', '-a', '--species', '--animal_species,', nargs='+',\
                         default=None, dest='animal_species')
     parser.add_argument('-r', '--regions', nargs='+', default=None)
+    parser.add_argument('-bt', '--boutons', action='store_true')
 
     args = parser.parse_args()
     min_nodes = args.min_nodes
@@ -734,6 +774,7 @@ def main():
     cell_types = args.cell_types
     animal_species = args.animal_species
     regions = args.regions
+    boutons = args.boutons
 
     if debug:
         cell_type = 'bipolar'
@@ -759,6 +800,8 @@ def main():
         neuromorpho_plots(min_nodes, max_nodes, cell_types, animal_species, regions)
     if neuron_builder:
         neuron_builder_plots()
+    if boutons:
+        boutons_plots()
 
 if __name__ == '__main__':
     main()

@@ -26,7 +26,8 @@ COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',\
            'norm_neural_dist', 'norm_centroid_dist', 'norm_random_dist',\
            'trials', 'successes', 'norm_successes']
 
-NEURON_TYPE_LABELS = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite'}
+NEURON_TYPE_LABELS = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite',\
+                      3: 'truncated axon'}
 
 TEST_NEW_FUNCTION = False
 
