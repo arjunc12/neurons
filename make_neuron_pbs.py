@@ -1,9 +1,14 @@
 import argparse
 import os
 
+DATASETS_DIR = '/iblsn/data/Arjun/neurons/datasets'
+PBS_DIR = '/iblsn/data/Arjun/neurons/pbs_files'
+OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output/steiner_output'
+FIGS_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output/steiner_figs'
+
 def make_neuron_pbs(cell_types, animal_species, regions, labs, names, min_nodes, max_nodes):
-    directory = 'datasets'
-    fnames = []
+    directory = DATASETS_DIR
+    fpaths = set()
     for cell_type in os.listdir(directory):
         if cell_types != None and cell_type not in cell_types:
             continue
@@ -16,9 +21,7 @@ def make_neuron_pbs(cell_types, animal_species, regions, labs, names, min_nodes,
                 for lab in os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region):
                     if labs != None and lab not in labs:
                         continue
-                    for neuron_file in os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
-                        filename = directory + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron_file
- 
+                    for neuron_file in os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab): 
                         neuron_name = neuron_file[:-8]
                         if names != None and neuron_name not in names:
                             continue
@@ -26,21 +29,32 @@ def make_neuron_pbs(cell_types, animal_species, regions, labs, names, min_nodes,
                         if neuron_file[-8:] != ".CNG.swc": 
                             continue
 
+                        output_dir = '/'.join([OUTPUT_DIR, cell_type, species, region, lab])
+                        print output_dir
+                        if os.path.isdir(output_dir):
+                            if len(os.listdir(output_dir) > 0):
+                                continue
+
                         bash_str = 'python pareto_steiner.py -n -c %s -s %s -r %s -l %s -na %s -min_nodes %d -max_nodes %d'\
                                                             % (cell_type, species,\
                                                                region, lab, neuron_name,\
                                                                min_nodes, max_nodes)
-                        fname = 'pareto_steiner_%s.pbs' % neuron_name
-                        fnames.append(fname)
-                        f = open(fname, 'a')
-                        f.write('#!/bin/bash\n')
-                        f.write('cd $SGE_O_WORKDIR\n')
+                        fname = 'pareto_steiner_%s.pbs' % (neuron_name)
+                        fpath = '%s/%s' % (PBS_DIR, fname)
+                        init_commands = False
+                        if fname not in os.listdir(PBS_DIR):
+                            init_commands = True
+                        fpaths.add(fpath)
+                        f = open(fpath, 'a')
+                        if init_commands:
+                            f.write('#!/bin/bash\n')
+                            f.write('cd /home/achandrasekhar/neurons/\n')
                         f.write('%s\n' % bash_str)
                         f.close()
-
-    for fname in fnames:
-        command = 'qsub %s' % fname
-        print command
+    
+    for fpath in fpaths:
+        command = 'cat %s' % fpath
+        #print command
         os.system(command)
 
 def main():
