@@ -8,7 +8,12 @@ from neuron_utils import get_neuron_points
 import pandas as pd
 import argparse
 import os
-from pareto_mst import SKIP_TYPES
+
+DATASETS_DIR = '/iblsn/data/Arjun/neurons/datasets'
+OUTDIR = '/iblsn/data/Arjun/neurons/neuron_density'
+
+NEURON_TYPES = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite',\
+                3: 'truncated axon'}
 
 def graph_volume(G):
     points = []
@@ -22,72 +27,82 @@ def density(G):
 
 def get_densities():
     prev_names = set()
-    if 'neuron_density.csv' in os.listdir('.'):
-        df = pd.read_csv('neuron_density.csv', names=['name', 'points', 'volume', 'mcost'])
+    first_line = False
+    if 'neuron_density.csv' in os.listdir(OUTDIR):
+        df = pd.read_csv('%s/neuron_density.csv' % OUTDIR,\
+                          names=['name', 'points', 'volume', 'mcost'],\
+                          skipinitialspace=True)
         prev_names = set(df['name'].values)
-    directory = 'datasets'
+    else:
+        first_line = True
     i = 0
-    f = open('neuron_density.csv', 'a')
-    for cell_type in os.listdir(directory):
-        if cell_type in SKIP_TYPES:
-            continue
-        for species in os.listdir(directory + '/' + cell_type):
-            for region in os.listdir(directory + '/' + cell_type + '/' + species):
-                for lab in os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region):
-                    for neuron in os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
-                        filename = directory + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron
-                        
-                        if neuron[-8:] != ".CNG.swc": 
-                            continue
-                        
-                        try:
-                            graphs = get_neuron_points(filename)
-                        except AssertionError:
-                            continue
-
-                        for i, G in enumerate(graphs):
-                            name = neuron[:-8] + str(i)
-
-                            if name in prev_names:
-                                continue
-
-                            if G.number_of_nodes() < 4:
-                                continue
-
-                            print name
-                            volume = None
-                            try:
-                                volume = graph_volume(G)
-                            except QhullError as qerror:
+    f = open('%s/neuron_density.csv' % OUTDIR, 'a')
+    with open('%s/, neuron_density.csv' % OUTDIR, 'a') as f:
+        if first_line:
+            f.write('neuron_name, points, mcost, volume\n')
+        directory = DATASETS_DIR
+        for cell_type in os.listdir(directory):
+            for species in os.listdir(directory + '/' + cell_type):
+                for region in os.listdir(directory + '/' + cell_type + '/' + species):
+                    for lab in os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region):
+                        for neuron in os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
+                            filename = directory + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron
+                            
+                            if neuron[-8:] != ".CNG.swc": 
                                 continue
                             
-                            if volume == None:
+                            try:
+                                graphs = get_neuron_points(filename)
+                            except AssertionError:
                                 continue
 
-                            mcost = mst_cost(G)
+                            for i, G in enumerate(graphs):
+                                neuron_name = neuron[:-8] + str(i)
+                                neuron_type = NEURON_TYPES[i]
 
-                            write_items = [name, G.number_of_nodes(), volume, mcost]
-                            write_items = map(str, write_items)
-                            write_items = ', '.join(write_items)
+                                if neuron_name in prev_names:
+                                    continue
 
-                            f.write('%s\n' % write_items)
+                                if G == None:
+                                    continue
 
-    f.close()
+                                if G.number_of_nodes() < 4:
+                                    continue
+
+                                print neuron_name
+                                volume = None
+                                try:
+                                    volume = graph_volume(G)
+                                except QhullError as qerror:
+                                    continue
+                                
+                                if volume == None:
+                                    continue
+
+                                mcost = mst_cost(G)
+
+                                write_items = [neuron_name, neuron_type, G.number_of_nodes(), mcost, volume]
+                                write_items = map(str, write_items)
+                                write_items = ', '.join(write_items)
+
+                                f.write('%s\n' % write_items)
 
 def get_df():
-    df = pd.read_csv('neuron_density.csv',\
+    df = pd.read_csv('%s/neuron_density.csv' % OUTDIR,\
                       names=['name', 'points', 'volume', 'mcost'],\
                       skipinitialspace=True)
+    df['density'] = df['mcost'] / df['volume']
     return df
 
 def neuron_density_stats():
     df = get_df()
+    x = pylab.log10(pylab.array(df['volume']))
+    y = pylab.log10(pylab.array(df['density']))
     pylab.figure()
-    #pylab.scatter(df['volume'], df['mcost'])
-    pylab.scatter(pylab.log(df['volume']), pylab.log(df['mcost']))
-    pylab.xlabel('volume')
-    pylab.ylabel('strategy')
-    pylab.savefig('neuron_density.pdf', format='pdf')
+    pylab.scatter(x, y)
+    pylab.xlabel('log10-volume')
+    pylab.ylabel('log10-density')
+    pylab.savefig('neuron_density/neuron_density.pdf', format='pdf')
     pylab.close()
 
 def main():
