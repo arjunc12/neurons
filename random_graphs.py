@@ -4,6 +4,9 @@ from itertools import combinations
 from neuron_utils import point_dist
 from collections import defaultdict
 from random import choice, shuffle
+from numpy.random import permutation
+from graph_utils import is_tree
+from dist_functions import node_dist
 
 def random_points(num_points=10, xmin=-10, xmax=10, ymin=-10, ymax=10,\
                                  zmin=-10, zmax=10):
@@ -59,3 +62,27 @@ def random_mst(G):
             curr = next
     
     return H
+
+def barabasi_tree(G):
+    ba = nx.barabasi_albert_graph(n=G.number_of_nodes(), m=1)
+    node_map = {}
+    for i, u in enumerate(permutation(G.nodes())):
+        node_map[i] = u
+
+    H = G.copy()
+    H.remove_edges_from(G.edges())
+
+    for a, b in ba.edges_iter():
+        u, v = node_map[a], node_map[b]
+        H.add_edge(u, v)
+        H[u][v]['length'] = node_dist(H, u, v)
+
+    return H
+
+def main():
+    G = random_point_graph()
+    T = barabasi_tree(G)
+    assert is_tree(T)
+
+if __name__ == '__main__':
+    main()
