@@ -1,13 +1,13 @@
 import pandas as pd
 from scipy.stats import ttest_ind, ks_2samp
-from pareto_steiner_stats import get_df
+from pareto_steiner_stats import get_df, DATASET_FILE
 import argparse
 from itertools import combinations
 import pylab
 
 def test_cat_vals(df, category, vals):
-    df2 = df.drop_duplicates(subset='name')
-    df2 = df2[df2[category].isin(vals)]
+    df2 = df[df[category].isin(vals)]
+    df2 = df2.drop_duplicates(subset='name')
     alphas = df2['alpha']
     for val1, val2 in combinations(vals, 2):
         sample1 = alphas[df2[category] == val1]
@@ -22,7 +22,7 @@ def main():
     parser.add_argument('-s', '--species', nargs='+', default=None)
     parser.add_argument('-r', '--regions', nargs='+', default=None)
     parser.add_argument('-c', '--cell_types', nargs='+', default=None)
-    parser.add_argument('-d', '--data_file', default='pareto_steiner.csv')
+    parser.add_argument('-d', '--data_file', default=DATASET_FILE)
 
     args = parser.parse_args()
     species = args.species
