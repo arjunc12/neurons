@@ -16,33 +16,21 @@ import argparse
 
 OUTDIR = 'steiner_stats'
 
-'''
-COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'alpha', 'neural_dist',\
-            'centroid_dist', 'random_dist', 'trials', 'successes', 'comparisons',\
-            'dominates']
-'''
-COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',\
-           'norm_alpha', 'neural_dist', 'centroid_dist', 'random_dist',\
-           'norm_neural_dist', 'norm_centroid_dist', 'norm_random_dist',\
-           'trials', 'successes', 'norm_successes']
+TEST_NEW_FUNCTION = True
 
-NEURON_TYPE_LABELS = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite',\
-                      3: 'truncated axon'}
+OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
+OUTPUT_FILE = '%s/pareto_steiner.csv' % OUTPUT_DIR
+MODELS_FILE = '%s/models.csv' % OUTPUT_DIR
 
-TEST_NEW_FUNCTION = False
-
-PSEUDOCOUNT = 0.0001
-
-CATEGORIES = ['cell_type', 'species', 'region', 'neuron_type', 'lab']
+CATEGORIES_FILE = '/iblsn/data/Arjun/neurons/neuron_categories/neuron_categories.csv'
+CATEGORIES = ['cell type', 'species', 'region', 'neuron type', 'lab']
 
 MIN_COUNT = 50
 
-MIN_POINTS = 10
+MIN_POINTS = 100
 MAX_POINTS = float("inf")
 
 LOG_DIST = True
-
-CLIP_DIST = True
 
 def add_count_col(df, categories):
     return df.groupby(categories).size().reset_index(name='count')
@@ -53,24 +41,15 @@ def remove_small_counts(df, categories):
     df2 = df2[df2['count'] >= MIN_COUNT]
     return df2
 
-def get_df(data_file='pareto_steiner.csv'):
-    df = pd.read_csv(data_file, names=COLUMNS, skipinitialspace=True)
-    for i, point in enumerate(list(df['points'])):
-        try:
-            x = int(point)
-        except:
-            print point
-            print df.ix[i]
-    df['points'] = df['points'].astype(int)
-    df = df[(df['points'] >= MIN_POINTS) & (df['points']  <= MAX_POINTS)]
-    df['neuron_type'] = df['name'].str[-1]
-    df['neuron_type'] = df['neuron_type'].astype(int)
-    df = df.replace({'neuron_type': NEURON_TYPE_LABELS})
-    df['lab'] = df['lab'].str.lower()
+def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
+            models_file=MODELS_FILE):
+    df1 = pd.read_csv(output_file, skipinitialspace=True)
+    df2 = pd.read_csv(categories_file, skipinitialspace=True)
+    categories_df = pd.merge(df1, df2)
 
-    df.drop_duplicates(subset=['name'] + CATEGORIES, inplace=True)
+    models_df = pd.read_csv(models_file, skipinitialspace=True)
 
-    return df
+    return categories_df, models_df
 
 def get_filtered_df(df=None):
     if df is None:
@@ -565,15 +544,19 @@ def size_dist_correlation(df, outdir=OUTDIR):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--data_file', default='pareto_steiner.csv')
-    parser.add_argument('-o', '--outdir', default=OUTDIR)
+    parser.add_argument('-o', '--output_file', default=OUTPUT_FILE)
+    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE)
+    parser.add_argument('-m', '--models_file', default=MODELS_FILE)
+    parser.add_argument('-f', '--figs_dir', default=OUTDIR)
     args = parser.parse_args()
-    data_file = args.data_file
+    output_file = args.output_file
+    categories_file = args.categories_file
+    models_file = args.models_file
     assert data_file[-4:] == '.csv'
     outdir = args.outdir
-    df = get_df(data_file=data_file)
+    dfs = get_dfs()
     if TEST_NEW_FUNCTION:
-        category_dists(df, CATEGORIES, norm=False)
+        print dfs
         return None
     
     size_correlation(df)
