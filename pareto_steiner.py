@@ -15,29 +15,36 @@ from read_imaris import *
 from pareto_functions import *
 from kruskal import *
 from neuron_builder import build_neuron
-from random_graphs import random_mst
+from random_graphs import random_mst, barabasi_tree
 import math
 import seaborn as sns
 from collections import defaultdict
+from numpy.random import permutation
+import pandas as pd
 
 SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported']
 
 VIZ_TREES = True
+VIZ_TREES_NEUROMORPHO = False
+VIZ_TREES_IMARIS = True
 MIN_NODES = 0
 MAX_NODES = 3000
 NO_CONTINUE = False
 
 LOG_PLOT = True
 
-FIGS_DIR = 'steiner_figs'
+DATASETS_DIR = '/iblsn/data/Arjun/neurons/datasets'
+PARETO_FIGS_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output/steiner_figs'
+PARETO_FRONT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_fronts'
+PARETO_OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_steiner_temp'
 
 # DIST_FUNC = pareto_dist_l2
 DIST_FUNC = pareto_dist_scale
 
-NEUROMORPHO_TRIALS = 1
-#NEUROMORPHO_TRIALS = 10
-
 NEUROMORPHO_PADDING = 500
+
+NEURON_TYPES = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite',\
+                3: 'truncated axon'}
 
 def ceil_power_of_10(n):
     exp = math.log(n, 10)
@@ -49,93 +56,175 @@ def floor_power_of_10(n):
     exp = math.ceil(exp)
     return 10**exp
 
-def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
-                            outdir='steiner_figs', output=True,\
-                            viz_trees=VIZ_TREES, axon=False):
+def pareto_plot_neuromorpho(G, neuron_name, neuron_type,\
+                            front_dir=PARETO_FRONT_DIR,\
+                            figs_dir=PARETO_FRONT_DIR,\
+                            viz_trees=VIZ_TREES_NEUROMORPHO):
     assert G.number_of_nodes() > 0
-
     assert is_tree(G)
    
-    print "making graph"
+    #print "making graph"
     synapses = G.graph['synapses']
     points = synapses + [G.graph['root']]
     point_graph = G.subgraph(points)
     point_graph = complete_graph(point_graph)
 
-    print point_graph.number_of_nodes(), "points"
+    sat_tree = satellite_tree(point_graph)
+    sat_scost = satellite_cost(sat_tree)
+    sat_mcost = mst_cost(sat_tree)
+    span_tree = nx.minimum_spanning_tree(point_graph, weight='length') 
+
+# ---------------------------------------
+    pareto_front_fname = '%s/pareto_front.csv' % front_dir
+    first_time = not os.path.exists(pareto_front_fname)
+
+    tree_costs_fname = '%s/tree_costs.csv' % front_dir
+   
+    models_fname = '%s/models_%s.csv' % (output_dir, neuron_name)
+    
+    output_fname = '%s/pareto_steiner_%s.csv' %  (output_dir, neuron_name)
+
+# ---------------------------------------
+    alphas = None
+    mcosts = None
+    scosts = None
+
+# ---------------------------------------
+    if (not first_time) and (not viz_trees):
+        df = pd.read_csv('%s/pareto_front.csv' % front_dir, skipinitialspace=True)
+        alphas = pylab.array(df['alpha'])
+        mcosts = pylab.array(df['mcost'])
+        scosts = pylab.array(df['scost'])
+    else:
+        delta = 0.01
+        alphas = np.arange(delta, 1 + delta, delta)
+        mcosts = []
+        scosts = []
+        costs = []
+
+        print "sorting neighbors"
+        sort_neighbors(point_graph)
+
+        front_lines = []
+        front_lines.append('alpha, mcost, scost\n')
+        front_lines.append('%f, %f, %f\n' % (0, sat_mcost, sat_scost))
+        axon = neuron_type == 'axon'
+        for i, alpha in enumerate(alphas):
+            print alpha
+            pareto_tree = pareto_steiner(point_graph, alpha, axon=axon)
+            #pareto_tree = pareto_steiner_sandbox(point_graph, alpha, axon=axon)
+                
+            #assert is_tree(pareto_tree)
+            mcost = mst_cost(pareto_tree)
+            scost = satellite_cost(pareto_tree, relevant_nodes=point_graph.nodes())
+            cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
+            '''
+            if scost < sat_scost:
+                print scost, opt_scost, opt_scost - scost
+                print "dist error", dist_error(pareto_tree)
+                print "scost error", scost_error(pareto_tree)
+            assert scost >= sat_scost
+            check_dists(pareto_tree)
+            '''
+
+            if (i % 5 == 4) and viz_trees:
+                viz_tree(pareto_tree, '%s-%0.2f' % ('alpha', alpha), outdir=figs_dir)
+            
+            mcosts.append(mcost)
+            scosts.append(scost)
+
+            front_lines.append('%f, %f, %f\n' % (alpha, mcost, scost))
+
+        front_fname = '%s/pareto_front.csv' % front_dir
+        with open(front_fname, 'w') as front_file:
+            front_file.writelines(front_lines)
+    pass
+
+def pareto_front_neuromorpho(G, neuron_name, neuron_type,\
+                             front_dir=PARETO_FRONT_DIR,\
+                             output_dir=PARETO_OUTPUT_DIR,\
+                             figs_dir=PARETO_FIGS_DIR, output=True,\
+                             viz_trees=VIZ_TREES_NEUROMORPHO):
+    
+    assert G.number_of_nodes() > 0
+    assert is_tree(G)
+   
+    #print "making graph"
+    synapses = G.graph['synapses']
+    points = synapses + [G.graph['root']]
+    point_graph = G.subgraph(points)
+    point_graph = complete_graph(point_graph)
 
     sat_tree = satellite_tree(point_graph)
-    opt_scost = satellite_cost(sat_tree)
-    span_tree = nx.minimum_spanning_tree(point_graph, weight='length')
-    opt_mcost = mst_cost(span_tree) / 2.0
- 
-# ---------------------------------------
-    mcosts = []
-    scosts = []
-    costs = []
-
-    delta = 0.01
-    alphas = np.arange(delta, 1 + delta, delta)
-    #alphas = [0.99]
-    print "sorting neighbors"
-    sort_neighbors(point_graph)
-
-    khuller_comparisons = 0
-    khuller_dominates = 0
-
-    os.system("mkdir -p %s" % outdir)
+    sat_scost = satellite_cost(sat_tree)
+    sat_mcost = mst_cost(sat_tree)
+    span_tree = nx.minimum_spanning_tree(point_graph, weight='length') 
 
 # ---------------------------------------
-    for i, alpha in enumerate(alphas):
-        print "alpha", alpha
-        pareto_tree = pareto_steiner(point_graph, alpha, axon=axon)
-        #pareto_tree = pareto_steiner_sandbox(point_graph, alpha, axon=axon)
+    pareto_front_fname = '%s/pareto_front.csv' % front_dir
+    first_time = not os.path.exists(pareto_front_fname)
+
+    tree_costs_fname = '%s/tree_costs.csv' % front_dir
+   
+    models_fname = '%s/models_%s.csv' % (output_dir, neuron_name)
+    
+    output_fname = '%s/pareto_steiner_%s.csv' %  (output_dir, neuron_name)
+
+# ---------------------------------------
+    alphas = None
+    mcosts = None
+    scosts = None
+
+# ---------------------------------------
+    if (not first_time) and (not viz_trees):
+        df = pd.read_csv('%s/pareto_front.csv' % front_dir, skipinitialspace=True)
+        alphas = pylab.array(df['alpha'])
+        mcosts = pylab.array(df['mcost'])
+        scosts = pylab.array(df['scost'])
+    else:
+        delta = 0.01
+        alphas = np.arange(delta, 1 + delta, delta)
+        mcosts = []
+        scosts = []
+        costs = []
+
+        print "sorting neighbors"
+        sort_neighbors(point_graph)
+
+        front_lines = []
+        front_lines.append('alpha, mcost, scost\n')
+        front_lines.append('%f, %f, %f\n' % (0, sat_mcost, sat_scost))
+        axon = neuron_type == 'axon'
+        for i, alpha in enumerate(alphas):
+            print alpha
+            pareto_tree = pareto_steiner(point_graph, alpha, axon=axon)
+            #pareto_tree = pareto_steiner_sandbox(point_graph, alpha, axon=axon)
+                
+            #assert is_tree(pareto_tree)
+            mcost = mst_cost(pareto_tree)
+            scost = satellite_cost(pareto_tree, relevant_nodes=point_graph.nodes())
+            cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
+            '''
+            if scost < sat_scost:
+                print scost, opt_scost, opt_scost - scost
+                print "dist error", dist_error(pareto_tree)
+                print "scost error", scost_error(pareto_tree)
+            assert scost >= sat_scost
+            check_dists(pareto_tree)
+            '''
+
+            if (i % 5 == 4) and viz_trees:
+                viz_tree(pareto_tree, '%s-%0.2f' % ('alpha', alpha), outdir=figs_dir)
             
-        assert is_tree(pareto_tree)
-        mcost = mst_cost(pareto_tree)
-        scost = satellite_cost(pareto_tree, relevant_nodes=point_graph.nodes())
-        cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
-        if scost < opt_scost:
-            print scost, opt_scost, opt_scost - scost
-            print "dist error", dist_error(pareto_tree)
-            print "scost error", scost_error(pareto_tree)
-        assert scost >= opt_scost
-        #check_dists(pareto_tree)
+            mcosts.append(mcost)
+            scosts.append(scost)
 
-        if (i % 5 == 4) and viz_trees:
-            viz_tree(pareto_tree, '%s-%0.2f' % (name, alpha), outdir=outdir)
-            #viz_tree(pareto_tree, name + '-' + str(alpha), outdir=outdir)
-        
-        mcosts.append(mcost)
-        scosts.append(scost)
-        costs.append(cost)
-       
-        '''
-        pareto_tree2 = pareto_khuller(point_graph, alpha, span_tree, sat_tree)
-        assert is_tree(pareto_tree2)
-        mcost2, scost2 = graph_costs(pareto_tree2)
-        cost2 = pareto_cost(mcost=mcost2, scost=scost2, alpha=alpha)
+            front_lines.append('%f, %f, %f\n' % (alpha, mcost, scost))
 
-        khuller_comparisons += 1
-        if cost <= cost2:
-            khuller_dominates += 1
-        '''
-
-# ---------------------------------------
-    min_mcost = min(mcosts)
-    max_mcost = max(mcosts)
-    min_scost = min(scosts)
-    max_scost = max(scosts)
-
-    opt_mcost = min_mcost
-    opt_scost = min_scost
-
-    normalize_scost = make_normalize_function(opt_scost)
-    normalize_mcost = make_normalize_function(opt_mcost)
-
-    norm_mcosts = map(normalize_mcost, mcosts)
-    norm_scosts = map(normalize_scost, scosts)
-
+        front_fname = '%s/pareto_front.csv' % front_dir
+        with open(front_fname, 'w') as front_file:
+            front_file.writelines(front_lines)
+   
 # ---------------------------------------
     
     #neural_mcost, neural_scost = graph_costs(G)
@@ -147,82 +236,104 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
     neural_closem = mcosts[neural_index] 
     neural_closes = scosts[neural_index]
     neural_alpha = alphas[neural_index]
+
     
 # ---------------------------------------
     centroid_tree = centroid_mst(point_graph)
 
     centroid_mcost, centroid_scost = graph_costs(centroid_tree)
-    norm_centroid_mcost = normalize_mcost(centroid_mcost)
-    norm_centroid_scost = normalize_scost(centroid_scost)
     
     centroid_dist, centroid_index = DIST_FUNC(mcosts, scosts,\
-                                                   centroid_mcost,\
-                                                   centroid_scost)
+                                              centroid_mcost,\
+                                              centroid_scost)
     centroid_closem = mcosts[centroid_index]
     centroid_closes = scosts[centroid_index]
     centroid_alpha = alphas[centroid_index]
 
+
 # ---------------------------------------
+    centroid_success = int(centroid_dist <= neural_dist)
+    centroid_ratio = centroid_dist / neural_dist
+    if first_time:
+        with open(models_fname, 'w') as models_file:
+            models_file.write('%s, %s, %s, %f,,\n' % (neuron_name,\
+                                                      neuron_type,\
+                                                      'neural',\
+                                                      neural_dist))
+            models_file.write('%s, %s, %s, %f, %d, %f\n' % (neuron_name,\
+                                                            neuron_type,\
+                                                            'centroid',\
+                                                            centroid_dist,\
+                                                            centroid_success,\
+                                                            centroid_ratio))
 
-    norm_neural_mcost = normalize_mcost(neural_mcost)
-    norm_neural_scost = normalize_scost(neural_scost)
-
-
-    norm_neural_dist, norm_neural_index = DIST_FUNC(norm_mcosts,\
-                                                    norm_scosts,\
-                                                    norm_neural_mcost,\
-                                                    norm_neural_scost)
-    norm_neural_alpha = alphas[norm_neural_index]
-
-    norm_centroid_dist, norm_centroid_index = DIST_FUNC(norm_mcosts,\
-                                                        norm_scosts,\
-                                                        norm_centroid_mcost,\
-                                                        norm_centroid_scost)
-    norm_centroid_alpha = alphas[norm_centroid_index] 
-        
 # ---------------------------------------
-    ntrials = 20
-    successes = 0
-    norm_successes = 0
+    if first_time:
+        with open(tree_costs_fname, 'w') as tree_costs_file:
+            tree_costs_file.write('tree, mcost, scost\n')
+            tree_costs_file.write('%s, %f, %f\n' % ('neural',neural_mcost,\
+                                                    neural_scost))
+            tree_costs_file.write('%s, %f, %f\n' % ('centroid', centroid_mcost,\
+                                                    centroid_scost))
+# ---------------------------------------
+    random_trials = 20
 
-    total_rand_dist = 0
-    total_norm_rand_dist = 0
-    rand_mcosts = []
-    rand_scosts = []
-
-    norm_rand_mcosts = []
-    norm_rand_scosts = []
-    for i in xrange(ntrials):
+    for i in xrange(random_trials):
         rand_mst = random_mst(point_graph)
-        
         rand_mcost, rand_scost = graph_costs(rand_mst)
-        
-        rand_mcosts.append(rand_mcost)
-        rand_scosts.append(rand_scost)
-        
-        rand_dist, rand_index = DIST_FUNC(mcosts, scosts, rand_mcost, rand_scost)
-        rand_closem = mcosts[rand_index]
-        rand_closes = scosts[rand_index]
-        rand_alpha = alphas[rand_index]
-       
-        norm_rand_mcost = normalize_mcost(rand_mcost)
-        norm_rand_scost = normalize_scost(rand_scost)
-        norm_rand_mcosts.append(norm_rand_mcost)
-        norm_rand_scosts.append(norm_rand_scost)
-        norm_rand_dist, norm_rand_index = DIST_FUNC(norm_mcosts,\
-                                                    norm_scosts,\
-                                                    norm_rand_mcost,\
-                                                    norm_rand_scost)
-        norm_rand_alpha = alphas[norm_rand_index]
+        rand_dist, rand_index = DIST_FUNC(mcosts, scosts, rand_mcost,\
+                                          rand_scost)
+        rand_success = int(rand_dist <= neural_dist)
+        rand_ratio = rand_dist / neural_dist
 
-        
-        if rand_dist < neural_dist:
-            successes += 1
-        if norm_rand_dist < norm_neural_dist:
-            norm_successes += 1
+        barabasi_mst = barabasi_tree(point_graph)
+        barabasi_mcost, barabasi_scost = graph_costs(barabasi_mst)
+        barabasi_dist, barabasi_index = DIST_FUNC(mcosts, scosts,\
+                                                  barabasi_mcost,\
+                                                  barabasi_scost)
+        barabasi_success = int(barabasi_dist <= neural_dist)
+        barabasi_ratio = barabasi_dist / neural_dist
 
-        total_rand_dist += rand_dist
-        total_norm_rand_dist += norm_rand_dist
+        with open(tree_costs_fname, 'a') as tree_costs_file:
+            tree_costs_file.write('%s, %f, %f\n' % ('random', rand_mcost,\
+                                                     rand_scost))
+            tree_costs_file.write('%s, %f, %f\n' % ('barabasi',\
+                                                     barabasi_mcost,\
+                                                     barabasi_scost))
+
+        with open(models_fname, 'a') as models_file:
+            models_file.write('%s, %s, %s, %f, %d, %f\n' % (neuron_name,\
+                                                            neuron_type,\
+                                                            'random',\
+                                                            rand_dist,\
+                                                            rand_success,\
+                                                            rand_ratio))
+            
+            models_file.write('%s, %s, %s, %f, %d, %f\n' % (neuron_name,\
+                                                            neuron_type,\
+                                                            'barabasi',\
+                                                            barabasi_dist,\
+                                                            barabasi_success,\
+                                                            barabasi_ratio))
+
+# ---------------------------------------
+    def remove_spaces(string):
+        return string.replace(' ', '')
+
+    def remove_commas(string):
+        return string.replace(',', '')
+     
+    if output and first_time:
+        write_items = [neuron_name, neuron_type, point_graph.number_of_nodes()]
+        
+        write_items.append(neural_alpha)
+        
+        write_items = map(str, write_items)
+        write_items = map(remove_commas, write_items)
+        #write_items = map(remove_spaces, write_items)
+        write_items = ', '.join(write_items)
+        with open(output_fname, 'w') as output_file:
+            output_file.write('%s\n' % write_items)
 
 # ---------------------------------------
     pylab.figure()
@@ -233,74 +344,13 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
    
     pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x',\
                    linewidths=60, label='neural', s=175) 
-    
-    pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+',
-                   linewidths=60, label='centroid mst', s=175)
-        
-    pylab.scatter(rand_mcosts, rand_scosts, c='m', marker='o', label='random mst')
-    
-    #pylab.scatter(rand_mcosts, rand_scosts, c='m', marker='o', label='random mst')
      
     pylab.xlabel('wiring cost')
     pylab.ylabel('conduction delay')
-
-    pylab.xlim(min_mcost - NEUROMORPHO_PADDING, max_mcost + NEUROMORPHO_PADDING)
-    pylab.ylim(min_scost - NEUROMORPHO_PADDING, max_scost + NEUROMORPHO_PADDING)
     
-    pylab.savefig('%s/pareto_front_%s.pdf' % (outdir, name), format='pdf')
+    pylab.savefig('%s/pareto_front.pdf' % figs_dir, format='pdf')
     pylab.close()
 
-# ---------------------------------------
-    if LOG_PLOT:
-        pylab.figure()
-        
-        mcosts = pylab.log10(mcosts)
-        scosts = pylab.log10(scosts)
-        
-        neural_mcost = pylab.log10(neural_mcost)
-        neural_scost = pylab.log10(neural_scost)
-        
-        centroid_mcost = pylab.log10(centroid_mcost)
-        centroid_scost = pylab.log10(centroid_scost)
-
-        rand_mcosts = pylab.log10(rand_mcosts)
-        rand_scosts = pylab.log10(rand_scosts)
-
-        pylab.plot(mcosts, scosts, c = 'b')
-        pylab.scatter(mcosts, scosts, c='b', label='greedy steiner')
-       
-        pylab.scatter([neural_mcost], [neural_scost], c='r', marker='x',\
-                       linewidths=15, label='neural') 
-        
-        pylab.scatter([centroid_mcost], [centroid_scost], c='g', marker='+',
-                       linewidths=15, label='centroid mst')
-        
-        pylab.scatter(rand_mcosts, rand_scosts, c='m', marker='o', label='random mst')
-         
-        pylab.xlabel('steiner tree cost')
-        pylab.ylabel('satellite cost')
-        
-        pylab.savefig('%s/log-pareto_front_%s.pdf' % (outdir, name), format='pdf')
-        pylab.close()
-    
-# ---------------------------------------
-    pylab.figure()
-    pylab.plot(norm_mcosts, norm_scosts, c = 'b')
-    pylab.scatter(norm_mcosts, norm_scosts, c='b', label='greedy steiner')
-    
-    pylab.scatter([norm_neural_mcost], [norm_neural_scost], c='r', marker='x',\
-                   linewidths=15, label='neural')
-    
-    pylab.scatter([norm_centroid_mcost], [norm_centroid_scost], c='g', marker='+',\
-                   linewidths=15, label='centroid mst')
-     
-    pylab.scatter(norm_rand_mcosts, norm_rand_scosts, c='m', marker='o', label='random mst')
-    
-    pylab.xlabel('wiring cost')
-    pylab.ylabel('conduction delay')
-    
-    pylab.savefig('%s/norm_pareto_front_%s.pdf' % (outdir, name), format='pdf')
-    pylab.close()
     
 # ---------------------------------------
 
@@ -311,43 +361,13 @@ def pareto_plot_neuromorpho(G, name, cell_type, species, region, lab,\
                 H.node[u]['label'] = 'root'
             else:
                 H.node[u]['label'] = 'synapse'
-    viz_tree(G, name + str('_neural'), outdir=outdir) 
-    viz_tree(sat_tree, name + str('_sat'), outdir=outdir)
-    viz_tree(span_tree, name + str('_mst'), outdir=outdir)
-    viz_tree(centroid_tree, name + '_centroid', outdir=outdir) 
-
-    mean_rand_dist = total_rand_dist / float(ntrials)
-    mean_norm_rand_dist = total_norm_rand_dist / float(ntrials)
+    if viz_trees:
+        viz_tree(G, 'neural', outdir=figs_dir) 
+        viz_tree(sat_tree, 'sat', outdir=figs_dir)
+        viz_tree(span_tree, 'mst', outdir=figs_dir)
+        viz_tree(centroid_tree, 'centroid', outdir=figs_dir) 
  
-    def remove_spaces(string):
-        return string.replace(' ', '')
-
-    def remove_commas(string):
-        return string.replace(',', '')
-    f = open('pareto_steiner.csv', 'a')
-    
-    if output:
-        write_items = [name, cell_type, species, region, lab, point_graph.number_of_nodes()]
-        
-        write_items.append(neural_alpha)
-        write_items.append(norm_neural_alpha)
-        
-        write_items += [neural_dist, centroid_dist, mean_rand_dist]
-        write_items += [norm_neural_dist, norm_centroid_dist, mean_norm_rand_dist]
-        
-        write_items.append(ntrials)
-        write_items.append(successes)
-        write_items.append(norm_successes)
-        
-        write_items = map(str, write_items)
-        write_items = map(remove_commas, write_items)
-        write_items = map(remove_spaces, write_items)
-        write_items = ', '.join(write_items)
-        f.write('%s\n' % write_items)
-
-    f.close()
-
-def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
+def pareto_plot_imaris(G, name, outdir='steiner_imaris', viz_trees=VIZ_TREES_IMARIS, axon=False):
     if not is_tree(G):
         print "not a tree"
         return None
@@ -574,26 +594,31 @@ def pareto_plot_imaris(G, name, outdir='figs', viz_trees=VIZ_TREES, axon=False):
     viz_tree(centroid_tree, name + '_centroid', outdir=outdir) 
 
 def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES, cell_types=None,\
-                      animal_species=None, regions=None):
+                      animal_species=None, regions=None, labs=None, names=None):
     #directory = 'neuromorpho'
-    directory = 'datasets'
-    i = 0
-    for cell_type in shuffle(os.listdir(directory)):
+
+    for cell_type in permutation(os.listdir(DATASETS_DIR)):
         if cell_type in SKIP_TYPES:
             continue
         if cell_types != None and cell_type not in cell_types:
             continue
-        for species in shuffle(os.listdir(directory + '/' + cell_type)):
+        for species in os.listdir(DATASETS_DIR + '/' + cell_type):
             if animal_species != None and species not in animal_species:
                 continue
-            for region in shuffle(os.listdir(directory + '/' + cell_type + '/' + species)):
+            for region in os.listdir(DATASETS_DIR + '/' + cell_type + '/' + species):
                 if regions != None and region not in regions:
                     continue
-                for lab in shuffle(os.listdir(directory + "/" + cell_type + '/' + species+ '/' + region)):
-                    for neuron in shuffle(os.listdir(directory + "/" + cell_type + "/" + species + '/' + region + '/' + lab)):
-                        filename = directory + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron
+                for lab in os.listdir(DATASETS_DIR + "/" + cell_type + '/' + species+ '/' + region):
+                    if labs != None and lab not in labs:
+                        continue
+                    for neuron_file in os.listdir(DATASETS_DIR + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
+                        filename = DATASETS_DIR + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron_file
                         
-                        if neuron[-8:] != ".CNG.swc": 
+                        neuron_name = neuron_file[:-8]
+                        if names != None and neuron_name not in names:
+                            continue
+
+                        if neuron_file[-8:] != ".CNG.swc": 
                             continue
                         
                         try:
@@ -605,41 +630,42 @@ def neuromorpho_plots(min_nodes=MIN_NODES, max_nodes=MAX_NODES, cell_types=None,
                             if G == None:
                                 continue 
                             
-
                             if not (min_nodes <= G.number_of_nodes() <= max_nodes):
                                 print "wrong nodes", G.number_of_nodes()
                                 continue
                             
-                            name = neuron[:-8] + str(i)
-                            
-                            
-                            #if not (min_nodes <= len(G.graph['synapses']) + 1 <= max_nodes):
-                                #print "wrong nodes", G.number_of_nodes()
-                                #continue
+                            neuron_type = NEURON_TYPES[i]
 
-                            outdir = '%s/%s/%s/%s/%s/%s' % (FIGS_DIR, cell_type, species, region, lab, name)
-                            outdir = outdir.replace(' ', '_')
-                            os.system('mkdir -p %s' % outdir)
-                            if len(os.listdir(outdir)) > 0:
-                                continue
-                            print species, lab, neuron
-                            axon = i == 0
+                            front_dir = '%s/%s/%s' % (PARETO_FRONT_DIR, neuron_name, neuron_type)
+                            front_dir = front_dir.replace(' ', '_')
+                            os.system('mkdir -p %s' % front_dir)
+
+                            output_dir = PARETO_OUTPUT_DIR
+                            output_dir = output_dir.replace(' ', '_')
+                            os.system('mkdir -p %s' % output_dir)
+
+                            figs_dir = '%s/%s/%s/%s/%s/%s/%s' % (PARETO_FIGS_DIR,\
+                                                                 cell_type,\
+                                                                 species,\
+                                                                 region, lab,\
+                                                                 neuron_name,\
+                                                                 neuron_type)
+
+                            figs_dir = figs_dir.replace(' ', '_')
+                            os.system('mkdir -p %s' % figs_dir)
+
                             try:
-                                for i in xrange(NEUROMORPHO_TRIALS):
-                                    #H = add_synapses(G)
-                                    H = G.copy()
-                                    H.graph['synapses'] = []
-                                    for u in H.nodes_iter():
-                                        if u != H.graph['root']:
-                                            H.graph['synapses'].append(u)
-                                    '''
-                                    if not (min_nodes <= len(H.graph['synapses']) + 1 <= max_nodes):
-                                        print "wrong nodes", len(H.graph['synapses'])
-                                        continue
-                                    '''
-                                    pareto_plot_neuromorpho(H, name, cell_type,\
-                                                            species, region,\
-                                                            lab, outdir, axon=axon)
+                                #H = add_synapses(G)
+                                H = G.copy()
+                                H.graph['synapses'] = []
+                                for u in H.nodes_iter():
+                                    if u != H.graph['root']:
+                                        H.graph['synapses'].append(u)
+                                
+                                pareto_front_neuromorpho(H, neuron_name, neuron_type,\
+                                                         front_dir=front_dir,\
+                                                         output_dir=output_dir,\
+                                                         figs_dir=figs_dir)
                             except RuntimeError as r:
                                 print r
                                 continue
@@ -735,7 +761,8 @@ def boutons_plots():
         group = fname[:-5]
         num = fname[-5]
         groups[group].append(num)
-    
+
+    all_edge_lengths = []
     for group in groups:
         G = None
         for num in groups[group]:
@@ -747,6 +774,23 @@ def boutons_plots():
             else:
                 G = nx.disjoint_union(G, H)
         viz_tree(G, group, 'boutons/drawings')
+        edge_lengths = []
+        for u, v in G.edges_iter():
+            edge_lengths.append(G[u][v]['length'])
+        print "group", group
+        print pylab.mean(edge_lengths)
+        pylab.figure()
+        pylab.hist(edge_lengths)
+        pylab.savefig('boutons/histograms/edge_lengths_%s.pdf' % group, format='pdf')
+        pylab.close()
+        all_edge_lengths += edge_lengths
+
+    print "grand average"
+    print pylab.mean(all_edge_lengths)
+    pylab.figure()
+    pylab.hist(all_edge_lengths)
+    pylab.savefig('boutons/histograms/edge_lengths_all.pdf', format='pdf')
+    pylab.close()
 
 def main():
     parser = argparse.ArgumentParser()
@@ -754,12 +798,16 @@ def main():
     parser.add_argument('-max_nodes', type=int, default=MAX_NODES)
     #parser.add_argument('-a', '--algorithm', choices=['greedy', 'khuller'], default='greedy')
     parser.add_argument('-n', '--neuromorpho', action='store_true')
+    parer.add_argument('-np', '--neuromorpho_plot', action='store_true')
+    parser.add_argument('-v', '--viz_trees', action='store_true')
     parser.add_argument('-i', '--imaris', action='store_true')
     parser.add_argument('-b', '--neuron_builder', action='store_true')
     parser.add_argument('-d', '--debug', action='store_true')
     parser.add_argument('-c', '--cell_types', nargs='+', default=None)
     parser.add_argument('-s', '-a', '--species', '--animal_species,', nargs='+',\
                         default=None, dest='animal_species')
+    parser.add_argument('-l', '--labs', nargs='+', default=None, dest='labs')
+    parser.add_argument('-na', '--names', nargs='+', default=None, dest='names')
     parser.add_argument('-r', '--regions', nargs='+', default=None)
     parser.add_argument('-bt', '--boutons', action='store_true')
 
@@ -768,12 +816,16 @@ def main():
     max_nodes = args.max_nodes
     #algorithm = args.algorithm
     neuromorpho = args.neuromorpho
+    neuromorpho_plot = args.neuromorpho_plot
+    viz_trees = args.viz_trees
     imaris = args.imaris
     neuron_builder = args.neuron_builder
     debug = args.debug
     cell_types = args.cell_types
     animal_species = args.animal_species
     regions = args.regions
+    labs = args.labs
+    names = args.names
     boutons = args.boutons
 
     if debug:
@@ -797,7 +849,7 @@ def main():
     if imaris:
         imaris_plots()
     if neuromorpho:
-        neuromorpho_plots(min_nodes, max_nodes, cell_types, animal_species, regions)
+        neuromorpho_plots(min_nodes, max_nodes, cell_types, animal_species, regions, labs, names)
     if neuron_builder:
         neuron_builder_plots()
     if boutons:
