@@ -1,5 +1,6 @@
 import argparse
 import os
+from collections import defaultdict
 
 DATASETS_DIR = '/iblsn/data/Arjun/neurons/datasets'
 PBS_DIR = '/iblsn/data/Arjun/neurons/pbs_files'
@@ -8,7 +9,7 @@ FIGS_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output/steiner_figs'
 
 def make_neuron_pbs(cell_types, animal_species, regions, labs, names, min_nodes, max_nodes):
     directory = DATASETS_DIR
-    fpaths = set()
+    fpaths = defaultdict(list)
     for cell_type in os.listdir(directory):
         if cell_types != None and cell_type not in cell_types:
             continue
@@ -29,32 +30,23 @@ def make_neuron_pbs(cell_types, animal_species, regions, labs, names, min_nodes,
                         if neuron_file[-8:] != ".CNG.swc": 
                             continue
 
-                        output_dir = '/'.join([OUTPUT_DIR, cell_type, species, region, lab])
-                        print output_dir
-                        if os.path.isdir(output_dir):
-                            if len(os.listdir(output_dir) > 0):
-                                continue
-
                         bash_str = 'python pareto_steiner.py -n -c %s -s %s -r %s -l %s -na %s -min_nodes %d -max_nodes %d'\
                                                             % (cell_type, species,\
                                                                region, lab, neuron_name,\
                                                                min_nodes, max_nodes)
                         fname = 'pareto_steiner_%s.pbs' % (neuron_name)
                         fpath = '%s/%s' % (PBS_DIR, fname)
-                        init_commands = False
-                        if fname not in os.listdir(PBS_DIR):
-                            init_commands = True
-                        fpaths.add(fpath)
-                        f = open(fpath, 'a')
-                        if init_commands:
-                            f.write('#!/bin/bash\n')
-                            f.write('cd /home/achandrasekhar/neurons/\n')
-                        f.write('%s\n' % bash_str)
-                        f.close()
+                        flines = []
+                        if fpath not in fpaths:
+                            flines += ['#!/bin/bash\n', 'cd /home/achandrasekhar/neurons/\n']
+                        flines += '%s\n' % bash_str
+                        fpaths[fpath] += flines
     
     for fpath in fpaths:
-        command = 'cat %s' % fpath
-        #print command
+        flines = fpaths[fpath]
+        with open(fpath, 'w') as f:
+            f.writelines(flines)
+        command = 'qsub %s' % fpath
         os.system(command)
 
 def main():
