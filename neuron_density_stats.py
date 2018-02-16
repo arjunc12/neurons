@@ -136,27 +136,11 @@ def main():
 
     neuron_density_df = neuron_density.get_df()
     neuron_density_df.drop('points', axis=1, inplace=True)
-    #neuron_density_df.drop_duplicates(subset='name', inplace=True)
 
     df = pd.merge(pareto_steiner_df, neuron_density_df, on='name')
     df.drop_duplicates(subset='name', inplace=True)
-    #print df[df['species'] == 'rabbit']
-    df['density'] = df['mcost'] / df['volume']
 
-    #print df['cell_type'].unique()
-    #print df['species'].unique()
-    #print df['region'].unique()
-
-    add_regression_cols(df, 'mcost', 'density', np.log10, np.log10)
-    
-    '''
-    for hue in [None, 'cell_type', 'species', 'region']:
-        outliers = None
-        if hue != None:
-            outliers = biggest_outliers(df, hue)
-            print hue, outliers
-        make_density_plot(df, hue=hue, outliers=outliers)
-    '''
+    add_regression_cols(df, 'volume', 'density', np.log10, np.log10)
     
     make_alpha_plots(df)
 
