@@ -30,7 +30,7 @@ cnames = c('name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',
            'norm_alpha', 'neural_dist', 'centroid_dist', 'random_dist',
            'norm_neural_dist', 'norm_centroid_dist', 'norm_random_dist',
            'trials', 'successes', 'norm_successes')
-df = read.csv('pareto_steiner.csv', col.names=cnames, header=FALSE)
+df = read.csv('/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_steiner.csv', col.names=cnames, header=FALSE)
 df = unique(df, by=c("name", "cell_type", "species", "region"))
 #print(df$cell_type == df$cell_type[3541])
 #df = df[df$cell_type != df$cell_type[3541],]
