@@ -4,7 +4,7 @@ import json
 from sys import argv
 
 SWC_DIR = 'neuron_nmo'
-DATASET_DIR = 'datasets'
+DATASET_DIR = '/iblsn/data/Arjun/neurons/datasets'
 
 TEST_NEURON_NAME = 'p20'
 
@@ -14,7 +14,8 @@ def neuron_info(neuron_file):
     if neuron[-4:] == '.CNG':
         neuron = neuron[:-4]
     #url = 'http://neuromorpho.org:8081/neuron/query/neuron_name&=&' + neuron
-    url = 'http://neuromorpho.org/api/neuron/query/neuron_name/' + neuron
+    #url = 'http://neuromorpho.org/api/neuron/query/neuron_name/' + neuron
+    url = 'http://neuromorpho.org/api/neuron/name/' + neuron
     data = urllib2.urlopen(url)
     data = json.load(data)
     if '_embedded' not in data:
