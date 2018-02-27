@@ -205,7 +205,7 @@ def label_points(G):
     for u in G:
         G.node[u]['label'] = get_label(G, u)
 
-def viz_tree(G, name, outdir='figs'):
+def viz_tree(G, name, outdir='figs', **kwargs):
     """ Displays plant/tree visualization. """
     
     root = G.graph['root']
@@ -254,21 +254,31 @@ def viz_tree(G, name, outdir='figs'):
             assert False
 
 
-    nx.draw(G,pos=pos,arrows=False,with_labels=False,node_size=node_size,node_color=node_color,edge_color="brown",width=4,font_size=12,font_color='red',font_weight='bold')
-    #nx.draw(G,pos=pos,arrows=False,with_labels=False,node_size=15,font_size=12,font_color='red',font_weight='bold')
+    nx.draw(G,pos=pos, arrows=False, with_labels=False, node_size=node_size,\
+            node_color=node_color, edge_color="brown", width=4, font_size=12,\
+            font_color='red', font_weight='bold')
     pylab.draw()
-    #PP.show()
-    
-    '''
-    mcost = mst_cost(G)
-    scost = satellite_cost(G)
-    title_str = 'satellite cost = %f\nspanning tree cost = %f' % (scost, mcost)
-    #pylab.text(125, 125, title_str)
-    '''
 
+    try:
+        xmin = kwargs['xmin']
+        xmax = kwargs['xmax']
+        ymin = kwargs['ymin']
+        ymax = kwargs['ymax']
+        if xmin != None and xmax != None and ymin != None and ymax != None:
+            pylab.xlim(xmin, xmax)
+            pylab.ylim(ymin, ymax)
+    except KeyError:
+        xmin, xmax = pylab.xlim()
+        ymin, ymax = pylab.ylim()
+        kwargs['xmin'] = xmin
+        kwargs['xmax'] = xmax
+        kwargs['ymin'] = ymin
+        kwargs['ymax'] = ymax
+    
     pylab.savefig("%s/%s.pdf" % (outdir, name))
     pylab.close()
 
+    return kwargs
 
 def main():
     #neuron_file = argv[1]
