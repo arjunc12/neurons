@@ -8,7 +8,7 @@ import os
 import seaborn as sns
 from itertools import combinations
 import numpy as np
-from scipy.stats import entropy
+from scipy.stats import entropy, binom_test, ttest_1samp
 from numpy.linalg import norm
 import numpy as np
 from stats_utils import *
@@ -25,12 +25,20 @@ MODELS_FILE = '%s/models.csv' % OUTPUT_DIR
 CATEGORIES_FILE = '/iblsn/data/Arjun/neurons/neuron_categories/neuron_categories.csv'
 CATEGORIES = ['cell type', 'species', 'region', 'neuron type', 'lab']
 
+METADATA_DIR = '/iblsn/data/Arjun/neurons/metadata'
+
 MIN_COUNT = 50
 
-MIN_POINTS = 100
+MIN_POINTS = 50
 MAX_POINTS = float("inf")
 
 LOG_DIST = True
+
+def count_duplicate_rows(df):
+    all_rows = len(df.index)
+    df2 = df.drop_duplicates()
+    unique_rows = len(df2.index)
+    return all_rows - unique_rows
 
 def add_count_col(df, categories):
     return df.groupby(categories).size().reset_index(name='count')
@@ -43,13 +51,17 @@ def remove_small_counts(df, categories):
 
 def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
             models_file=MODELS_FILE):
-    df1 = pd.read_csv(output_file, skipinitialspace=True)
-    df2 = pd.read_csv(categories_file, skipinitialspace=True)
-    categories_df = pd.merge(df1, df2)
+    output_df = pd.read_csv(output_file, skipinitialspace=True)
+    cat_df = pd.read_csv(categories_file, skipinitialspace=True)
 
     models_df = pd.read_csv(models_file, skipinitialspace=True)
+    neural_df = models_df[models_df['model'] == 'neural']
+    neural_df = neural_df[['neuron name', 'neuron type', 'dist']]
 
-    return categories_df, models_df
+    categories_df = pd.merge(output_df, cat_df, on='neuron name')
+    categories_df = pd.merge(categories_df, neural_df, on=['neuron name', 'neuron type'])
+
+    return models_df, categories_df
 
 def get_filtered_df(df=None):
     if df is None:
@@ -144,7 +156,7 @@ def hellinger_distance(dist1, dist2):
     return dist
 
 def make_dist_frame(df, category, alphas=None, dist_func=pseudo_kld):
-    df2 = df.drop_duplicates(subset=['name', category])
+    df2 = df.drop_duplicates(subset=['neuron name', 'neuron type', category])
     df2 = remove_small_counts(df2, category)
 
     counts = all_counts(df2, category, alphas)
@@ -180,11 +192,12 @@ def dist_heat(df, category, alphas=None, dist_func=pseudo_kld, outdir=OUTDIR):
     dist_frame = dist_frame.pivot(category + '1', category + '2', 'distance')
     pylab.figure()
     ax = sns.heatmap(dist_frame, vmin=0, vmax=1)
-    ax.tick_params(axis='x', rotation=90)#, labelsize=20)
-    ax.tick_params(axis='y', rotation=0)#, labelsize=20)
+    pylab.xticks(rotation='vertical')
+    pylab.yticks(rotation='horizontal')
     pylab.tight_layout()
-    pylab.savefig('%s/%s_heat_%s.pdf' % (outdir, DIST_FUNC_NAMES[dist_func], category),
-                   format='pdf')#, bbox_inches='tight')
+    pylab.savefig('%s/%s_heat_%s.pdf' % (outdir, DIST_FUNC_NAMES[dist_func],\
+                                         category.replace(' ', '_')),
+                   format='pdf')
     pylab.close()
 
 def kld_heat(df, category, alphas=None):
@@ -203,15 +216,23 @@ def dist_heats(df, categories, dist_funcs, alphas=None, outdir=OUTDIR):
 
 def alphas_heat(df, categories, outdir=OUTDIR):
     for cat1, cat2 in combinations(categories, 2):
-        df2 = df.drop_duplicates(subset=['name', cat1, cat2])
+        df2 = df.drop_duplicates(subset=['neuron name', 'neuron type', cat1, cat2])
         df2 = remove_small_counts(df2, [cat1, cat2])
         df2 = df2.groupby([cat1, cat2], as_index=False).agg({'alpha' : pylab.mean})
         data = df2.pivot(cat1, cat2, 'alpha')
         pylab.figure()
         ax = sns.heatmap(data, vmin=0, vmax=1)
-        pylab.xticks(rotation=90)#, size=20)
+        #print cat1, cat2
+        for text in  ax.get_xticklabels():
+            pass
+            #print text.get_rotation()
+        #pylab.xticks(rotation=90)#, size=20)
+        pylab.xticks(rotation='vertical')
+        pylab.yticks(rotation='horizontal')
         pylab.tight_layout()
-        pylab.savefig('%s/%s_%s_alphas_heat.pdf' % (outdir, cat1, cat2),\
+        pylab.savefig('%s/%s_%s_alphas_heat.pdf' % (outdir,\
+                                                    cat1.replace(' ', '_'),\
+                                                    cat2.replace(' ', '_')),\
                       format='pdf')#, bbox_inches='tight')
         pylab.close()
 
@@ -232,7 +253,10 @@ def cat_to_num(categories):
 
 def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=OUTDIR):
     for category in categories:
-        df2 = df.drop_duplicates(subset=['name', category])
+        subset_cols = ['neuron name', 'neuron type', 'alpha']
+        if category != 'neuron type':
+            subset_cols.append(category)
+        df2 = df.drop_duplicates(subset=subset_cols)
         df2 = remove_small_counts(df2, category)
         cat_vals = []
         medians = []
@@ -246,10 +270,11 @@ def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=OUTDIR
         order = cat_vals[order]
 
         pylab.figure()
+        sns.set()
         dist_plot = plot_func(x='alpha', y=category, data=df2, orient='h', order=order)
         #dist_plot.tick_params(axis='y', labelsize=20)
         pylab.tight_layout()
-        pylab.savefig('%s/%s_alphas_%s.pdf' % (outdir, category, plot_descriptor),
+        pylab.savefig('%s/%s_alphas_%s.pdf' % (outdir, category.replace(' ', '_'), plot_descriptor),
                        format='pdf')#, bbox_inches='tight')
         pylab.close()
 
@@ -264,172 +289,112 @@ def violin_alphas(df, identifiers, outdir=OUTDIR):
 
 def swarm_alphas(df, identifiers, outdir=OUTDIR):
     alpha_distribution(df, identifiers, sns.swarmplot, 'swarm', outdir=outdir)
-
-def category_dists_barplot(df, category, name, dist_col='neural_dist', outdir=OUTDIR):
-    df = df[[category, dist_col]]
-    cat_vals = []
-    cat_means = []
-    for cat_val, group in df.groupby(category):
-        cat_vals.append(cat_val)
-        cat_means.append(pylab.mean(group[dist_col]))
-    order = pylab.argsort(cat_means)
-    cat_vals = pylab.array(cat_vals)
-    sorted_vals = cat_vals[order]
-    pylab.figure()
-    dist_plot = sns.barplot(x=category, y=dist_col, data=df, order=sorted_vals)
-    pylab.xticks(rotation=90)#, size=20)
-    if name == None:
-        name = '%s/' % outdir
-        if norm:
-            name += 'norm_'
-        name += 'pareto_dists_' + category + '.pdf'
-    pylab.tight_layout()
-    pylab.savefig(name + '_' + category + '.pdf', format='pdf')#, bbox_inches='tight')
     
 
-def category_dists(df, categories, norm=False, outdir=OUTDIR):
-    regression_df = df[['name', 'points', 'neural_dist']]
-    regression_df = regression_df.drop_duplicates(subset='name')
-    add_regression_cols(regression_df, 'points', 'neural_dist')
-    regression_df['neural_dist_resid2'] = regression_df['neural_dist_resid'] ** 2
+def category_dists(df, categories, outdir=OUTDIR):
     for category in categories:
-        df2 = df.drop_duplicates(subset=['name', category])
-        df2 = remove_small_counts(df2, category)
-        
-        dist_col = ''
-        if norm:
-            dist_col += 'norm_'
-        dist_col += 'neural_dist'
-        
-        name = '%s/' % OUTDIR
-        if norm:
-            name += 'norm_'
-        name += 'pareto_dists'
+        df2 = df.drop_duplicates(subset=['neuron name', 'neuron type', category])
+        df2 = remove_small_counts(df2, category) 
+        cat_vals = []
+        cat_means = []
+        for cat_val, group in df.groupby(category):
+            cat_vals.append(cat_val)
+            cat_means.append(pylab.mean(group['dist']))
+        order = pylab.argsort(cat_means)
+        cat_vals = pylab.array(cat_vals)
+        sorted_vals = cat_vals[order]
+        pylab.figure()
+        sns.set()
+        dist_plot = sns.barplot(x=category, y='dist', data=df, order=sorted_vals)
+        pylab.xticks(rotation='vertical')
+        pylab.tight_layout()
+        pylab.savefig('%s/pareto_dists_%s.pdf' % (outdir,\
+                                                  category.replace(' ', '_')),\
+                                                  format='pdf')
 
-        category_dists_barplot(df2, category, name, dist_col, outdir=outdir)
+def scatter_dists(models_df, outdir=OUTDIR):
+    df = models_df[['neuron name', 'neuron type', 'model', 'dist']]
+    model_dists = defaultdict(list)
+    for name, group in df.groupby(['neuron name', 'neuron type']):
+        for model, group2 in group.groupby('model'):
+            model_dists[model].append(pylab.mean(group2['dist']))
 
-        df3 = regression_df.merge(df2, on='name')
-        dist_col += '_resid2'
-        name += '_regression'
-        category_dists_barplot(df3, category, name, dist_col, outdir=outdir)
-
-
-def scatter_dists(df, outdir=OUTDIR):
-    df2 = df.drop_duplicates(subset='name')
-    for neuron_type, group in df2.groupby('neuron_type'):
-        print neuron_type, pylab.mean(group['neural_dist']), '+/-', pylab.std(group['neural_dist'], ddof=1)
-
-    if LOG_DIST:
-        df2 = df2[(df2['neural_dist'] > 0) & (df2['centroid_dist'] > 0) \
-                 & (df2['random_dist'] > 0)]
-
-#    df2 = df2[(df2['neural_dist'] > 1) & (df2['centroid_dist'] > 1) &\
-#              (df2['random_dist'] > 1)]
-
-    neural_dist = pylab.array(df2['neural_dist'])
-    centroid_dist = pylab.array(df2['centroid_dist'])
-    random_dist = pylab.array(df2['random_dist'])
-
-    if LOG_DIST:
-        neural_dist = pylab.log10(neural_dist)
-        centroid_dist = pylab.log10(centroid_dist)
-        random_dist = pylab.log10(random_dist)
-
-    if CLIP_DIST:
-        neural_dist = neural_dist.clip(min=0)
-        centroid_dist = centroid_dist.clip(min=0)
-        random_dist = random_dist.clip(min=0)
-
-    assert len(neural_dist) == len(centroid_dist) == len(random_dist)
-
-    order = pylab.argsort(neural_dist)
-    neural_dist = neural_dist[order]
-    centroid_dist = centroid_dist[order]
-    random_dist = random_dist[order]
-
-    x = range(len(neural_dist))
+    order = pylab.argsort(model_dists['neural'])
+    x = pylab.arange(len(model_dists['neural']))
     pylab.figure()
-    pylab.scatter(x, random_dist, c='m', label='random')
-    pylab.scatter(x, centroid_dist, c='g', label='centroid')
-    pylab.scatter(x, neural_dist, c='r', label='neural')
-    pylab.xlim(-5, len(x))
-    pylab.xlabel('neuron')
-    ylab = ''
-    if LOG_DIST:
-        ylab += 'log-'
-    ylab += 'distance'
-    pylab.ylabel(ylab)
-    #pylab.title('Distance to Pareto Front') 
-    pylab.legend(loc='upper right')
+    sns.set()
     pylab.tight_layout()
-    pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf')#, bbox_inches='tight')
-    pylab.close()
-
-def alphas_hist(df, norm=False, outdir=OUTDIR):
-    df2 = df.drop_duplicates(subset='name')
-    alpha_col = ''
-    if norm:
-        alpha_col += 'norm_'
-    alpha_col += 'alpha'
-    alphas = list(df2[alpha_col])
-    weights = pylab.ones_like(alphas) / len(alphas)
-    pylab.figure()
-    pylab.hist(alphas, range=(0, 1), weights=weights)
-    curr_ax = pylab.gca()
-    curr_ax.set_ylim((0, 1))
-    pylab.xlabel('alpha')
-    pylab.ylabel('proportion')
-    name = outdir + '/'
-    if norm:
-        name += 'norm_'
-    name += 'alphas_hist.pdf'
-    pylab.tight_layout()
-    pylab.savefig(name, format='pdf')#, bbox_inches='tight')
-    pylab.close()
-
-def neuron_types_hist(df, norm=False, outdir=OUTDIR):
-    df2 = df.drop_duplicates(subset='name')
-    pylab.figure()
-    alphas = []
-    weights = []
-    labels = []
-    for neuron_type, group in df2.groupby('neuron_type'):
-        alpha_col = ''
-        if norm:
-            alpha_col += 'norm_'
-        alpha_col += 'alpha'
-        alpha = list(group[alpha_col])
-        #weight = pylab.ones_like(alphas) / len(alphas)
-        weight = pylab.ones_like(alpha) / len(alpha)
-        #pylab.hist(alphas, alpha=0.5, label=neuron_type,\
-        #           range=(0, 1), weights=weights)
-        alphas.append(alpha)
-        weights.append(weight)
-        labels.append(neuron_type)
-
-    pylab.hist(alphas, range=(0, 1), weights=weights, label=labels)
+    for model, dists in model_dists.iteritems():
+        dists = pylab.array(dists)
+        y = dists[order]
+        if LOG_DIST:
+            y = pylab.log10(y)
+        pylab.scatter(x, y, label=model)
+    pylab.ylabel('pareto distance')
     pylab.legend()
+    pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf')
+
+def alphas_hist(df, outdir=OUTDIR, categories=None):
+    subset_cols = ['neuron name', 'neuron type']
+    if categories != None:
+        for category in categories:
+            if category != 'neuron type':
+                subset_cols.append(category)
+    df2 = df.drop_duplicates(subset_cols)
+    
+    alphas = None
+    weights = None
+    labels = None
+    
+    if categories == None:
+        alphas = list(df2['alpha'])
+        weights = pylab.ones_like(alphas) / len(alphas)
+    else:
+        alphas = []
+        weights = []
+        labels = []
+        for name, group in df2.groupby(categories):
+            cat_alphas = group['alpha']
+            cat_weights = pylab.ones_like(cat_alphas) / len(cat_alphas)
+            alphas.append(cat_alphas)
+            weights.append(cat_weights)
+            labels.append(name)
+    
+    pylab.figure()
+    sns.set()
+    if labels == None:
+        pylab.hist(alphas, range=(0, 1), weights=weights)
+    else:
+        pylab.hist(alphas, range=(0, 1), weights=weights, label=labels)
+        pylab.legend()
     curr_ax = pylab.gca()
     curr_ax.set_ylim((0, 1))
     pylab.xlabel('alpha')
     pylab.ylabel('proportion')
-    name = outdir + '/'
-    if norm:
-        name += 'norm_'
-    name += 'neuron_types_hist.pdf'
     pylab.tight_layout()
-    pylab.savefig(name, format='pdf')#, bbox_inches='tight')
+    name = 'alphas_hist'
+    if categories != None:
+        cat_str = '_'.join(categories)
+        cat_str = cat_str.replace(' ', '_')
+        name += '_' + cat_str
+
+    outname = '%s/%s.pdf' % (outdir, name)
+    outname = outname.replace(' ', '_')
+    pylab.savefig('%s/%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
+
+def neuron_types_hist(df, outdir=OUTDIR):
+    alphas_hist(df, outdir, ['neuron type'])
 
 def size_correlation(df):
-    print "---------------size-alpha correlation----------------"
-    df2 = df.drop_duplicates(subset='name')
+    print "-----------------------------------------------------"
+    df2 = df.drop_duplicates(subset='neuron name')
     #df2['points'] = df2['points'].astype(int)
     corr1 = pearsonr(df2['points'], df2['alpha'])
     corr2 = spearmanr(df2['points'], df2['alpha'])
     print "pearson correlation: " + str(corr1) 
     print "spearman correlation: " + str(corr2)
-    for name, group in df2.groupby('neuron_type'):
+    for name, group in df2.groupby('neuron type'):
         print name
         corr1 = pearsonr(group['points'], group['alpha'])
         corr2 = spearmanr(group['points'], group['alpha'])
@@ -452,61 +417,49 @@ def categories_correlations(df):
         print '--------------------------------'
         category_correlation(df2, category)
 
-def basic_stats(df):
-    df2 = df.drop_duplicates(subset='name')
-    total_trials = df2['trials'].sum()
-    total_successes = df2['successes'].sum()
-    print "random tree successes"
-    print total_successes, total_trials
-    print "p-value", float(total_successes) / total_trials
-
-    df3 = df2[(df2['centroid_dist'] > 0) & (df2['random_dist'] > 0)]
-    centroid_ratio = df3['neural_dist'] / df3['centroid_dist']
-    random_ratio = df3['neural_dist'] / df3['random_dist']
-    print "neural to centroid ratio", pylab.mean(centroid_ratio)
-    print ttest_1samp(centroid_ratio, 1)
-    print "neural to random ratio", pylab.mean(random_ratio)
-    print ttest_1samp(random_ratio, 1)
-
-    #print "dominate percentage", float(df2['dominates'].sum()) / df2['comparisons'].sum()
-    #df3 = df2[df2['neuron_type'] != 'axon']
-    #print "dendrite dominate percentage", float(df3['dominates'].sum()) / df3['comparisons'].sum()
-
-    df4 = df2[df2['neural_dist'] < df2['centroid_dist']]
-    centroid_trials = df2['neural_dist'].count()
-    centroid_successes = df4['neural_dist'].count()
-    assert centroid_trials >= centroid_successes
-    print "beats centroid"
-    print centroid_successes / float(centroid_trials)
-    print binom_test(centroid_successes, centroid_trials)
+def null_models_analysis(models_df):
+    print "-----------------------------------------------------"
+    df2 = models_df.drop_duplicates()
+    df2 = df2[df2['model'] != 'neural']
+    for model, group in df2.groupby('model'):
+        print '***%s***' % model
+        ntrials = len(group['success'])
+        success_rate = pylab.mean(group['success'])
+        print "success rate", success_rate, "trials", len(group['success'])
+        print "binomial p-value", binom_test(success_rate, ntrials)
+        print "neural to %s ratio" % model, pylab.mean(group['ratio'])
+        print "t-test p-value", ttest_1samp(group['ratio'], popmean=1)
 
 def infmean(arr):
     return pylab.mean(masked_invalid(arr))
 
 def metadata(df):
+    print "-----------------------------------------------------"
     print "unique neurons"
-    print len(df['name'].unique())
+    print len(df.groupby(['neuron name', 'neuron type']))
 
     for category in CATEGORIES:
         print "unique " + category
         print len(df[category].unique())
-        df2 = df.drop_duplicates(subset=['name', category])
+        df2 = df.drop_duplicates(subset=['neuron name', category])
         df2 = add_count_col(df2, category)
         df2 = df2[df2['count'] >= 25]
-        f = open(category + '.txt', 'w')
+        category_str = category.replace(' ', '_')
+        f = open('%s/%s.txt' % (METADATA_DIR, category_str), 'w')
         with pd.option_context('display.max_rows', None, 'display.max_columns', 3):
             print >> f,  df2
         f.close()
 
 def neuron_type_alphas(df):
-    df2 = df.drop_duplicates(subset=['name', 'neuron_type'])
+    print "-----------------------------------------------------"
+    df2 = df.drop_duplicates(subset=['neuron name', 'neuron type'])
     types = []
     dists = []
-    indices = [0, 1, 2]
-    for neuron_type, group in df2.groupby('neuron_type'):
+    for neuron_type, group in df2.groupby('neuron type'):
         print neuron_type, pylab.mean(group['alpha']), '+/-', pylab.std(group['alpha'], ddof=1)
         types.append(neuron_type)
         dists.append(pylab.array(group['alpha']))
+    indices = range(len(types))
     for idx1, idx2 in combinations(indices, 2):
         type1, type2 = types[idx1], types[idx2]
         dist1, dist2 = dists[idx1], dists[idx2]
@@ -515,30 +468,69 @@ def neuron_type_alphas(df):
         #print mannwhitneyu(dist1, dist2, alternative='two-sided')
         print ks_2samp(dist1, dist2)
 
-def size_dist_correlation(df, outdir=OUTDIR):
-    df2 = df.drop_duplicates(subset='name')
-    df2 = df2[df2['neural_dist'] >= 1]
-    points = df2['points']
-    dists = df2['neural_dist']
-    points = pylab.log10(points)
-    dists = pylab.log10(dists) 
-    print "---------size vs. dist correlation--------"
-    print pearsonr(points, dists)
-    print spearmanr(points, dists)
+def vals_correlation(df, val1, val2, outdir=OUTDIR):
+    print "-----------------------------------------------------"
+    df2 = df.drop_duplicates(subset=['neuron name', 'neuron type'])
+    v1 = df2[val1]
+    v2 = df2[val2]
+    v1 = pylab.log10(v1)
+    v2 = pylab.log10(v2)
+    print pearsonr(v1, v2)
+    print spearmanr(v1, v2)
 
-    add_regression_cols(df2, 'points', 'neural_dist', xtransform=pylab.log10,\
-                        ytransform=pylab.log10)
+    regression_df = df2.copy()
+    add_regression_cols(regression_df, val1, val2, xtransform=pylab.log10, ytransform=pylab.log10)
 
     pylab.figure()
-    pylab.scatter(points, dists)
-    x = points
-    y = df2['neural_dist_hat']
+    sns.set()
+    pylab.scatter(v1, v2)
+    x = v1
+    y = regression_df['%s_hat' % val2]
     order = pylab.argsort(x)
     x = x[order]
     y = y[order]
     pylab.plot(x, y, c='g')
     pylab.tight_layout()
-    pylab.savefig('%s/size_dist.pdf' % outdir, format='pdf')#, bbox_inches='tight')
+    pylab.savefig('%s/%s_%s.pdf' % (outdir, val1, val2), format='pdf')
+    pylab.close()
+
+def size_dist_correlation(df, outdir=OUTDIR):
+    print "size-dist correlation"
+    vals_correlation(df, 'points', 'dist', outdir=outdir)
+
+def alpha_dist_correlation(df, outdir=OUTDIR):
+    print "alpha-dist correlation"
+    vals_correlation(df, 'alpha', 'dist', outdir=OUTDIR)
+
+def truncation_hist(df, outdir=OUTDIR):
+    df2 = df[df['neuron type'].isin(['axon', 'truncated axon'])]
+    alphas = []
+    weights = []
+    labels = []
+    for neuron_type, group in df2.groupby('neuron type'):
+        alpha = group['alpha']
+        weight = pylab.ones_like(alpha) / len(alpha)
+        alphas.append(alpha)
+        weights.append(weight)
+        labels.append(neuron_type)
+
+    pylab.figure()
+    sns.set()
+    
+    pylab.hist(alphas, range=(0, 1), weights=weights, label=labels)
+    pylab.legend()
+    
+    curr_ax = pylab.gca()
+    curr_ax.set_ylim((0, 1))
+    
+    pylab.xlabel('alpha')
+    pylab.ylabel('proportion')
+    pylab.tight_layout()
+    
+    name = 'truncation_hist'
+    outname = '%s/%s.pdf' % (outdir, name)
+    outname = outname.replace(' ', '_')
+    pylab.savefig('%s/%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
 
 
@@ -549,34 +541,32 @@ def main():
     parser.add_argument('-m', '--models_file', default=MODELS_FILE)
     parser.add_argument('-f', '--figs_dir', default=OUTDIR)
     args = parser.parse_args()
+    
     output_file = args.output_file
     categories_file = args.categories_file
     models_file = args.models_file
-    assert data_file[-4:] == '.csv'
-    outdir = args.outdir
-    dfs = get_dfs()
+    figs_dir = args.figs_dir
+    
+    models_df, categories_df = get_dfs()
+
     if TEST_NEW_FUNCTION:
-        print dfs
+        size_dist_correlation(categories_df, outdir=figs_dir)
+        alpha_dist_correlation(categories_df, outdir=figs_dir)
         return None
     
-    size_correlation(df)
-    metadata(df)
-    neuron_type_alphas(df)
-    basic_stats(df)
-    #categories_correlations(df)
-    os.system('mkdir -p %s' % outdir)
-    scatter_dists(df, outdir=outdir)
-    boxplot_alphas(df, CATEGORIES, outdir=outdir)
-    alphas_hist(df, norm=False, outdir=outdir)
-    neuron_types_hist(df, norm=False, outdir=outdir)
-    alphas_heat(df, CATEGORIES, outdir=outdir)
-    dist_heats(df, CATEGORIES, DIST_FUNCS, outdir=outdir)
-    category_dists(df, CATEGORIES, norm=False, outdir=outdir)
-    size_dist_correlation(df, outdir=outdir)
-
-    filtered_df = get_filtered_df(df)
-    prefix = outdir[-4:]
-    filtered_df.to_csv('%s_filtered.csv' % prefix, index=False)
-
+    size_correlation(categories_df)
+    metadata(categories_df)
+    neuron_type_alphas(categories_df)
+    null_models_analysis(models_df)
+    os.system('mkdir -p %s' % figs_dir)
+    scatter_dists(models_df, outdir=figs_dir)
+    boxplot_alphas(categories_df, CATEGORIES, outdir=figs_dir)
+    alphas_hist(categories_df, outdir=figs_dir)
+    neuron_types_hist(categories_df, outdir=figs_dir)
+    alphas_heat(categories_df, CATEGORIES, outdir=figs_dir)
+    dist_heats(categories_df, CATEGORIES, DIST_FUNCS, outdir=figs_dir)
+    category_dists(categories_df, CATEGORIES, outdir=figs_dir)
+    truncation_hist(categories_df, outdir=figs_dir)
+    
 if __name__ == '__main__':
     main()
