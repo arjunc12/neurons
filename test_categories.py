@@ -1,13 +1,13 @@
 import pandas as pd
 from scipy.stats import ttest_ind, ks_2samp
-from pareto_steiner_stats import get_df, DATASET_FILE
+from pareto_steiner_stats import get_dfs, OUTPUT_FILE, MODELS_FILE, CATEGORIES_FILE
 import argparse
 from itertools import combinations
 import pylab
 
 def test_cat_vals(df, category, vals):
     df2 = df[df[category].isin(vals)]
-    df2 = df2.drop_duplicates(subset='name')
+    df2 = df2.drop_duplicates(subset=['neuron name', 'neuron type'])
     alphas = df2['alpha']
     for val1, val2 in combinations(vals, 2):
         sample1 = alphas[df2[category] == val1]
@@ -22,19 +22,28 @@ def main():
     parser.add_argument('-s', '--species', nargs='+', default=None)
     parser.add_argument('-r', '--regions', nargs='+', default=None)
     parser.add_argument('-c', '--cell_types', nargs='+', default=None)
-    parser.add_argument('-d', '--data_file', default=DATASET_FILE)
+    parser.add_argument('-l', '--labs', nargs='+', default=None)
+    parser.add_argument('-of', '--output_file', default=OUTPUT_FILE)
+    parser.add_argument('-mf', '--models_file', default=MODELS_FILE)
+    parser.add_argument('-cf', '--categories_file', default=CATEGORIES_FILE)
 
     args = parser.parse_args()
     species = args.species
     regions = args.regions
     cell_types = args.cell_types
-    data_file = args.data_file
+    labs = args.labs
+    output_file = args.output_file
+    models_file = args.models_file
+    categories_file = args.categories_file
 
-    df = get_df(data_file)
+    models_df, categories_df =  get_dfs(output_file=OUTPUT_FILE,\
+                                        categories_file=CATEGORIES_FILE,\
+                                        models_file=MODELS_FILE)
 
-    for category, vals in zip(['species', 'region', 'cell_type'], [species, regions, cell_types]):
+    for category, vals in zip(['species', 'region', 'cell type', 'lab'],\
+                              [species, regions, cell_types, labs]):
         if vals != None:
-            test_cat_vals(df, category, vals)
+            test_cat_vals(categories_df, category, vals)
 
 if __name__ == '__main__':
     main()
