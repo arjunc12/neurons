@@ -53,7 +53,7 @@ def make_alpha_plots(df):
     density_resid = df['density_resid']
 
     pylab.figure()
-    neuron_types = df['neuron_type'].unique()
+    neuron_types = df['neuron type'].unique()
     nrows = 3
     ncols = len(neuron_types) + 1
     enum_items = zip([density, log_density, density_resid],\
@@ -73,8 +73,8 @@ def make_alpha_plots(df):
             pylab.xlabel('alpha')
 
         for j, neuron_type in enumerate(neuron_types):
-            x2 = alpha[df['neuron_type'] == neuron_type]
-            y2 = y[df['neuron_type'] == neuron_type]
+            x2 = alpha[df['neuron type'] == neuron_type]
+            y2 = y[df['neuron type'] == neuron_type]
             print neuron_type
             #print label, pearsonr(x2, y2)
             print label, spearmanr(x2, y2)
@@ -132,17 +132,17 @@ def make_density_plot(df, hue=None, outliers=None):
     pylab.close()
 
 def main():
-    pareto_steiner_df = pareto_steiner_stats.get_df()
+    models_df, categories_df = pareto_steiner_stats.get_dfs()
 
     neuron_density_df = neuron_density.get_df()
-    neuron_density_df.drop('points', axis=1, inplace=True)
 
-    df = pd.merge(pareto_steiner_df, neuron_density_df, on='name')
-    df.drop_duplicates(subset='name', inplace=True)
-
-    add_regression_cols(df, 'volume', 'density', np.log10, np.log10)
+    df = pd.merge(categories_df, neuron_density_df, on=['neuron name', 'neuron type', 'points'])
     
-    make_alpha_plots(df)
+    df2 = df.drop_duplicates(subset=['neuron name', 'neuron type'])
+
+    add_regression_cols(df2, 'volume', 'density', np.log10, np.log10)
+    
+    make_alpha_plots(df2)
 
 if __name__ == '__main__':
     main()
