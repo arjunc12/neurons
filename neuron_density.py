@@ -36,10 +36,9 @@ def get_densities():
     else:
         first_line = True
     i = 0
-    f = open('%s/neuron_density.csv' % OUTDIR, 'a')
-    with open('%s/, neuron_density.csv' % OUTDIR, 'a') as f:
+    with open('%s/neuron_density.csv' % OUTDIR, 'a') as f:
         if first_line:
-            f.write('neuron_name, points, mcost, volume\n')
+            f.write('neuron name, neuron type, points, mcost, volume\n')
         directory = DATASETS_DIR
         for cell_type in os.listdir(directory):
             for species in os.listdir(directory + '/' + cell_type):
@@ -89,7 +88,6 @@ def get_densities():
 
 def get_df():
     df = pd.read_csv('%s/neuron_density.csv' % OUTDIR,\
-                      names=['name', 'points', 'volume', 'mcost'],\
                       skipinitialspace=True)
     df['density'] = df['mcost'] / df['volume']
     return df
