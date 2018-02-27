@@ -1,14 +1,18 @@
 library(ICC)
 library(stringr)
 
-MIN_COUNT = 10
+OUTPUT_FILE = '/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_steiner.csv'
+CATEGORIES_FILE = '/iblsn/data/Arjun/neurons/neuron_categories/neuron_categories.csv'
+CATEGORIES = c('cell.type', 'species', 'region', 'neuron.type', 'lab')
+
+MIN_COUNT = 50
 MIN_POINTS = 50
 
 getICCs <- function(df)
 {
-    for (cat in c("cell_type", "species", "region"))
+    for (cat in CATEGORIES)
     {
-        df2 = unique(df, by=c("name", cat))
+        df2 = unique(df, by=c("neuron.name", "neuron.type", cat))
         df2$count = ave(df2$alpha, df2[,cat], FUN=length)
         df2 = df2[df2$count > MIN_COUNT,]
         print(cat)
@@ -16,46 +20,29 @@ getICCs <- function(df)
     }
 }
 
-
-#COLUMNS = ['name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',\
-#           'norm_alpha', 'neural_dist', 'centroid_dist', 'random_dist',\
-#           'norm_neural_dist', 'norm_centroid_dist', 'norm_random_dist',\
-#           'trials', 'successes', 'norm_successes']
-
-#cnames = c('name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',
-#             'neural_dist', 'centroid_dist', 'random_dist', 'trials', 
-#             'successes')
-
-cnames = c('name', 'cell_type', 'species', 'region', 'lab', 'points', 'alpha',
-           'norm_alpha', 'neural_dist', 'centroid_dist', 'random_dist',
-           'norm_neural_dist', 'norm_centroid_dist', 'norm_random_dist',
-           'trials', 'successes', 'norm_successes')
-df = read.csv('/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_steiner.csv', col.names=cnames, header=FALSE)
-df = unique(df, by=c("name", "cell_type", "species", "region"))
-#print(df$cell_type == df$cell_type[3541])
-#df = df[df$cell_type != df$cell_type[3541],]
+categories_df = read.csv(CATEGORIES_FILE, strip.white=TRUE)
+output_df = read.csv(OUTPUT_FILE, strip.white=TRUE)
+df = merge(x=categories_df, y=output_df, by="neuron.name")
 df = df[df$points >= MIN_POINTS,]
-
-df$neuron_type = str_sub(df$name, -1, -1)
 
 print("-----all-----")
 getICCs(df)
 
 print("-----axons-----")
-getICCs(df[df$neuron_type == '0',])
+getICCs(df[df$neuron.type == 'axon',])
 
 print("-----basal dendrite-----")
-getICCs(df[df$neuron_type == '1',])
+getICCs(df[df$neuron.type == 'basal dendrite',])
 
 print("-----apical dendrite-----")
-getICCs(df[df$neuron_type == '2',])
+getICCs(df[df$neuron.type == 'apical dendrite',])
 
 print("-----dendrite-----")
-getICCs(df[df$neuron_type != '0',])
+getICCs(df[df$neuron.type != 'axon' & df$neuron.type != 'truncated axon',])
 
 print("-----neuron type-----")
-print(ICCbare(x=neuron_type, y=alpha, data=df))
+print(ICCbare(x=neuron.type, y=alpha, data=df))
 
 print("-----axon vs dendrite-----")
-df$axon = as.numeric(df$neuron_type == '0')
+df$axon = as.numeric(df$neuron.type == "axon" | df$neuron.type == 'truncated axon')
 print(ICCbare(x=axon, y=alpha, data=df))
