@@ -58,6 +58,7 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
             G.add_node(id1)
             G.node[id1]['coord'] = new_coord
             G.node[id1]['label'] = 'synapse'
+            G.graph['synapses'].append(id1)
             if j == 0:
                 start_counts[new_coord] += 1
                 start_ids.append(id1)
