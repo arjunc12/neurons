@@ -8,13 +8,13 @@ def radius_plot(df):
     pylab.scatter(df['radius'], df['alpha'])
     pylab.xlabel('radius')
     pylab.ylabel('alpha')
-    pylab.savefig('stats/radius_alphas.pdf', format='pdf')
+    pylab.savefig('steiner_stats/radius_alphas.pdf', format='pdf')
     pylab.close()
 
 def alphas_distribution(df):
     pylab.figure()
     pylab.hist(df['alpha'])
-    pylab.savefig('stats/neuron_builder_alphas.pdf', format='pdf')
+    pylab.savefig('steiner_stats/neuron_builder_alphas.pdf', format='pdf')
     pylab.close()
 
 def neuron_builder_stats(df):
