@@ -51,7 +51,7 @@ def make_normalize_function(opt_cost):
 def normalize_cost(cost, opt_cost):
     return 1 - (opt_cost / cost)
 
-def graph_costs(G):
+def graph_costs(G, relevant_nodes=None):
     scost = 0
     mcost = 0
     
@@ -82,7 +82,8 @@ def graph_costs(G):
                 child_droot = length + droot[curr]
                 droot[child] = child_droot
                 #scost += child_droot
-                scosts.append(child_droot)
+                if relevant_nodes == None or child in relevant_nodes:
+                    scosts.append(child_droot)
                 parent[child] = curr
                 queue.append(child)
 
