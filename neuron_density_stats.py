@@ -6,6 +6,8 @@ import pylab
 from stats_utils import *
 from scipy.stats import pearsonr, spearmanr
 
+MIN_OUTLIER_COUNT = 25
+
 def biggest_outliers(df, category, ycol='density'):
     resid_col = ycol + '_resid'
     max_val = None
@@ -17,7 +19,7 @@ def biggest_outliers(df, category, ycol='density'):
         residuals so that they will cancel out. We then take absolute value
         to measure magnitude.
         '''
-        if len(group[resid_col]) < 5:
+        if len(group[resid_col]) < 25:
             continue
         resid = pylab.mean(group[resid_col])
         resid = abs(resid)
@@ -97,9 +99,11 @@ def make_alpha_plots(df):
 
 
 def sorted_points(df, col1, col2):
-    idx = pylab.argsort(df[col1])
-    x = df[col1][idx]
-    y = df[col2][idx]
+    x = pylab.array(df[col1])
+    y = pylab.array(df[col2])
+    order = pylab.argsort(x)
+    x = x[order]
+    y = y[order]
     return x, y
 
 def make_density_plot(df, hue=None, outliers=None):
@@ -116,16 +120,15 @@ def make_density_plot(df, hue=None, outliers=None):
     fname += '.pdf'
 
     pylab.figure()
-    pylab.scatter(np.log10(df['mcost']), np.log10(df['density']), c=c, cmap=cmap)
-    x, y = sorted_points(df, 'mcost', 'density_hat')
+    pylab.scatter(np.log10(df['volume']), np.log10(df['density']), c=c, cmap=cmap)
+    x, y = sorted_points(df, 'volume', 'density_hat')
     pylab.plot(np.log10(x), y, c='r')
 
     if outliers != None:
         for outlier in outliers:
             df2 = df[df[hue] == outlier].copy()
-            #print df2
-            add_regression_cols(df2, 'mcost', 'density', np.log10, np.log10)
-            x, y = sorted_points(df2, 'mcost', 'density_hat')
+            add_regression_cols(df2, 'volume', 'density', np.log10, np.log10)
+            x, y = sorted_points(df2, 'volume', 'density_hat')
             pylab.plot(np.log10(x), y, c='g')
 
     pylab.savefig('neuron_density/%s' % fname)
@@ -135,14 +138,18 @@ def main():
     models_df, categories_df = pareto_steiner_stats.get_dfs()
 
     neuron_density_df = neuron_density.get_df()
-
-    df = pd.merge(categories_df, neuron_density_df, on=['neuron name', 'neuron type', 'points'])
-    
-    df2 = df.drop_duplicates(subset=['neuron name', 'neuron type'])
-
-    add_regression_cols(df2, 'volume', 'density', np.log10, np.log10)
-    
-    make_alpha_plots(df2)
+    add_regression_cols(neuron_density_df, 'volume', 'density', pylab.log10, pylab.log10)
+    df = pd.merge(categories_df, neuron_density_df)
+    make_alpha_plots(df)
+    for hue in [None, 'cell type', 'species', 'region']:
+        plot_df = df.copy()
+        outliers = None
+        if hue != None:
+            outliers = biggest_outliers(df, hue)
+            print hue, outliers
+            plot_df.drop_duplicates(subset=['neuron name', 'neuron type', hue],\
+                                    inplace=True)
+        make_density_plot(df, hue=hue, outliers=outliers)
 
 if __name__ == '__main__':
     main()
