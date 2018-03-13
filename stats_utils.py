@@ -16,4 +16,3 @@ def add_regression_cols(df, xcol, ycol, xtransform=None, ytransform=None):
 
     df[ycol + '_hat'] = yhat
     df[ycol + '_resid'] = yresid
-
