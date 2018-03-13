@@ -12,6 +12,14 @@ from graph_utils import is_tree
 
 SYNAPSE_RATE = 1.8661051308416368
 
+EXPONENTIAL = False
+UNIFORM = True
+
+SYNAPSE_RATES = {'dendrite' : 0.2, 'axon' : 4, 'apical dendrite' : 0.2,\
+                'basal dendrite' : 0.2, 'truncated axon' : 4}
+
+INIT_OFFSET = 0.5
+
 def truncate_graph(G):
     remove_nodes = set()
     queue = [G.graph['root']]
@@ -43,7 +51,14 @@ def new_synapse_points(coord1, coord2, rate=SYNAPSE_RATE, offset=0):
     dists = []
     while total_dist < max_dist:
         dists.append(total_dist)
-        dist = exponential(rate)
+        dist = None
+        if UNIFORM:
+            dist = rate
+        elif EXPONENTIAL:
+            dist = exponential(rate)
+        else:
+            print "what synapse distribution?"
+            assert False
         total_dist += dist
     new_offset = total_dist - max_dist
     new_points = []
@@ -54,20 +69,26 @@ def new_synapse_points(coord1, coord2, rate=SYNAPSE_RATE, offset=0):
         new_points.append(new_point)
     return new_points, new_offset
 
-def add_synapses(G, rate=SYNAPSE_RATE):
+def add_synapses(G, neuron_type='dendrite', rate=None):
+    if rate == None:
+        if neuron_type != None:
+            rate = SYNAPSE_RATES[neuron_type]
+        else:
+            rate = SYNAPSE_RATE
+
     H = G.copy()
     assert is_tree(H)
     root = H.graph['root']
     stack = [root]
     offsets = {}
-    offsets[root] = 0
+    offsets[root] = INIT_OFFSET
     visited = set()
     H.graph['synapses'] = []
     next_node = max(G.nodes()) + 1
     while len(stack) > 0:
         curr = stack.pop()
         visited.add(curr)
-        for n in H.neighbors(curr):
+        for n in G.neighbors(curr):
             if n in visited:
                 continue
 
@@ -98,13 +119,13 @@ def add_synapses(G, rate=SYNAPSE_RATE):
             stack.append(n)
             offsets[n] = new_offset
 
-    print len(H.graph['synapses']), 'synapses'
     return H
 
 def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
     graphs = []
     for arbor_type in ["2", "3", "4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
+        print "Arbor tybe", arbor_type
         
         # Reads in 3D arborization.
         G = nx.Graph()
@@ -281,18 +302,10 @@ def viz_tree(G, name, outdir='figs', **kwargs):
     return kwargs
 
 def main():
-    #neuron_file = argv[1]
-    #print map(str, neuron_info(neuron_file))
-    G = nx.Graph()
-    for i in xrange(1, 11):
-        G.add_edge(i - 1, i)
-    print G.nodes()
-    print G.edges()
-    for j in xrange(11, 20):
-        pass
-        #G.add_edge(10, j)
-    G.graph['root'] = 0
-    truncate_graph(G)
+    filename = '/iblsn/data/Arjun/neurons/datasets/principal_cell/elephant/neocortex/Jacobs/156-2-11k.CNG.swc'
+    graphs = get_neuron_points(filename)
+    G = graphs[-1]
+    G = add_synapses(G)
     print G.nodes()
     print G.edges()
 
