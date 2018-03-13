@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.spatial.distance import euclidean
+import pandas as pd
 
 def point_dist(p1, p2):
     '''
@@ -50,7 +51,6 @@ def pareto_dist_scale(pareto_mcosts, pareto_scosts, mcost, scost):
     assert len(pareto_mcosts) == len(pareto_scosts)
     best_scale = float("inf")
     best_index = None
-
     for i in xrange(len(pareto_mcosts)):
         pareto_mcost = pareto_mcosts[i]
         assert pareto_mcost >= 0
@@ -67,3 +67,14 @@ def pareto_dist_scale(pareto_mcosts, pareto_scosts, mcost, scost):
             best_scale = scale
             best_index = i
     return best_scale, best_index
+
+def main():
+    mcost, scost = 24.105986, 381.100000
+    pareto_front = pd.read_csv('/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_fronts_synthetic/140826_02_recon-13/apical_dendrite/pareto_front.csv', skipinitialspace=True)
+    pareto_mcosts = pareto_front['mcost']
+    pareto_scosts = pareto_front['scost']
+
+    print pareto_dist_scale(pareto_mcosts, pareto_scosts, mcost, scost)
+
+if __name__ == '__main__':
+    main()
