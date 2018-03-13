@@ -26,13 +26,15 @@ def density(G):
     return mst_cost(G) / graph_volume(G)
 
 def get_densities():
-    prev_names = set()
+    prev_neurons = set()
     first_line = False
     if 'neuron_density.csv' in os.listdir(OUTDIR):
         df = pd.read_csv('%s/neuron_density.csv' % OUTDIR,\
-                          names=['name', 'points', 'volume', 'mcost'],\
+                          names=['neuron name', 'neuron type', 'points', 'volume', 'mcost'],\
                           skipinitialspace=True)
-        prev_names = set(df['name'].values)
+        neuron_names = list(df['neuron name'])
+        neuron_types = list(df['neuron type'])
+        prev_neurons = set(zip(neuron_names, neuron_types))
     else:
         first_line = True
     i = 0
@@ -49,38 +51,41 @@ def get_densities():
                             
                             if neuron[-8:] != ".CNG.swc": 
                                 continue
-                            
+                           
+                            neuron_name = neuron[:-8]
+
                             try:
                                 graphs = get_neuron_points(filename)
                             except AssertionError:
                                 continue
 
                             for i, G in enumerate(graphs):
-                                neuron_name = neuron[:-8] + str(i)
                                 neuron_type = NEURON_TYPES[i]
 
-                                if neuron_name in prev_names:
+                                if (neuron_name, neuron_type) in prev_neurons:
                                     continue
+                                prev_neurons.add((neuron_name, neuron_type))
 
                                 if G == None:
                                     continue
 
-                                if G.number_of_nodes() < 4:
-                                    continue
-
-                                print neuron_name
+                                print neuron_name, neuron_type
+                                points = G.number_of_nodes()
+                                mcost = mst_cost(G)
+                                write_items = [neuron_name, neuron_type, points, mcost]
+                                
                                 volume = None
                                 try:
                                     volume = graph_volume(G)
                                 except QhullError as qerror:
-                                    continue
+                                    pass
                                 
                                 if volume == None:
-                                    continue
+                                    write_items.append('')
+                                else:
+                                    write_items.append(volume)
 
-                                mcost = mst_cost(G)
 
-                                write_items = [neuron_name, neuron_type, G.number_of_nodes(), mcost, volume]
                                 write_items = map(str, write_items)
                                 write_items = ', '.join(write_items)
 
@@ -89,6 +94,7 @@ def get_densities():
 def get_df():
     df = pd.read_csv('%s/neuron_density.csv' % OUTDIR,\
                       skipinitialspace=True)
+    df.dropna(axis=0, how='any', inplace=True)
     df['density'] = df['mcost'] / df['volume']
     return df
 
