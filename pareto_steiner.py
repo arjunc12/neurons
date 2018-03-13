@@ -56,6 +56,8 @@ NEURON_TYPES = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite',\
 
 COLORS = {'neural' : 'r', 'centroid' : 'g', 'random' : 'm', 'barabasi' : 'c'}
 
+PLOT_TREES = ['neural', 'centroid']
+
 def ceil_power_of_10(n):
     exp = math.log(n, 10)
     exp = math.ceil(exp)
@@ -66,7 +68,7 @@ def floor_power_of_10(n):
     exp = math.ceil(exp)
     return 10**exp
 
-def pareto_plot(G, neuron_name, fronts_dir, figs_dir):
+def pareto_plot(fronts_dir, figs_dir):
     pareto_front = pd.read_csv('%s/pareto_front.csv' % fronts_dir,\
                                skipinitialspace=True)
     mcosts = pareto_front['mcost']
@@ -82,8 +84,9 @@ def pareto_plot(G, neuron_name, fronts_dir, figs_dir):
     pylab.scatter(mcosts, scosts, c='b', label='pareto front')
   
     for tree, costs in tree_costs.groupby('tree'):
-        pylab.scatter(costs['mcost'], costs['scost'], label=tree, marker='x',\
-                      s=175, c=COLORS[tree])
+        if tree in PLOT_TREES:
+            pylab.scatter(costs['mcost'], costs['scost'], label=tree,\
+                          marker='x', s=175, c=COLORS[tree])
      
     pylab.xlabel('wiring cost')
     pylab.ylabel('conduction delay')
@@ -92,7 +95,8 @@ def pareto_plot(G, neuron_name, fronts_dir, figs_dir):
     pylab.savefig('%s/pareto_front.pdf' % figs_dir, format='pdf')
     pylab.close()
 
-def pareto_tree_costs(G, point_graph, axon=False, viz_trees=False, figs_dir=None):
+def pareto_tree_costs(G, point_graph, axon=False, viz_trees=False, figs_dir=None,\
+                      sandbox=False):
     delta = 0.01
     alphas = np.arange(delta, 1 + delta, delta)
     mcosts = []
@@ -101,9 +105,13 @@ def pareto_tree_costs(G, point_graph, axon=False, viz_trees=False, figs_dir=None
     print "sorting neighbors"
     sort_neighbors(point_graph)
 
+    pareto_func = pareto_steiner
+    if sandbox:
+        pareto_func = pareto_steiner_sandbox
     for i, alpha in enumerate(alphas):
         print alpha
-        pareto_tree = pareto_steiner(point_graph, alpha, axon=axon)
+        #pareto_tree = pareto_steiner(point_graph, alpha, axon=axon)
+        pareto_tree = pareto_func(point_graph, alpha, axon=axon)
         mcost = mst_cost(pareto_tree)
         scost = satellite_cost(pareto_tree, relevant_nodes=point_graph.nodes())
         cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
@@ -119,7 +127,7 @@ def pareto_tree_costs(G, point_graph, axon=False, viz_trees=False, figs_dir=None
 
 def pareto_front(G, point_graph, neuron_name, neuron_type,\
                  fronts_dir=NEUROMORPHO_FRONTS_DIR, figs_dir=NEUROMORPHO_FIGS_DIR,\
-                 viz_trees=VIZ_TREES_NEUROMORPHO):
+                 viz_trees=VIZ_TREES_NEUROMORPHO, sandbox=False):
 
     sat_tree = satellite_tree(point_graph)
     sat_scost = satellite_cost(sat_tree)
@@ -148,7 +156,8 @@ def pareto_front(G, point_graph, neuron_name, neuron_type,\
         axon = neuron_type == 'axon'
 
         alphas, mcosts, scosts = pareto_tree_costs(G, point_graph, axon,\
-                                                   viz_trees, figs_dir=figs_dir)
+                                                   viz_trees, figs_dir=figs_dir,\
+                                                   sandbox=sandbox)
 
         for i in xrange(len(alphas)):
             alpha = alphas[i]
@@ -183,7 +192,6 @@ def pareto_analysis(G, neuron_name, neuron_type,\
                     viz_trees=VIZ_TREES_NEUROMORPHO):
     
     assert G.number_of_nodes() > 0
-    print G.number_of_nodes(), 'points'
     assert is_tree(G)
 
     print neuron_name, neuron_type
@@ -192,6 +200,7 @@ def pareto_analysis(G, neuron_name, neuron_type,\
     synapses = G.graph['synapses']
     points = synapses + [G.graph['root']]
     point_graph = G.subgraph(points)
+    print point_graph.number_of_nodes(), 'points'
     point_graph = complete_graph(point_graph)
    
 # ---------------------------------------
@@ -205,8 +214,7 @@ def pareto_analysis(G, neuron_name, neuron_type,\
     alphas, mcosts, scosts, first_time = pareto_front(G, point_graph,\
                                                       neuron_name, neuron_type,\
                                                       fronts_dir, figs_dir,\
-                                                      viz_trees)
-   
+                                                      viz_trees) 
 # ---------------------------------------
     
     neural_mcost = mst_cost(G)
@@ -323,7 +331,8 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
                            viz_trees=VIZ_TREES_IMARIS):
     assert G.number_of_nodes() > 0
     assert is_tree(G)
- 
+
+    print neuron_name
     print "making graph"
     synapses = G.graph['synapses']
     points = synapses + [G.graph['root']]
@@ -332,10 +341,18 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
     print point_graph.number_of_nodes(), "points"
     
     alphas, mcosts, scosts, first_time = pareto_front(G, point_graph,\
-                                                      neuron_name, neuron_type,\
+                                                      neuron_name,\
+                                                      neuron_type,\
                                                       fronts_dir, figs_dir,\
                                                       viz_trees)
    
+    axon = neuron_type == 'axon'
+    alphas2, mcosts2, scosts2 = pareto_tree_costs(G, point_graph, axon=axon,\
+                                                  viz_trees=False,\
+                                                  figs_dir=None,\
+                                                  sandbox=True)
+    mcosts2 = [mcosts[0]] + mcosts2
+    scosts2 = [scosts[0]] + scosts2
 # ---------------------------------------
     
     neural_mcost = mst_cost(G)
@@ -353,13 +370,18 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
         tree_costs_file.write('%s, %f, %f\n' % ('centroid', centroid_mcost,\
                                                 centroid_scost))
 
-    pareto_plot(G, neuron_name, fronts_dir, figs_dir)
+    pareto_plot(fronts_dir, figs_dir)
     
     pylab.figure()
     sns.set()
     
     pylab.plot(mcosts, scosts, c = 'b', label='_nolegend_')
     pylab.scatter(mcosts, scosts, c='b', label='pareto front')
+    
+    pylab.plot(mcosts2, scosts2, c = 'm', label='_nolegend_')
+    pylab.scatter(mcosts2, scosts2, c='m', label='sandbox pareto front')
+    
+    pylab.savefig('%s/pareto_front.pdf' % figs_dir, format='pdf')
 
     neural_dist, neural_index = DIST_FUNC(mcosts, scosts, neural_mcost,\
                                           neural_scost)
@@ -376,13 +398,15 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
 
     pylab.legend()
 
-    pylab.savefig('%s/pareto_front_scaled_%s.pdf' % (figs_dir, neuron_name), format='pdf')
+    pylab.savefig('%s/pareto_front_scaled.pdf' % figs_dir, format='pdf')
     pylab.close()
 
 
 def pareto_analysis_neuromorpho(min_nodes=MIN_NODES, max_nodes=MAX_NODES,\
                                 cell_types=None, animal_species=None,\
-                                regions=None, labs=None, names=None, neuron_types=None):
+                                regions=None, labs=None, names=None,\
+                                neuron_types=None, viz_trees=VIZ_TREES_NEUROMORPHO,\
+                                plot=False, synthetic=False):
     #directory = 'neuromorpho'
     datasets_dir = NEUROMORPHO_DATASETS_DIR
     for cell_type in os.listdir(datasets_dir):
@@ -421,19 +445,29 @@ def pareto_analysis_neuromorpho(min_nodes=MIN_NODES, max_nodes=MAX_NODES,\
                             if neuron_types != None and i not in neuron_types:
                                 continue
                             
-                            if not (min_nodes <= G.number_of_nodes() <= max_nodes):
-                                print "wrong nodes", G.number_of_nodes()
-                                continue
+                            neuron_type = NEURON_TYPES[i] 
                             
-                            neuron_type = NEURON_TYPES[i]
+                            H = None
+                            if synthetic:
+                                H = add_synapses(G, neuron_type=neuron_type)
+                            else:
+                                H = G.copy()
+                                H.graph['synapses'] = []
+                                for u in H.nodes_iter():
+                                    if u != H.graph['root']:
+                                        H.graph['synapses'].append(u)
+                         
+                            npoints = len(H.graph['synapses']) + 1
+                            if not (min_nodes <= npoints <= max_nodes):
+                                print "wrong nodes", npoints
+                                continue
+
 
                             fronts_dir = '%s/%s/%s' % (NEUROMORPHO_FRONTS_DIR, neuron_name, neuron_type)
                             fronts_dir = fronts_dir.replace(' ', '_')
-                            os.system('mkdir -p %s' % fronts_dir)
 
                             output_dir = NEUROMORPHO_TEMP_DIR
                             output_dir = output_dir.replace(' ', '_')
-                            os.system('mkdir -p %s' % output_dir)
 
                             figs_dir = '%s/%s/%s/%s/%s/%s/%s' % (NEUROMORPHO_FIGS_DIR,\
                                                                  cell_type,\
@@ -443,20 +477,29 @@ def pareto_analysis_neuromorpho(min_nodes=MIN_NODES, max_nodes=MAX_NODES,\
                                                                  neuron_type)
 
                             figs_dir = figs_dir.replace(' ', '_')
-                            #os.system('mkdir -p %s' % figs_dir)
+                           
+                            if synthetic:
+                                fronts_dir = fronts_dir.replace('/pareto_fronts/',\
+                                                                '/pareto_fronts_synthetic/')
+                                output_dir += '_synthetic'
+                                figs_dir = figs_dir.replace('/steiner_figs/',\
+                                                            '/steiner_figs_synthetic/')
 
-                            try:
-                                #H = add_synapses(G)
-                                H = G.copy()
-                                H.graph['synapses'] = []
-                                for u in H.nodes_iter():
-                                    if u != H.graph['root']:
-                                        H.graph['synapses'].append(u)
-                                
+                            os.system('mkdir -p %s' % fronts_dir)
+                            os.system('mkdir -p %s' % output_dir)
+                            if plot or viz_trees:
+                                os.system('mkdir -p %s' % figs_dir)
+
+                            try: 
                                 pareto_analysis(H, neuron_name, neuron_type,\
                                                 fronts_dir=fronts_dir,\
                                                 output_dir=output_dir,\
-                                                figs_dir=figs_dir)
+                                                figs_dir=figs_dir,\
+                                                viz_trees=viz_trees)
+                                if plot:
+                                    pareto_plot(fronts_dir, figs_dir)
+
+
                             except RuntimeError as r:
                                 print r
                                 continue
@@ -595,6 +638,7 @@ def main():
     parser.add_argument('-r', '--regions', nargs='+', default=None)
     parser.add_argument('-nt', '--neuron_types', nargs='+', type=int, default=None)
     parser.add_argument('-bt', '--boutons', action='store_true')
+    parser.add_argument('--synthetic', action='store_true')
 
     args = parser.parse_args()
     min_nodes = args.min_nodes
@@ -613,6 +657,7 @@ def main():
     names = args.names
     neuron_types = args.neuron_types
     boutons = args.boutons
+    synthetic = args.synthetic
 
     if debug:
         cell_type = 'bipolar'
@@ -634,10 +679,11 @@ def main():
 
     if imaris:
         imaris_plots()
-    if neuromorpho:
+    if neuromorpho or neuromorpho_plot:
         pareto_analysis_neuromorpho(min_nodes, max_nodes, cell_types,\
                                     animal_species, regions, labs, names,\
-                                    neuron_types)
+                                    neuron_types, viz_trees, neuromorpho_plot,\
+                                    synthetic)
     if neuron_builder:
         neuron_builder_analysis()
     if boutons:
