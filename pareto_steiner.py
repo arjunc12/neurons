@@ -14,7 +14,7 @@ from neuron_utils import *
 from read_imaris import *
 from pareto_functions import *
 from kruskal import *
-from neuron_builder import build_neuron
+from neuron_builder import build_neuron_snider
 from random_graphs import random_mst, barabasi_tree
 import math
 import seaborn as sns
@@ -539,7 +539,7 @@ def neuron_builder_analysis(rmin=0.5, rmax=1.5, rstep=0.01, num_iters=10):
     for i in xrange(num_iters):
         for radius in pylab.arange(rmax, rmin - rstep, -rstep):
             print "radius", radius
-            G = build_neuron(radius)
+            G = build_neuron_snider(radius)
             point_graph = complete_graph(G)
             print point_graph.number_of_nodes(), "points"
 
