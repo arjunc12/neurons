@@ -226,11 +226,11 @@ def label_points(G):
     for u in G:
         G.node[u]['label'] = get_label(G, u)
 
-def viz_tree(G, name, outdir='figs', **kwargs):
+def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
     """ Displays plant/tree visualization. """
     
     root = G.graph['root']
-    node_size,node_color = [],[]
+    node_size,node_color = [], []
     pos = {}    
     label_points(G)
     for u in G:
@@ -274,7 +274,6 @@ def viz_tree(G, name, outdir='figs', **kwargs):
             print label
             assert False
 
-
     nx.draw(G,pos=pos, arrows=False, with_labels=False, node_size=node_size,\
             node_color=node_color, edge_color="brown", width=4, font_size=12,\
             font_color='red', font_weight='bold')
@@ -295,9 +294,10 @@ def viz_tree(G, name, outdir='figs', **kwargs):
         kwargs['xmax'] = xmax
         kwargs['ymin'] = ymin
         kwargs['ymax'] = ymax
-    
-    pylab.savefig("%s/%s.pdf" % (outdir, name))
-    pylab.close()
+
+    if save:    
+        pylab.savefig("%s/%s.pdf" % (outdir, name))
+        pylab.close()
 
     return kwargs
 
