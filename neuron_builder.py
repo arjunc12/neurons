@@ -99,7 +99,7 @@ def update_graph(G, unmarked_points, radius=1):
         if u == G.graph['root']:
             add_bifurcations(G, u, n=1)
         elif G.degree(u) == 1:
-            connect_to_synapses(G, u, marked_points, unmarked_points, radius=1)
+            connect_to_synapses(G, u, unmarked_points, radius=1)
             choice = next_choice()
             if choice == 'extend':
                 parent = G.neighbors(u)[0]
@@ -116,6 +116,7 @@ def build_neuron_video():
     G.add_node(1)
     G.node[1]['coord'] = (0, 0, 0)
     G.graph['root'] = 1
+    G.node[1]['label'] = 'root'
     prev_node = None
     graphs = [G.copy()]
     for i in xrange(100):
@@ -141,8 +142,8 @@ def build_neuron_video():
         for u in G.nodes_iter():
             coord = G.node[u]['coord']
             pos[u] = (coord[0], coord[1])
-        nx.draw_networkx(G, pos=pos, with_labels=False)
-        plt.draw()
+        viz_tree(G, save=False)
+        #plt.draw()
         
     ani = animation.FuncAnimation(fig, redraw2d, init_func=init, frames=len(graphs), \
                                   interval = 1000)
