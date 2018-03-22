@@ -349,8 +349,7 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
     axon = neuron_type == 'axon'
     alphas2, mcosts2, scosts2 = pareto_tree_costs(G, point_graph, axon=axon,\
                                                   viz_trees=False,\
-                                                  figs_dir=None,\
-                                                  sandbox=True)
+                                                  figs_dir=None)
     mcosts2 = [mcosts[0]] + mcosts2
     scosts2 = [scosts[0]] + scosts2
 # ---------------------------------------
