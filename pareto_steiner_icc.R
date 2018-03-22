@@ -2,6 +2,7 @@ library(ICC)
 library(stringr)
 
 OUTPUT_FILE = '/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_steiner.csv'
+SYNTHETIC_OUTPUT_FILE = '/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_steiner_synthetic.csv'
 CATEGORIES_FILE = '/iblsn/data/Arjun/neurons/neuron_categories/neuron_categories.csv'
 CATEGORIES = c('cell.type', 'species', 'region', 'neuron.type', 'lab')
 

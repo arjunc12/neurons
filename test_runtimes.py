@@ -4,50 +4,37 @@ mpl.use('agg')
 import pylab
 from pareto_functions import *
 from time import time
-from cost_functions import graph_costs, normalize_cost, partially_dominates, mst_cost, satellite_cost
+from cost_functions import graph_costs, normalize_cost, partially_dominates, mst_cost, satellite_cost, pareto_cost
 from graph_utils import complete_graph, is_tree
-from neuron_utils import pareto_cost, sort_neighbors
+from neuron_utils import sort_neighbors
 from random_graphs import random_point_graph
 import argparse
 import pandas as pd
 from scipy.stats import binom_test
+from collections import defaultdict
+import os
 
 MIN_POINTS = 8
 MAX_POINTS = 50
 
-COLNAMES = ['num_points', 'steiner_runtime', 'prim_runtime', 'khuller_runtime',\
-            'genetic_runtime', 'prim_comparisons', 'prim_dominated',\
-            'khuller_comparisons', 'khuller_dominated', 'genetic_comparisons',\
-            'genetic_dominated']
-
 def runtimes_stats():
-    df = pd.read_csv('test_runtimes.csv', names=COLNAMES)
-    #print "greedy success rate", float(sum(df['dominates'])) / float(sum(df['comparisons']))
-    df2 = df.groupby('num_points', as_index=False).agg(pylab.mean)
+    df = pd.read_csv('test_runtimes.csv', skipinitialspace=True)
     pylab.figure()
-    points = df2['num_points']
-    time1 = df2['steiner_runtime']
-    time2 = df2['prim_runtime']
-    time3 = df2['khuller_runtime']
-    time4 = df2['genetic_runtime']
-    pylab.plot(points, time1, c='b', label='steiner')
-    pylab.plot(points, time2, c='r', label='prim')
-    pylab.plot(points, time3, c='k', label='khuller')
-    pylab.plot(points, time4, c='g', label='genetic')
-    #pylab.ylim(ymin=-1)
+    for algorithm, group in df.groupby('algorithm'):
+        print algorithm
+        comparisons = group['comparisons'].sum()
+        dominated = group['dominated'].sum()
+        print float(dominated) / float(comparisons)
+        print binom_test(dominated, comparisons)
+        group = group.groupby('points', as_index=False).agg(pylab.mean)
+        pylab.plot(group['points'], group['runtime'], label=algorithm)
+
     pylab.legend(loc=2)
     pylab.xlabel('number of points')
     pylab.ylabel('rumtime (minutes)')
     pylab.savefig('test_runtimes/runtimes.pdf', format='pdf')
     pylab.close()
-
-    for algorithm in ['prim', 'khuller', 'genetic']:
-        print algorithm
-        comparisons = df[algorithm + '_comparisons'].sum()
-        dominated = df[algorithm + '_dominated'].sum()
-        print float(dominated) / float(comparisons)
-        print binom_test(dominated, comparisons)
-
+    
 def time_function(G, alpha, pareto_func):
     start = time()
     mst = pareto_func(G, alpha)
@@ -57,8 +44,7 @@ def time_function(G, alpha, pareto_func):
     scost = satellite_cost(mst, relevant_nodes=G.nodes())
     return mcost, scost, runtime
 
-def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
-    
+def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):    
     for i in xrange(num_iters):
         print "iteration", i
         for num_points in xrange(min_points, max_points + 1):
@@ -66,91 +52,44 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
             G = random_point_graph(num_points=num_points)
             
             sat_tree = satellite_tree(G)
-            span_tree = nx.minimum_spanning_tree(G, weight='length')
-                   
-            opt_scost = float(satellite_cost(sat_tree))
-            normalize_scost = lambda cost : normalize_cost(cost, opt_scost)
-            opt_mcost = float(mst_cost(span_tree))
-            normalize_mcost = lambda cost : normalize_cost(cost, opt_mcost)
             
             sort_neighbors(G)
             
-            mcosts1 = []
-            mcosts2 = []
-            mcosts3 = []
-            mcosts4 = []
-            
-            scosts1 = []
-            scosts2 = []
-            scosts3 = []
-            scosts4 = []
-
-            times1 = []
-            times2 = []
-            times3 = []
-            times4 = []
+            mcosts = defaultdict(list)
+            scosts = defaultdict(list)
+            times = defaultdict(float)
 
             delta = 0.01
             alphas = pylab.arange(delta, 1, delta)
+            algorithms = [pareto_steiner, pareto_steiner_old, pareto_prim, pareto_khuller]
+            names = ['steiner', 'old steiner', 'prim', 'khuller']
             for alpha in alphas:
                 print "alpha", alpha
-                mcost1, scost1, time1 = time_function(G, alpha, pareto_steiner)
-                mcost2, scost2, time2 = time_function(G, alpha, pareto_prim)
-                mcost3, scost3, time3 = time_function(G, alpha, pareto_khuller)
+                for algorithm, name in zip(algorithms, names):
+                    mcost, scost, runtime = time_function(G, alpha, algorithm)
+                    mcosts[name].append(mcost)
+                    scosts[name].append(scost)
+                    times[name] += runtime
 
-                #mcost1 = normalize_mcost(mcost1)
-                #scost1 = normalize_scost(scost1)
+            if num_points <= 50:
+                names.append('genetic')
+                genetic_start = time()
+                genetic_trees = pareto_genetic(G)
+                genetic_end = time()
 
-                mcosts1.append(mcost1)                
-                mcosts2.append(mcost2)
-                mcosts3.append(mcost3)
-
-                scosts1.append(scost1)
-                scosts2.append(scost2)
-                scosts3.append(scost3)
-
-                times1.append(time1)
-                times2.append(time2)
-                times3.append(time3)
+                genetic_runtime = (genetic_end - genetic_start) / 60.0
+                times['genetic'] = genetic_runtime
+               
+                for mcost, scost, T in genetic_trees: 
+                    mcosts['genetic'].append(mcost)
+                    scosts['genetic'].append(scost)
             
-            steiner_runtime = sum(times1)
-            prim_runtime = sum(times2)
-            khuller_runtime = sum(times3)
-
-            genetic_start = time()
-            genetic_trees = pareto_genetic(G)
-            genetic_end = time()
-
-            genetic_runtime = (genetic_end - genetic_start) / 60.0
-
-            for mcost4, scost4, T in genetic_trees: 
-                mcosts4.append(mcost4)
-                scosts4.append(scost4)
-
-            prim_comparisons, prim_dominated = prop_dominated(mcosts1,\
-                                                              scosts1,\
-                                                              mcosts2,\
-                                                              scosts2)
-            khuller_comparisons, khuller_dominated = prop_dominated(mcosts1,\
-                                                                    scosts1,\
-                                                                    mcosts3,\
-                                                                    scosts3)
-            genetic_comparisons, genetic_dominated = prop_dominated(mcosts1,\
-                                                                    scosts1,\
-                                                                    mcosts4,\
-                                                                    scosts4)
-
             pylab.figure()
-            pylab.scatter(mcosts1, scosts1, c='b', label='steiner')
-            pylab.plot(mcosts1, scosts1, c='b')
-
-            pylab.scatter(mcosts2, scosts2, c='r', label='prim')
-            pylab.plot(mcosts2, scosts2, c='r')
-
-            pylab.scatter(mcosts3, scosts3, c='k', label='khuller')
-            pylab.plot(mcosts3, scosts3, c='k')
-
-            pylab.scatter(mcosts4, scosts4, c='g', label='genetic')
+            for name in names:
+                mcost = mcosts[name]
+                scost = scosts[name]
+                pylab.scatter(mcost, scost, label=name)
+                pylab.plot(mcost, scost)
 
             pylab.legend()
             pylab.xlabel('spanning tree cost')
@@ -160,18 +99,29 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
             
             pylab.close()
 
-            write_items = [num_points, steiner_runtime, prim_runtime,\
-                           khuller_runtime, genetic_runtime, prim_comparisons,\
-                           prim_dominated, khuller_comparisons,\
-                           khuller_dominated, genetic_comparisons,\
-                           genetic_dominated]
-            
-            write_items = map(str, write_items)
-            write_items = ', '.join(write_items)
+            header_line = None
+            if not os.path.exists('test_runtimes.csv'):
+                header_line = ['points', 'runtime', 'comparisons', 'dominated']
+                header_line = ', '.join(header_line)
 
-            outfile = open('test_runtimes.csv', 'a')
-            outfile.write('%s\n' % write_items)
-            outfile.close()
+            mcosts1, scosts1 = mcosts['steiner'], scosts['steiner']
+            with open('test_runtimes.csv', 'a') as outfile:
+                if header_line != None:
+                    outfile.write('%s\n' % header_line)
+                for name in names:
+                    write_items = [name, num_points, times[name]]
+                    if name in mcosts:
+                        assert name in scosts
+                        mcosts2, scosts2 = mcosts[name], scosts[name]
+                        comparisons, dominated = prop_dominated(mcosts1, scosts1,\
+                                                                mcosts2, scosts2)
+                        write_items += [comparisons, dominated]
+                    else:
+                        write_items += ['', '']
+     
+                    write_items = map(str, write_items)
+                    write_items = ', '.join(write_items)
+                    outfile.write('%s\n' % write_items)
 
 def main():
     parser = argparse.ArgumentParser()
