@@ -24,6 +24,8 @@ def partially_dominates(costs1, costs2):
 def prop_dominated(mcosts1, scosts1, mcosts2, scosts2):
     assert len(mcosts1) == len(scosts1)
     assert len(mcosts2) == len(scosts2)
+    assert len(mcosts1) == len(scosts1)
+    
     comparisons = 0
     dominated = 0
     for i in xrange(len(mcosts2)):
