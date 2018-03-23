@@ -274,9 +274,9 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
             print label
             assert False
 
-    nx.draw(G,pos=pos, arrows=False, with_labels=False, node_size=node_size,\
-            node_color=node_color, edge_color="brown", width=4, font_size=12,\
-            font_color='red', font_weight='bold')
+    nx.draw_networkx(G,pos=pos, arrows=False, with_labels=False, node_size=node_size,\
+                     node_color=node_color, edge_color="brown", width=4, font_size=12,\
+                     font_color='red', font_weight='bold')
     pylab.draw()
 
     try:
