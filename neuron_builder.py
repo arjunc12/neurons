@@ -239,7 +239,30 @@ def init_graph(dim=3):
 def update_graph(G, algorithm, unmarked_points, dim=3, **kwargs):
     update_func = get_update_func(algorithm)
     return update_func(G, unmarked_points, dim=dim, **kwargs)
-                
+
+def swc_line(G, u, parent, point_labels, segment_type):
+    write_items = []
+    root = G.node[u] == G.graph['root']
+    if root:
+        write_items += [1, 1]
+    else:
+        assert parent in point_labels[parent]
+        next_label = len(point_labels) + 1
+        point_labels[u] = next_label
+        write_items += [next_label, 0]
+
+    write_items += list(G.node[u]['coord'])
+    write_items.append(0)
+    if root:
+        write_items.append(-1)
+    else:
+        assert parent in point_labels
+        write_items.append(point_labels[parent])
+
+def two_swc(G, outfile='neuron_builder.swc'):
+    with open(outfile) as f:
+        f.write()
+
 def build_neuron(algorithm='snider', dim=3, **kwargs):
     unmarked_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
     G = init_graph(dim=dim)
