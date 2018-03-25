@@ -139,6 +139,7 @@ def get_neuron_points(filename, dim='3D'):
                 assert len(cols) == 7
 
                 if not (cols[1] == "1" or cols[1] == arbor_type): continue
+                
  
                 if cols[6] == "-1":
                     if root != -1: assert False # duplicate root.
