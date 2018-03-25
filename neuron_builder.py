@@ -282,7 +282,6 @@ def write_to_swc(G, outfile='neuron_builder.swc'):
                     queue.append(n)
 
 def build_neuron(algorithm='snider', dim=3, **kwargs):
-    seed(10)
     unmarked_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
     G = init_graph(dim=dim)
     done = False
@@ -295,9 +294,21 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
     retract_graph(G)
     viz_tree(G, name='neuron_builder1', outdir='neuron_builder')
     write_to_swc(G, outfile='neuron_builder/neuron_builder.swc')
+    with open('neuron_builder/synapses.txt', 'w') as f:
+        synapses = G.graph['synapses']
+        for synapse in synapses:
+            f.write('%d\n' % synapse)
     
     graphs = get_neuron_points('neuron_builder/neuron_builder.swc')
     G2 = graphs[1]
+    G2.graph['synapses'] = []
+    for line in open('neuron_builder/synapses.txt'):
+        synapse = int(line)
+        G2.node[synapse]['label'] = 'synapse'
+        G2.graph['synapses'].append(synapse)
+    for u in G2.nodes_iter():
+        if 'label' not in G2.node[u] or  G.node[u]['label'] not in ['synapse', 'root']:
+            G2.node[u]['label'] = 'steiner_midpoint'
     viz_tree(G2, name='neuron_builder2', outdir='neuron_builder')
 
 def build_neuron_video(algorithm='snider', dim=3, **kwargs):
