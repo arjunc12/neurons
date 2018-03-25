@@ -240,7 +240,7 @@ def update_graph(G, algorithm, unmarked_points, dim=3, **kwargs):
     update_func = get_update_func(algorithm)
     return update_func(G, unmarked_points, dim=dim, **kwargs)
 
-def swc_line(G, u, parent, point_labels, segment_type):
+def swc_line(G, u, parent, point_labels):
     write_items = []
     root = G.node[u] == G.graph['root']
     if root:
@@ -249,7 +249,7 @@ def swc_line(G, u, parent, point_labels, segment_type):
         assert parent in point_labels[parent]
         next_label = len(point_labels) + 1
         point_labels[u] = next_label
-        write_items += [next_label, 0]
+        write_items += [next_label, 3]
 
     write_items += list(G.node[u]['coord'])
     write_items.append(0)
@@ -258,12 +258,26 @@ def swc_line(G, u, parent, point_labels, segment_type):
     else:
         assert parent in point_labels
         write_items.append(point_labels[parent])
+    write_items = map(str, write_items)
+    write_items = ', '.join(write_items)
+    return write_items
 
-def two_swc(G, outfile='neuron_builder.swc'):
+def write_to_swc(G, outfile='neuron_builder.swc'):
     with open(outfile) as f:
-        f.write()
+        root = G.graph['root']
+        queue = [root]
+        visited = set()
+        point_labels = {}
+        while len(queue) > 0:
+            curr = queue.pop(0)
+            visited.add(curr)
+            for n in G.neighbors(u):
+                if n not in visited:
+                    line = swc_line(G, n, u, point_labels)
+                    f.write('%s\n' % line)                    
 
 def build_neuron(algorithm='snider', dim=3, **kwargs):
+    seed(10)
     unmarked_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
     G = init_graph(dim=dim)
     done = False
@@ -274,7 +288,7 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
         done = not can_extend
         
     retract_graph(G)
-    print G.number_of_nodes(), G.number_of_edges()
+    write_to_swc(G, outfile='neuron_builder/neuron_builder.swc')
 
 def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     fig = plt.figure()
