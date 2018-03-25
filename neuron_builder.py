@@ -1,5 +1,5 @@
 import os
-from neuron_utils import get_neuron_points, viz_tree
+from neuron_utils import get_neuron_points, viz_tree, get_neuron_points
 from graph_utils import is_tree
 from sys import argv
 
@@ -240,41 +240,46 @@ def update_graph(G, algorithm, unmarked_points, dim=3, **kwargs):
     update_func = get_update_func(algorithm)
     return update_func(G, unmarked_points, dim=dim, **kwargs)
 
-def swc_line(G, u, parent, point_labels):
+def swc_line(G, u, parents, point_labels):
     write_items = []
-    root = G.node[u] == G.graph['root']
-    if root:
-        write_items += [1, 1]
-    else:
-        assert parent in point_labels[parent]
-        next_label = len(point_labels) + 1
-        point_labels[u] = next_label
-        write_items += [next_label, 3]
+    root = u == G.graph['root']
+    
+    next_label = u
+    point_labels[u] = next_label
+    write_items.append(next_label)
+    
+    segment_type = 3
+    write_items.append(segment_type)
 
     write_items += list(G.node[u]['coord'])
     write_items.append(0)
     if root:
         write_items.append(-1)
     else:
+        assert u in parents
+        parent = parents[u]
         assert parent in point_labels
         write_items.append(point_labels[parent])
     write_items = map(str, write_items)
-    write_items = ', '.join(write_items)
+    write_items = ' '.join(write_items)
     return write_items
 
 def write_to_swc(G, outfile='neuron_builder.swc'):
-    with open(outfile) as f:
+    with open(outfile, 'w') as f:
         root = G.graph['root']
         queue = [root]
         visited = set()
         point_labels = {}
+        parents = {}
         while len(queue) > 0:
             curr = queue.pop(0)
+            line = swc_line(G, curr, parents, point_labels)
+            f.write('%s\n' % line)
             visited.add(curr)
-            for n in G.neighbors(u):
+            for n in G.neighbors(curr):
                 if n not in visited:
-                    line = swc_line(G, n, u, point_labels)
-                    f.write('%s\n' % line)                    
+                    parents[n] = curr
+                    queue.append(n)
 
 def build_neuron(algorithm='snider', dim=3, **kwargs):
     seed(10)
@@ -288,7 +293,12 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
         done = not can_extend
         
     retract_graph(G)
+    viz_tree(G, name='neuron_builder1', outdir='neuron_builder')
     write_to_swc(G, outfile='neuron_builder/neuron_builder.swc')
+    
+    graphs = get_neuron_points('neuron_builder/neuron_builder.swc')
+    G2 = graphs[1]
+    viz_tree(G2, name='neuron_builder2', outdir='neuron_builder')
 
 def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     fig = plt.figure()
