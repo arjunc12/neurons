@@ -102,8 +102,8 @@ def pareto_tree_costs(G, point_graph, axon=False, viz_trees=False, figs_dir=None
     mcosts = []
     scosts = []
 
-    print "sorting neighbors"
-    sort_neighbors(point_graph)
+    #print "sorting neighbors"
+    #sort_neighbors(point_graph)
 
     pareto_func = pareto_steiner
     if sandbox:
@@ -346,12 +346,6 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
                                                       fronts_dir, figs_dir,\
                                                       viz_trees)
    
-    axon = neuron_type == 'axon'
-    alphas2, mcosts2, scosts2 = pareto_tree_costs(G, point_graph, axon=axon,\
-                                                  viz_trees=False,\
-                                                  figs_dir=None)
-    mcosts2 = [mcosts[0]] + mcosts2
-    scosts2 = [scosts[0]] + scosts2
 # ---------------------------------------
     
     neural_mcost = mst_cost(G)
@@ -376,9 +370,6 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
     
     pylab.plot(mcosts, scosts, c = 'b', label='_nolegend_')
     pylab.scatter(mcosts, scosts, c='b', label='pareto front')
-    
-    pylab.plot(mcosts2, scosts2, c = 'm', label='_nolegend_')
-    pylab.scatter(mcosts2, scosts2, c='m', label='sandbox pareto front')
     
     pylab.savefig('%s/pareto_front.pdf' % figs_dir, format='pdf')
 
@@ -533,6 +524,146 @@ def imaris_plots():
                                    fronts_dir=fronts_dir,\
                                    figs_dir=figs_dir,\
                                    viz_trees=VIZ_TREES_IMARIS)
+
+def neuron_builder__analysis(G, neuron_name, neuron_type,\
+                    fronts_dir=NEUROMORPHO_FRONTS_DIR,\
+                    output_dir=NEUROMORPHO_OUTPUT_DIR,\
+                    figs_dir=NEUROMORPHO_FIGS_DIR, output=True,\
+                    viz_trees=VIZ_TREES_NEUROMORPHO):
+    
+    assert G.number_of_nodes() > 0
+    assert is_tree(G)
+
+    print neuron_name, neuron_type
+   
+    #print "making graph"
+    synapses = G.graph['synapses']
+    points = synapses + [G.graph['root']]
+    point_graph = G.subgraph(points)
+    print point_graph.number_of_nodes(), 'points'
+    point_graph = complete_graph(point_graph)
+   
+# ---------------------------------------
+    tree_costs_fname = '%s/tree_costs.csv' % fronts_dir
+   
+    models_fname = '%s/models_%s.csv' % (output_dir, neuron_name)
+    
+    output_fname = '%s/pareto_steiner_%s.csv' %  (output_dir, neuron_name)
+
+# ---------------------------------------
+    alphas, mcosts, scosts, first_time = pareto_front(G, point_graph,\
+                                                      neuron_name, neuron_type,\
+                                                      fronts_dir, figs_dir,\
+                                                      viz_trees) 
+# ---------------------------------------
+    
+    neural_mcost = mst_cost(G)
+    neural_scost = satellite_cost(G, relevant_nodes=point_graph.nodes())
+    
+    neural_dist, neural_index = DIST_FUNC(mcosts, scosts, neural_mcost,\
+                                          neural_scost)
+    neural_closem = mcosts[neural_index] 
+    neural_closes = scosts[neural_index]
+    neural_alpha = alphas[neural_index]
+
+    
+# ---------------------------------------
+    centroid_tree = centroid_mst(point_graph)
+
+    centroid_mcost = mst_cost(centroid_tree)
+    centroid_scost = satellite_cost(centroid_tree, relevant_nodes=point_graph.nodes())
+    
+    centroid_dist, centroid_index = DIST_FUNC(mcosts, scosts,\
+                                              centroid_mcost,\
+                                              centroid_scost)
+    centroid_closem = mcosts[centroid_index]
+    centroid_closes = scosts[centroid_index]
+    centroid_alpha = alphas[centroid_index]
+
+
+# ---------------------------------------
+    centroid_success = int(centroid_dist <= neural_dist)
+    centroid_ratio = centroid_dist / neural_dist
+    if first_time:
+        with open(models_fname, 'a') as models_file:
+            models_file.write('%s, %s, %s, %f,,\n' % (neuron_name,\
+                                                      neuron_type,\
+                                                      'neural',\
+                                                      neural_dist))
+            models_file.write('%s, %s, %s, %f, %d, %f\n' % (neuron_name,\
+                                                            neuron_type,\
+                                                            'centroid',\
+                                                            centroid_dist,\
+                                                            centroid_success,\
+                                                            centroid_ratio))
+
+# ---------------------------------------
+    if first_time:
+        with open(tree_costs_fname, 'w') as tree_costs_file:
+            tree_costs_file.write('tree, mcost, scost\n')
+            tree_costs_file.write('%s, %f, %f\n' % ('neural',neural_mcost,\
+                                                    neural_scost))
+            tree_costs_file.write('%s, %f, %f\n' % ('centroid', centroid_mcost,\
+                                                    centroid_scost))
+# ---------------------------------------
+    random_trials = 20
+
+    for i in xrange(random_trials):
+        rand_mst = random_mst(point_graph)
+        rand_mcost, rand_scost = graph_costs(rand_mst)
+        rand_dist, rand_index = DIST_FUNC(mcosts, scosts, rand_mcost,\
+                                          rand_scost)
+        rand_success = int(rand_dist <= neural_dist)
+        rand_ratio = rand_dist / neural_dist
+
+        barabasi_mst = barabasi_tree(point_graph)
+        barabasi_mcost, barabasi_scost = graph_costs(barabasi_mst)
+        barabasi_dist, barabasi_index = DIST_FUNC(mcosts, scosts,\
+                                                  barabasi_mcost,\
+                                                  barabasi_scost)
+        barabasi_success = int(barabasi_dist <= neural_dist)
+        barabasi_ratio = barabasi_dist / neural_dist
+
+        with open(tree_costs_fname, 'a') as tree_costs_file:
+            tree_costs_file.write('%s, %f, %f\n' % ('random', rand_mcost,\
+                                                     rand_scost))
+            tree_costs_file.write('%s, %f, %f\n' % ('barabasi',\
+                                                     barabasi_mcost,\
+                                                     barabasi_scost))
+
+        with open(models_fname, 'a') as models_file:
+            models_file.write('%s, %s, %s, %f, %d, %f\n' % (neuron_name,\
+                                                            neuron_type,\
+                                                            'random',\
+                                                            rand_dist,\
+                                                            rand_success,\
+                                                            rand_ratio))
+            
+            models_file.write('%s, %s, %s, %f, %d, %f\n' % (neuron_name,\
+                                                            neuron_type,\
+                                                            'barabasi',\
+                                                            barabasi_dist,\
+                                                            barabasi_success,\
+                                                            barabasi_ratio))
+
+# ---------------------------------------
+    def remove_spaces(string):
+        return string.replace(' ', '')
+
+    def remove_commas(string):
+        return string.replace(',', '')
+     
+    if output and first_time:
+        write_items = [neuron_name, neuron_type, point_graph.number_of_nodes()]
+        
+        write_items.append(neural_alpha)
+        
+        write_items = map(str, write_items)
+        write_items = map(remove_commas, write_items)
+        #write_items = map(remove_spaces, write_items)
+        write_items = ', '.join(write_items)
+        with open(output_fname, 'a') as output_file:
+            output_file.write('%s\n' % write_items)
 
 def neuron_builder_analysis(rmin=0.5, rmax=1.5, rstep=0.01, num_iters=10):
     for i in xrange(num_iters):
