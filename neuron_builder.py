@@ -21,7 +21,7 @@ import argparse
 
 BUILDER_EXE = 'neuronbuilder2'
 
-OUTDIR = 'neuron_builder'
+OUTDIR = '/iblsn/data/Arjun/neurons/neuron_builder'
 OUTFILE = 'neuron_builder.swc'
 
 def grid_points2d(xmin=-10, xmax=10, ymin=-10, ymax=10, dist=1):
@@ -281,6 +281,20 @@ def write_to_swc(G, outfile='neuron_builder.swc'):
                     parents[n] = curr
                     queue.append(n)
 
+def read_tree(tree_dir):
+    graphs = get_neuron_points('%s/tree.swc' % tree_dir)
+    G = graphs[1]
+    G.graph['synapses'] = []
+    for line in open('%s/synapses.txt' % tree_dir):
+        synapse = int(line)
+        G.node[synapse]['label'] = 'synapse'
+        G.graph['synapses'].append(synapse)
+    for u in G.nodes_iter():
+        if 'label' not in G.node[u] or  G.node[u]['label'] not in ['synapse', 'root']:
+            G.node[u]['label'] = 'steiner_midpoint'
+
+    return G
+
 def build_neuron(algorithm='snider', dim=3, **kwargs):
     unmarked_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
     G = init_graph(dim=dim)
@@ -292,25 +306,26 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
         done = not can_extend
         
     retract_graph(G)
-    viz_tree(G, name='neuron_builder1', outdir='neuron_builder')
-    write_to_swc(G, outfile='neuron_builder/neuron_builder.swc')
-    with open('neuron_builder/synapses.txt', 'w') as f:
+
+    outdir = '%s/%s' % (OUTDIR, algorithm)
+    os.system('mkdir -p %s' % outdir)
+    tree_dir = '%s/tree%d' % (outdir, len(os.listdir(outdir)) + 1)
+    os.system('mkdir -p %s' % tree_dir)
+    write_to_swc(G, outfile='%s/tree.swc' % tree_dir)
+    with open('%s/synapses.txt' % tree_dir, 'w') as f:
         synapses = G.graph['synapses']
         for synapse in synapses:
             f.write('%d\n' % synapse)
-    
-    graphs = get_neuron_points('neuron_builder/neuron_builder.swc')
-    G2 = graphs[1]
-    G2.graph['synapses'] = []
-    for line in open('neuron_builder/synapses.txt'):
-        synapse = int(line)
-        G2.node[synapse]['label'] = 'synapse'
-        G2.graph['synapses'].append(synapse)
-    for u in G2.nodes_iter():
-        if 'label' not in G2.node[u] or  G.node[u]['label'] not in ['synapse', 'root']:
-            G2.node[u]['label'] = 'steiner_midpoint'
-    viz_tree(G2, name='neuron_builder2', outdir='neuron_builder')
 
+    with open('%s/parameters.txt' % tree_dir, 'w') as f:
+        for key, value in kwargs.iteritems():
+            f.write('%s %s\n' % (key, value))
+
+    G = read_tree(tree_dir)
+    print G.nodes()
+    print G.graph['synapses']
+        
+    
 def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     fig = plt.figure()
     ax = p3.Axes3D(fig)
@@ -368,12 +383,12 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--algorithm', default='snider')
-    parser.add_argument('-d', '--dim', default=3)
-    parser.add_argument('-rp', '--radius_puncta', default=1)
-    parser.add_argument('-rr', '--radius_remove', default=1)
-    parser.add_argument('-ra', '--radius_annihilation', default=1)
-    parser.add_argument('-p', '--branching_prob', default=0.1)
-    parser.add_argument('-l', '--trial_length', default=1)
+    parser.add_argument('-d', '--dim', default=3, type=int)
+    parser.add_argument('-rp', '--radius_puncta', default=1, type=float)
+    parser.add_argument('-rr', '--radius_remove', default=1, type=float)
+    parser.add_argument('-ra', '--radius_annihilation', default=1, type=float)
+    parser.add_argument('-p', '--branching_prob', default=0.1, type=float)
+    parser.add_argument('-l', '--trial_length', default=1, type=float)
     parser.add_argument('-v', '--video', action='store_true')
     
     args = parser.parse_args()
