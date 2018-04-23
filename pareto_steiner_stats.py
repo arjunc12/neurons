@@ -236,18 +236,13 @@ def alphas_heat(df, categories, outdir=FIGS_DIR):
         data = df2.pivot(cat1, cat2, 'alpha')
         pylab.figure()
         ax = sns.heatmap(data, vmin=0, vmax=1)
-        #print cat1, cat2
-        for text in  ax.get_xticklabels():
-            pass
-            #print text.get_rotation()
-        #pylab.xticks(rotation=90)#, size=20)
         pylab.xticks(rotation='vertical')
         pylab.yticks(rotation='horizontal')
         pylab.tight_layout()
         pylab.savefig('%s/%s_%s_alphas_heat.pdf' % (outdir,\
                                                     cat1.replace(' ', '_'),\
                                                     cat2.replace(' ', '_')),\
-                      format='pdf')#, bbox_inches='tight')
+                      format='pdf')
         pylab.close()
 
 def cat_to_num(categories):
@@ -346,8 +341,15 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
         if LOG_DIST:
             y = pylab.log10(y)
         pylab.scatter(x, y, label=model)
-    pylab.ylabel('pareto distance')
-    pylab.legend()
+    pylab.xlabel('neuron index', fontsize=25)
+    ylab = ''
+    if LOG_DIST:
+        ylab += 'log-'
+    ylab += 'distance to Pareto front'
+    pylab.ylabel(ylab, fontsize=25)
+    pylab.legend(ncol=2)
+    ax = pylab.gca()
+    pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
     pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf')
 
 def alphas_hist(df, outdir=FIGS_DIR, categories=None):
