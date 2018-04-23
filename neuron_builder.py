@@ -339,12 +339,12 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
     G = read_tree(tree_dir)
     print G.nodes()
     print G.graph['synapses']
-        
-    
+            
 def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     fig = plt.figure()
     ax = p3.Axes3D(fig)
-    init_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
+    #init_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
+    init_points = random_points(num_points=400, xmin=-10, xmax=10, ymin=-10, ymax=10, zmin=0, zmax=0)
     points = init_points[:]
     G = init_graph(dim=dim)
     graphs = [G.copy()]
