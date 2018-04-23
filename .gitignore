@@ -55,3 +55,5 @@ sandbox/*
 *.pbs*
 
 *.deb
+
+neural_computation_poster
