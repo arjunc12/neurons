@@ -309,7 +309,7 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
 
     outdir = '%s/%s' % (OUTDIR, algorithm)
     os.system('mkdir -p %s' % outdir)
-    tree_dir = '%s/tree%d' % (outdir, len(os.listdir(outdir)) + 1)
+    tree_dir = '%s/trees/tree%d' % (outdir, len(os.listdir(outdir)) + 1)
     os.system('mkdir -p %s' % tree_dir)
     write_to_swc(G, outfile='%s/tree.swc' % tree_dir)
     with open('%s/synapses.txt' % tree_dir, 'w') as f:
@@ -322,9 +322,6 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
             f.write('%s %s\n' % (key, value))
 
     G = read_tree(tree_dir)
-    print G.nodes()
-    print G.graph['synapses']
-        
     
 def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     fig = plt.figure()
