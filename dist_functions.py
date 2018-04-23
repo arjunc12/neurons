@@ -25,9 +25,22 @@ def root_dist(G, u):
     assert 'root' in G.graph
     return node_dist(G, u, G.graph['root'])
 
-def sort_neighbors(G):
+def k_nearest_neighbors(G, u, k=None, candidate_nodes=None):
+    if candidate_nodes == None:
+        candidate_nodes = G.nodes()
+        candidate_nodes.remove(u)
+    nearest_neighbors = sorted(candidate_nodes, key = lambda v : node_dist(G, u, v))
+    if k != None:
+        assert type(k) == int
+        nearest_neighbors = nearest_neighbors[:k]
+    return nearest_neighbors
+
+def sort_neighbors(G, k=None):
     for u in G.nodes_iter():
-        G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
+        #G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
+        #G.node[u]['close_neighbors'] = sorted(G.nodes(), key=lambda v : node_dist(G, u, v))
+        #G.node[u]['close_neighbors'].remove(u)
+        G.node[u]['close_neighbors'] = k_nearest_neighbors(G, u, k=k, candidate_nodes=None)
     G.graph['sorted'] = True
 
 def pareto_dist_l2(pareto_mcosts, pareto_scosts, mcost, scost):
