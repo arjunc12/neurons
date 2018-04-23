@@ -19,6 +19,8 @@ from dist_functions import point_dist
 
 import argparse
 
+MAX_STEPS = 1000
+
 BUILDER_EXE = 'neuronbuilder2'
 
 OUTDIR = '/iblsn/data/Arjun/neurons/neuron_builder'
@@ -32,7 +34,8 @@ def grid_points2d(xmin=-10, xmax=10, ymin=-10, ymax=10, dist=1):
     i = 0
     while x <= xmax:
         while y <= ymax:
-            points.append((x, y))
+            if (x != 0) or (y != 0):
+                points.append((x, y))
             y += dist
         x += dist
     return points
@@ -45,7 +48,8 @@ def grid_points3d(xmin=-10, xmax=10, ymin=-10, ymax=10, zmin=-10, zmax=10, dist=
         while y <= ymax:
             z = zmin
             while z <= zmax: 
-                points.append((x, y, z))
+                if (x != 0) or (y != 0) or (z != 0):
+                    points.append((x, y, z))
                 z += dist
             y += dist
         x += dist
@@ -125,18 +129,28 @@ def add_extension_node(G, u, parent, trial_length=None):
     new_coord = extend(coord1, coord2, trial_length=trial_length)
     return add_new_node(G, new_coord, u)
 
-def connect_to_synapses(G, u, unmarked_points, radius=1):
+def remove_close_points(point, unmarked_points, remove_radius=1):
+    close_points = []
+    for unmarked_point in unmarked_points:
+        if point_dist(point, unmarked_point) <= remove_radius:
+            close_points.append(unmarked_point)
+    for close_point in close_points:
+        unmarked_points.remove(close_point)
+
+def connect_to_synapses(G, u, unmarked_points, puncta_radius=1, remove_radius=1):
     coord = G.node[u]['coord']
     added_points = []
     for point in unmarked_points:
-        if point_dist(coord, point) <= radius:
+        if point_dist(coord, point) <= puncta_radius:
             added_points.append(point)
-
-    new_nodes = []    
-    for point in added_points:
-        new_nodes.append(add_new_node(G, point, u, synapse=True))
-        unmarked_points.remove(point)
-    return new_nodes
+    
+    if len(added_points) == 0:
+        return None
+    
+    new_point = choice(added_points)
+    remove_close_points(new_point, unmarked_points, remove_radius=remove_radius)
+    new_node = add_new_node(G, new_point, u, synapse=True) 
+    return new_node
         
 def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None):
     coord = G.node[u]['coord']
@@ -208,13 +222,14 @@ def update_graph_barw(G, unmarked_points, dim=3, **kwargs):
     return True
                 
 def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
-    r_puncta = kwargs['radius_puncta']
     trial_length = kwargs['trial_length']
+    r_puncta = kwargs['radius_puncta']
     r_remove = kwargs['radius_remove']
     u = choice(G.nodes())
     new_extension = add_bifurcations(G, u, dim=dim, bifurcations=1, dist=trial_length)[0]
-    new_synapses = connect_to_synapses(G, new_extension, unmarked_points, radius=r_puncta)
-    if len(new_synapses) == 0:
+    new_synapse = connect_to_synapses(G, new_extension, unmarked_points,\
+                                      puncta_radius=r_puncta, remove_radius=r_remove)
+    if new_synapse == None:
         G.remove_node(new_extension)
         
     return can_extend(G, unmarked_points, trial_length, r_puncta)
@@ -336,13 +351,14 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     unmarked_points = [init_points]
 
     done = False
-    while not done:
+    for i in xrange(MAX_STEPS):
         if len(points) == 0:
             break
         can_extend = update_graph(G, algorithm, points, dim=dim, **kwargs)
         graphs.append(G.copy())
         unmarked_points.append(points[:])
-        done = not can_extend
+        if not can_extend:
+            break
         
     retract_graph(G)
     graphs.append(G.copy())
@@ -386,9 +402,9 @@ def main():
     parser.add_argument('-d', '--dim', default=3, type=int)
     parser.add_argument('-rp', '--radius_puncta', default=1, type=float)
     parser.add_argument('-rr', '--radius_remove', default=1, type=float)
+    parser.add_argument('-l', '--trial_length', default=1, type=float)
     parser.add_argument('-ra', '--radius_annihilation', default=1, type=float)
     parser.add_argument('-p', '--branching_prob', default=0.1, type=float)
-    parser.add_argument('-l', '--trial_length', default=1, type=float)
     parser.add_argument('-v', '--video', action='store_true')
     
     args = parser.parse_args()
