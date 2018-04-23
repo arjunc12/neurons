@@ -155,203 +155,256 @@ def pareto_genetic(G, axon=False, pop_size=POP_SIZE, generations=GENERATIONS,\
         best_trees.append((mcost, scost, T))
     return best_trees    
 
-def pareto_prim(G, alpha, axon=False):
+def pareto_steiner(G, alpha, axon=False):
+    return pareto_steiner_fast(G, alpha, axon=axon)
+
+def pareto_steiner_space(G, alpha, axon=False):
     root = G.graph['root']
-    if 'sorted' not in G.graph:
-        sort_neighbors(G)
 
     H = nx.Graph()
    
     H.add_node(root)
     H.graph['root'] = root
     H.node[root]['droot'] = 0
-    H.node[root]['coord'] = G.node[root]['coord']
+    H.node[root]['parent'] = None
+    root_coord = G.node[root]['coord']
+    H.node[root]['coord'] = root_coord
+    H.node[root]['label'] = 'root'
+    added_nodes = 1
+
+    out_nodes = set(G.nodes())
+    out_nodes.remove(root)
    
     graph_mcost = 0
     graph_scost = 0
-
-    closest_neighbors = {}
-    for u in G.nodes_iter():
-        closest_neighbors[u] = G.node[u]['close_neighbors'][:]
-
-    unpaired_neighbors = []
-    candidate_nodes = defaultdict(list)
-
-    while H.number_of_nodes() < G.number_of_nodes():
-        best_edge = None
-        best_mcost = None
-        best_scost = None
-        best_cost = float("inf")
-
-        candidate_edges = []
-        for u in H.nodes():
-            if axon and (u == H.graph['root']) and (H.degree(u) > 0):
-                continue
-
-            assert 'droot' in H.node[u]
-             
-            invalid_neighbors = []
-            closest_neighbor = None
-            for i in xrange(len(closest_neighbors[u])):
-                v = closest_neighbors[u][i]
-                if H.has_node(v):
-                    invalid_neighbors.append(v)
-                else:
-                    closest_neighbor = v
-                    break
-
-            for n in invalid_neighbors:
-                closest_neighbors[u].remove(n)
-
-            if closest_neighbor != None:
-                candidate_edges.append((u, closest_neighbor))
-                candidate_nodes[closest_neighbor].append(u)
-
-        for u, v in candidate_edges:
-            length = G[u][v]['length']
-            
-            mcost = length
-
-            scost = 0
-            
-            assert H.has_node(u)
-            scost += length + H.node[u]['droot']
-            
-            cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
-            
-            if cost < best_cost:
-                best_edge = (u, v)
-                best_cost = cost
-                best_mcost = mcost
-                best_scost = scost
-
-        if best_edge == None:
-            break
-        u, v = best_edge
-
-        H.add_edge(u, v)
-        H[u][v]['length'] = G[u][v]['length']
-
-        assert 'droot' in H.node[u]
-        H.node[v]['droot'] = H.node[u]['droot'] + G[u][v]['length']
-        H.node[v]['coord'] = G.node[v]['coord']
-
-        check_dists(H)
- 
-        closest_neighbors[u].remove(v)
-        closest_neighbors[v].remove(u)
-         
-    pareto_mst = G.copy()
-    pareto_mst.remove_edges_from(G.edges())
-    for u, v in H.edges():
-        pareto_mst.add_edge(u, v)
-        pareto_mst[u][v]['length'] = G[u][v]['length']
-
-    return pareto_mst
-
-def pareto_prim_sandbox(G, alpha, axon=False):
-    root = G.graph['root']
-    H = nx.Graph()
-   
-    H.add_node(root)
-    H.graph['root'] = root
-    H.node[root]['droot'] = 0
-   
-    graph_mcost = 0
-    graph_scost = 0
-
-    closest_neighbors = {}
-    for u in G.nodes_iter():
-        closest_neighbors[u] = G.node[u]['close_neighbors'][:]
 
     unpaired_nodes = [root]
-    candidate_nodes = defaultdict(list)
 
-    while H.number_of_nodes() < G.number_of_nodes():
+    node_index = max(G.nodes()) + 1
+
+    dist_error = 0
+
+    steps = 0
+
+    best_edges = []
+    while added_nodes < G.number_of_nodes():
+        for u in unpaired_nodes:
+            if axon and (u == H.graph['root']) and (H.degree(u) > 0):
+                continue
+        
+            closest_neighbor = None
+            closest_dist = float("inf")
+            for v in out_nodes:
+                coord1 = H.node[u]['coord']
+                coord2 = G.node[v]['coord']
+                dist = point_dist(coord1, coord2)
+                if dist < closest_dist:
+                    closest_dist = dist
+                    closest_neighbor = v
+ 
+            p1 = H.node[u]['coord']
+            p2 = G.node[closest_neighbor]['coord']
+                
+            length = point_dist(p1, p2)
+            mcost = length
+            scost = length + H.node[u]['droot']
+            cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
+            insort(best_edges, (cost, u, closest_neighbor))
+
+        cost, u, v = best_edges.pop(0)
+
+        best_edges2 = []
+        unpaired_nodes = [u, v]
+        while len(best_edges) > 0:
+            cost, x, y = best_edges.pop(0)
+            if y == v:
+                unpaired_nodes.append(x)
+            else:
+                best_edges2.append((cost, x, y))
+        best_edges = best_edges2
+
+        H.add_node(v)
+        H.node[v]['coord'] = G.node[v]['coord']
+        H.node[v]['label'] = 'synapse'
+        out_nodes.remove(v)
+
+        p1 = H.node[u]['coord']
+        p2 = H.node[v]['coord']
+        midpoints = steiner_points(p1, p2, npoints=STEINER_MIDPOINTS)
+        midpoint_nodes = []
+        for midpoint in midpoints:
+            midpoint_node = node_index
+            node_index += 1
+            H.add_node(midpoint_node)
+            H.node[midpoint_node]['coord'] = midpoint
+
+            midpoint_nodes.append(midpoint_node)
+
+            unpaired_nodes.append(midpoint_node)
+
+        line_nodes = [v] + list(reversed(midpoint_nodes)) + [u]
+        for i in xrange(-1, -len(line_nodes), -1):
+            n1 = line_nodes[i]
+            n2 = line_nodes[i - 1]
+            H.add_edge(n1, n2)
+            H[n1][n2]['length'] = node_dist(H, n1, n2)
+            H.node[n2]['parent'] = n1
+            H.node[n2]['droot'] = node_dist(H, n2, u) + H.node[u]['droot']
+            if not G.has_node(n2):
+                H.node[n2]['label'] = 'steiner_midpoint'
+
+        added_nodes += 1
+
+    return H
+
+def pareto_steiner_space2(G, alpha, axon=False):
+    root = G.graph['root']
+
+    H = nx.Graph()
+   
+    H.add_node(root)
+    H.graph['root'] = root
+    H.node[root]['droot'] = 0
+    H.node[root]['parent'] = None
+    root_coord = G.node[root]['coord']
+    H.node[root]['coord'] = root_coord
+    H.node[root]['label'] = 'root'
+    added_nodes = 1
+
+    out_nodes = set(G.nodes())
+    out_nodes.remove(root)
+   
+    graph_mcost = 0
+    graph_scost = 0
+
+    closest_neighbors = {}
+    is_sorted = 'sorted' in G.graph
+    max_neighbors = 10
+    for u in G.nodes_iter():
+        if is_sorted:
+            closest_neighbors[u] = G.node[u]['close_neighbors'][:max_neighbors]
+        else:
+            closest_neighbors[u] = k_nearest_neighbors(G, u, k=max_neighbors, candidate_nodes=None)
+    best_neighbor = {}
+
+    unpaired_nodes = set([root])
+
+    node_index = max(G.nodes()) + 1
+
+    dist_error = 0
+
+    steps = 0
+
+    best_edges = []
+    while added_nodes < G.number_of_nodes():
+        assert len(out_nodes) > 0
         best_edge = None
         best_mcost = None
         best_scost = None
         best_cost = float("inf")
+
+        best_choice = None
+        best_midpoint = None
 
         candidate_edges = []
         for u in unpaired_nodes:
             if axon and (u == H.graph['root']) and (H.degree(u) > 0):
                 continue
 
+            assert H.has_node(u)
             assert 'droot' in H.node[u]
-             
-            invalid_neighbors = []
+        
             closest_neighbor = None
-            for i in xrange(len(closest_neighbors[u])):
-                v = closest_neighbors[u][i]
-                if H.has_node(v):
-                    invalid_neighbors.append(v)
-                else:
-                    closest_neighbor = v
-                    break
+            while closest_neighbor == None:
+                invalid_neighbors = []
+            
+                for i in xrange(len(closest_neighbors[u])):
+                    v = closest_neighbors[u][i]
+                    if H.has_node(v):
+                        invalid_neighbors.append(v)
+                    else:
+                        closest_neighbor = v
+                        break
 
-            for n in invalid_neighbors:
-                closest_neighbors[u].remove(n)
+                for invalid_neighbor in invalid_neighbors:
+                    closest_neighbors[u].remove(invalid_neighbor)
 
-            if closest_neighbor != None:
-                #candidate_edges.append((u, closest_neighbor))
-                candidate_nodes[closest_neighbor].append(u)
+                if closest_neighbor == None:
+                    closest_neighbors[u] = k_nearest_neighbors(G, u, k=10, candidate_nodes=out_nodes)
+            
+            
+            assert closest_neighbor != None
+            assert not H.has_node(closest_neighbor)
+            
+            p1 = H.node[u]['coord']
+            p2 = G.node[closest_neighbor]['coord']
+                
+            length = point_dist(p1, p2)
+            mcost = length
+            scost = length + H.node[u]['droot']
+            cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
+            insort(best_edges, (cost, u, closest_neighbor))
 
-                length = G[u][closest_neighbor]['length']
-                mcost = length
-                scost = 0
-                assert H.has_node(u)
-                scost = length + H.node[u]['droot']
-                cost = pareto_cost(mcost, scost, alpha)
-                insort(candidate_edges, (cost, (u, closest_neighbor)))
+        cost, u, v = best_edges.pop(0)
 
-        best_cost, best_edge = candidate_edges.pop(0)
+        best_edges2 = []
+        unpaired_nodes = set([u, v])
+        for cost, x, y in best_edges:
+            if y == v:
+                unpaired_nodes.add(x)
+            else:
+                best_edges2.append((cost, x, y))
+        best_edges = best_edges2
 
-        if best_edge == None:
-            break
-        u, v = best_edge
-        H.add_edge(u, v)
+        assert H.has_node(u)
+        assert not H.has_node(v)
+        H.add_node(v)
+        H.node[v]['coord'] = G.node[v]['coord']
+        H.node[v]['label'] = 'synapse'
+        out_nodes.remove(v)
 
-        unpaired_nodes = [v] + candidate_nodes[v]
-        del candidate_nodes[v]
+        p1 = H.node[u]['coord']
+        p2 = H.node[v]['coord']
+        midpoints = steiner_points(p1, p2, npoints=STEINER_MIDPOINTS)
+        midpoint_nodes = []
+        for midpoint in midpoints:
+            midpoint_node = node_index
+            node_index += 1
+            H.add_node(midpoint_node)
+            H.node[midpoint_node]['coord'] = midpoint
 
-        assert 'droot' in H.node[u]
-        H.node[v]['droot'] = H.node[u]['droot'] + G[u][v]['length']
-        
-        closest_neighbors[u].remove(v)
-        closest_neighbors[v].remove(u)
-        
- 
-    pareto_mst = G.copy()
-    pareto_mst.remove_edges_from(G.edges())
-    for u, v in H.edges():
-        pareto_mst.add_edge(u, v)
-        pareto_mst[u][v]['length'] = G[u][v]['length']
+            neighbors = []
+            for out_node in out_nodes:
+                out_coord = G.node[out_node]['coord']
+                dist = point_dist(midpoint, out_coord)
+                neighbors.append((dist, out_node))
 
-    return pareto_mst
+            neighbors = sorted(neighbors)
+            closest_neighbors[midpoint_node] = []
+            for dist, neighbor in neighbors:
+                closest_neighbors[midpoint_node].append(neighbor)
 
-def add_midpoint(G, u, parent, midpoint, midpoint_node):
-    assert G.has_edge(u, parent)
-    G.remove_edge(u, parent)
-    G.add_node(midpoint_node)
-    G.node[midpoint_node]['coord'] = midpoint
-    G.node[midpoint_node]['label'] = 'steiner_point'
+            midpoint_nodes.append(midpoint_node)
 
-    G.add_edge(u, midpoint_node)
-    G[u][midpoint_node]['length'] = node_dist(G, u, midpoint_node)
-    G.node[u]['parent'] = midpoint_node
+            unpaired_nodes.add(midpoint_node)
 
-    G.add_edge(midpoint_node, parent)
-    G[midpoint_node][parent]['length'] = node_dist(G, midpoint_node, parent)
-    G.node[midpoint_node]['parent'] = parent
+        line_nodes = [v] + list(reversed(midpoint_nodes)) + [u]
+        for i in xrange(-1, -len(line_nodes), -1):
+            n1 = line_nodes[i]
+            n2 = line_nodes[i - 1]
+            H.add_edge(n1, n2)
+            H[n1][n2]['length'] = node_dist(H, n1, n2)
+            assert 'droot' in H.node[n1]
+            H.node[n2]['parent'] = n1
+            H.node[n2]['droot'] = node_dist(H, n2, u) + H.node[u]['droot']
+            if not G.has_node(n2):
+                H.node[n2]['label'] = 'steiner_midpoint'
 
-    G.node[midpoint_node]['droot'] = G[midpoint_node][parent]['length'] + G.node[parent]['droot']
+        added_nodes += 1
+    return H
 
-def pareto_steiner(G, alpha, axon=False):
+def pareto_steiner_fast(G, alpha, axon=False):
     root = G.graph['root']
-    if 'sorted' not in G.graph:
-        pass
-        #sort_neighbors(G)
 
     H = nx.Graph()
    
@@ -372,14 +425,14 @@ def pareto_steiner(G, alpha, axon=False):
     graph_mcost = 0
     graph_scost = 0
 
-    '''
     closest_neighbors = {}
+    is_sorted = 'sorted' in G.graph
     for u in G.nodes_iter():
-        closest_neighbors[u] = G.node[u]['close_neighbors'][:]
-    best_neighbor = {}
-    '''
+        if is_sorted:
+            closest_neighbors[u] = G.node[u]['close_neighbors'][:]
+        else:
+            closest_neighbors[u] = k_nearest_neighbors(G, u, k=None, candidate_nodes=None)
 
-    #candidate_nodes = defaultdict(list)
     unpaired_nodes = set([root])
 
     node_index = max(G.nodes()) + 1
@@ -387,11 +440,10 @@ def pareto_steiner(G, alpha, axon=False):
     dist_error = 0
 
     steps = 0
-    #midpoints = {}
-    #choices = {}
 
     best_edges = []
     while added_nodes < G.number_of_nodes():
+        assert len(out_nodes) > 0
         best_edge = None
         best_mcost = None
         best_scost = None
@@ -408,7 +460,6 @@ def pareto_steiner(G, alpha, axon=False):
             assert H.has_node(u)
             assert 'droot' in H.node[u]
         
-            '''
             invalid_neighbors = []
             closest_neighbor = None
             for i in xrange(len(closest_neighbors[u])):
@@ -421,22 +472,9 @@ def pareto_steiner(G, alpha, axon=False):
 
             for invalid_neighbor in invalid_neighbors:
                 closest_neighbors[u].remove(invalid_neighbor)
-            '''
-            closest_neighbor = None
-            closest_dist = float("inf")
-            for v in G.nodes():
-                if not H.has_node(v):
-                    coord1 = H.node[u]['coord']
-                    coord2 = G.node[v]['coord']
-                    dist = point_dist(coord1, coord2)
-                    if dist < closest_dist:
-                        closest_dist = dist
-                        closest_neighbor = v
+           
             assert closest_neighbor != None
             assert not H.has_node(closest_neighbor)
-
-            #candidate_edges.append((u, closest_neighbor))
-            #candidate_nodes[closest_neighbor].append(u)
             
             p1 = H.node[u]['coord']
             p2 = G.node[closest_neighbor]['coord']
@@ -476,7 +514,6 @@ def pareto_steiner(G, alpha, axon=False):
             H.add_node(midpoint_node)
             H.node[midpoint_node]['coord'] = midpoint
 
-            '''
             neighbors = []
             for out_node in out_nodes:
                 out_coord = G.node[out_node]['coord']
@@ -487,7 +524,6 @@ def pareto_steiner(G, alpha, axon=False):
             closest_neighbors[midpoint_node] = []
             for dist, neighbor in neighbors:
                 closest_neighbors[midpoint_node].append(neighbor)
-            '''
 
             midpoint_nodes.append(midpoint_node)
 
@@ -507,7 +543,7 @@ def pareto_steiner(G, alpha, axon=False):
 
         added_nodes += 1
     return H
-   
+
 def pareto_steiner_old(G, alpha, axon=False):
     root = G.graph['root']
     if 'sorted' not in G.graph:
@@ -718,20 +754,15 @@ def main():
     alpha = args.alpha
 
     G = random_point_graph(points)
-    start1 = time()
-    tree1 = pareto_steiner(G, alpha)
-    end1 = time()
 
-    start2 = time()
-    tree2 = pareto_steiner_old(G, alpha)
-    end2 = time()
-
-    print graph_costs(tree1, relevant_nodes=G.nodes())
-    print graph_costs(tree2, relevant_nodes=G.nodes())
-
-    print end1 - start1
-    print end2 - start2
-    
+    #algorithms = [pareto_steiner_space, pareto_steiner_space2, pareto_steiner_fast, pareto_steiner_old]
+    algorithms = [pareto_steiner_space2, pareto_steiner_fast]
+    for pareto_func in algorithms:
+        start = time()
+        tree = pareto_func(G, alpha)
+        end = time()
+        #print graph_costs(tree, relevant_nodes=G.nodes())
+        print end - start 
 
 if __name__ == '__main__':
-    main()
+   main()
