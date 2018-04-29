@@ -35,7 +35,7 @@ def random_point_graph(num_points=10, xmin=-10, xmax=10,\
 
     return G
 
-def random_mst(G):
+def random_mst(G, euclidean=False):
     H = G.copy()
     H.remove_edges_from(G.edges())
     root = H.graph['root']
@@ -50,7 +50,13 @@ def random_mst(G):
     for u in vertices:
         curr = u
         while not in_tree[curr]:
-            successor[curr] = choice(G.neighbors(curr))
+            candidates = None
+            if euclidean:
+                candidates = G.nodes()
+                candidates.remove(u)
+            else:
+                candidates = G.neighbors(curr)
+            successor[curr] = choice(candidates)
             curr = successor[curr]
 
         curr = u
