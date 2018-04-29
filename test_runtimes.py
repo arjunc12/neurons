@@ -61,8 +61,12 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
 
             delta = 0.01
             alphas = pylab.arange(delta, 1, delta)
+            '''
             algorithms = [pareto_steiner, pareto_steiner_old, pareto_prim, pareto_khuller]
             names = ['steiner', 'old steiner', 'prim', 'khuller']
+            '''
+            algorithms = [pareto_steiner_space, pareto_steiner_space2, pareto_steiner_fast, pareto_steiner_old]
+            names = ['space efficient', 'medium space efficient', 'fast', 'unoptimized']
             for alpha in alphas:
                 print "alpha", alpha
                 for algorithm, name in zip(algorithms, names):
@@ -71,6 +75,7 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
                     scosts[name].append(scost)
                     times[name] += runtime
 
+            '''
             if num_points <= 50:
                 names.append('genetic')
                 genetic_start = time()
@@ -83,6 +88,7 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
                 for mcost, scost, T in genetic_trees: 
                     mcosts['genetic'].append(mcost)
                     scosts['genetic'].append(scost)
+            '''
             
             pylab.figure()
             for name in names:
