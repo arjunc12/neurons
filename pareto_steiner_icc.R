@@ -22,7 +22,7 @@ getICCs <- function(df)
 }
 
 categories_df = read.csv(CATEGORIES_FILE, strip.white=TRUE)
-output_df = read.csv(OUTPUT_FILE, strip.white=TRUE)
+output_df = read.csv(SYNTHETIC_OUTPUT_FILE, strip.white=TRUE)
 df = merge(x=categories_df, y=output_df, by="neuron.name")
 df = df[df$points >= MIN_POINTS,]
 
