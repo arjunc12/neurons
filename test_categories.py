@@ -26,6 +26,7 @@ def main():
     parser.add_argument('-of', '--output_file', default=OUTPUT_FILE)
     parser.add_argument('-mf', '--models_file', default=MODELS_FILE)
     parser.add_argument('-cf', '--categories_file', default=CATEGORIES_FILE)
+    parser.add_argument('--synthetic', action='store_true')
 
     args = parser.parse_args()
     species = args.species
@@ -35,7 +36,12 @@ def main():
     output_file = args.output_file
     models_file = args.models_file
     categories_file = args.categories_file
+    synthetic = args.synthetic
 
+    if synthetic:
+        output_file = output_file.replace('.csv', '_synthetic.csv')
+        models_file = models_file.replace('.csv', '_synthetic.csv')
+    
     models_df, categories_df =  get_dfs(output_file=OUTPUT_FILE,\
                                         categories_file=CATEGORIES_FILE,\
                                         models_file=MODELS_FILE)
