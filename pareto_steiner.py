@@ -64,7 +64,8 @@ NEURON_TYPES = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite',\
 COLORS = {'neural' : 'r', 'centroid' : 'g', 'random' : 'm', 'barabasi' : 'c'}
 MARKERS = {'neural' : 'x', 'centroid' : 'o', 'random' : '^', 'barabasi' : 's'}
 
-PLOT_TREES = ['neural', 'centroid', 'barabasi', 'random']
+PLOT_TREES = ['neural']
+LOG_PLOT_TREES = ['neural', 'centroid', 'barabasi', 'random']
 
 def ceil_power_of_10(n):
     exp = math.log(n, 10)
@@ -93,9 +94,14 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False):
 
     pylab.plot(mcosts, scosts, c='b', label='_nolegend_')
     pylab.scatter(mcosts, scosts, c='b', label='Pareto optimal')
-  
+ 
+    plot_trees = None
+    if log_plot:
+        plot_trees = LOG_PLOT_TREES
+    else:
+        plot_trees = PLOT_TREES
     for tree, costs in tree_costs.groupby('tree'):
-        if tree in PLOT_TREES:
+        if tree in plot_trees:
             mcosts = costs['mcost']
             scosts = costs['scost']
             if log_plot:
@@ -545,6 +551,7 @@ def pareto_analysis_neuromorpho(min_nodes=MIN_NODES, max_nodes=MAX_NODES,\
                                                 viz_trees=viz_trees)
                                 if plot:
                                     pareto_plot(fronts_dir, figs_dir)
+                                    pareto_plot(fronts_dir, figs_dir, log_plot=True)
 
 
                             except RuntimeError as r:
@@ -586,7 +593,7 @@ def pareto_analysis_neuron_builder(algorithm, tree_name):
     tree_dir = '/iblsn/data/Arjun/neurons/neuron_builder/%s/trees/%s' % (algorithm, tree_name)
     G = read_tree(tree_dir)
     fronts_dir = tree_dir
-    output_dir = '/iblsn/data/Arjun/neurons/neuron_builder/%s/output' % algorithm
+    output_dir = '/iblsn/data/Arjun/neurons/neuron_builder/%s/temp' % algorithm
     figs_dir = tree_dir
     output = True
     viz_trees = False
@@ -606,6 +613,8 @@ def pareto_analysis_neuron_builder(algorithm, tree_name):
     models_fname = '%s/models_%s.csv' % (output_dir, tree_name)
     
     output_fname = '%s/pareto_steiner_%s.csv' %  (output_dir, tree_name)
+
+    params_fname = '%s/parameters_%s.csv' % (output_dir, tree_name)
 
 # ---------------------------------------
     alphas, mcosts, scosts, first_time = pareto_front(G, point_graph,\
@@ -718,6 +727,21 @@ def pareto_analysis_neuron_builder(algorithm, tree_name):
         write_items = ', '.join(write_items)
         with open(output_fname, 'a') as output_file:
             output_file.write('%s\n' % write_items)
+
+        write_items = [tree_name]
+        
+        with open('%s/parameters.txt' % tree_dir) as params_file:
+            for line in params_file:
+                line = line.split()
+                item = line[1]
+                item = item.strip('\n')
+                write_items.append(item)
+
+        write_items = map(str, write_items)
+        write_items = ', '.join(write_items)
+
+        with open(params_fname, 'a') as params_file:
+            params_file.write('%s\n' % write_items)
 
 def neuron_builder_plots():
     neuron_builder_dir = '/iblsn/data/Arjun/neurons/neuron_builder'
