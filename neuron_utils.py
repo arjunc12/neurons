@@ -303,12 +303,12 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
     return kwargs
 
 def main():
-    filename = '/iblsn/data/Arjun/neurons/datasets/principal_cell/elephant/neocortex/Jacobs/156-2-11k.CNG.swc'
+    filename = '/iblsn/data/Arjun/neurons/datasets/amacrine/human/retina/kantor/humret_CR_AII_63x_1.CNG.swc'
     graphs = get_neuron_points(filename)
-    G = graphs[-1]
+    G = graphs[2]
+    viz_tree(G, name='no_synapses')
     G = add_synapses(G)
-    print G.nodes()
-    print G.edges()
+    viz_tree(G, name='synapses')
 
 if __name__ == '__main__':
     main()
