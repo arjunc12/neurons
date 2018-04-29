@@ -12,17 +12,17 @@
 
 .nfs*
 
-neuromorpho/*
+neuromorpho
 
 *.swp
 
 .vimrc
 
-datasets/*
+datasets
 
 *.sh
 
-neuron_nmo/*
+neuron_nmo
 
 .DS_Store
 
@@ -32,7 +32,7 @@ tracings/*
 
 .Rhistory
 
-neuron_builder/*
+neuron_builder
 
 *.swc
 
@@ -40,9 +40,11 @@ figs/*
 
 imaris/*
 
-steiner_figs/*
+steiner_figs
 
-steiner_imaris/*
+steiner_imaris
+
+steiner_figs_synthetic
 
 paper_plots.txt
 
@@ -50,7 +52,7 @@ boutons/*
 
 NLMorphologyConverter
 
-sandbox/*
+sandbox
 
 *.pbs*
 
@@ -61,3 +63,5 @@ space_efficiency/*
 neural_computation_poster
 
 synapses
+
+BDA2018
