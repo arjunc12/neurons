@@ -311,7 +311,8 @@ def read_tree(tree_dir):
     return G
 
 def build_neuron(algorithm='snider', dim=3, **kwargs):
-    unmarked_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
+    #unmarked_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
+    unmarked_points = random_points(num_points=400, xmin=-10, xmax=10, ymin=-10, ymax=10, zmin=0, zmax=0)
     G = init_graph(dim=dim)
     done = False
     while not done:
@@ -322,9 +323,12 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
         
     retract_graph(G)
 
-    outdir = '%s/%s' % (OUTDIR, algorithm)
-    os.system('mkdir -p %s' % outdir)
-    tree_dir = '%s/trees/tree%d' % (outdir, len(os.listdir(outdir)) + 1)
+    if G.number_of_nodes() < 10:
+        return None
+
+    trees_dir = '%s/%s/trees' % (OUTDIR, algorithm)
+    tree_dir = '%s/tree%d' % (trees_dir, len(os.listdir(trees_dir)) + 1)
+    print tree_dir
     os.system('mkdir -p %s' % tree_dir)
     write_to_swc(G, outfile='%s/tree.swc' % tree_dir)
     with open('%s/synapses.txt' % tree_dir, 'w') as f:
