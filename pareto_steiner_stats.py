@@ -29,7 +29,7 @@ CATEGORIES = ['cell type', 'species', 'region', 'neuron type', 'lab']
 
 METADATA_DIR = '/iblsn/data/Arjun/neurons/metadata'
 
-CATEGORY_MIN_COUNTS = {'species': 100, 'cell type' : 100, 'region' : 100, 'neuron type' : 100, 'lab' : 100}
+CATEGORY_MIN_COUNTS = {'species': 100, 'cell type' : 500, 'region' : 500, 'neuron type' : 100, 'lab' : 500}
 MIN_COUNT = 50
 
 MIN_POINTS = 100
@@ -52,7 +52,7 @@ def add_count_col(df, categories):
 def remove_small_counts(df, categories, min_count=MIN_COUNT):
     df2 = add_count_col(df, categories)
     df2 = pd.merge(df, df2)
-    df2 = df2[df2['count'] >= MIN_COUNT]
+    df2 = df2[df2['count'] >= min_count]
     return df2
 
 def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
@@ -282,10 +282,12 @@ def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=FIGS_D
         pylab.figure()
         sns.set()
         dist_plot = plot_func(x='alpha', y=category, data=df2, orient='h', order=order)
-        #dist_plot.tick_params(axis='y', labelsize=20)
-        pylab.tight_layout()
+        dist_plot.tick_params(axis='y', labelsize=20)
+        #pylab.tight_layout()
+        pylab.xlabel('alpha', fontsize=20)
+        pylab.ylabel(category, fontsize=20)
         pylab.savefig('%s/%s_alphas_%s.pdf' % (outdir, category.replace(' ', '_'), plot_descriptor),
-                       format='pdf')#, bbox_inches='tight')
+                       format='pdf', bbox_inches='tight')
         pylab.close()
 
 def cluster_alphas(df, identifiers, outdir=FIGS_DIR):
@@ -310,13 +312,14 @@ def category_dists(df, categories, outdir=FIGS_DIR):
         cat_means = []
         for cat_val, group in df2.groupby(category):
             cat_vals.append(cat_val)
-            cat_means.append(pylab.mean(group['dist']))
+            cat_mean = pylab.mean(group['dist'])
+            cat_means.append(cat_mean)
         order = pylab.argsort(cat_means)
         cat_vals = pylab.array(cat_vals)
         sorted_vals = cat_vals[order]
         pylab.figure()
         sns.set()
-        dist_plot = sns.barplot(x=category, y='dist', data=df, order=sorted_vals)
+        dist_plot = sns.barplot(x=category, y='dist', data=df2, order=sorted_vals)
         pylab.xticks(rotation='vertical')
         pylab.tight_layout()
         pylab.savefig('%s/pareto_dists_%s.pdf' % (outdir,\
@@ -366,6 +369,7 @@ def alphas_hist(df, outdir=FIGS_DIR, categories=None):
     
     if categories == None:
         alphas = list(df2['alpha'])
+        print "all neurons mean alpha", pylab.mean(alphas)
         weights = pylab.ones_like(alphas) / len(alphas)
     else:
         alphas = []
@@ -373,6 +377,7 @@ def alphas_hist(df, outdir=FIGS_DIR, categories=None):
         labels = []
         for name, group in df2.groupby(categories):
             cat_alphas = group['alpha']
+            print name + " neurons mean alpha", pylab.mean(cat_alphas)
             cat_weights = pylab.ones_like(cat_alphas) / len(cat_alphas)
             alphas.append(cat_alphas)
             weights.append(cat_weights)
@@ -609,14 +614,17 @@ def main():
                                        models_file=models_file)
 
     if TEST_NEW_FUNCTION:
+        
         return None
     
     metadata(categories_df)
+    print "-----------------------------------------------------"
+    print "mean neural dist", pylab.mean(models_df['dist'][models_df['model'] == 'neural'])
     null_models_analysis(models_df)
     neuron_type_alphas(categories_df)
     os.system('mkdir -p %s' % figs_dir)
     scatter_dists(models_df, outdir=figs_dir)
-    boxplot_alphas(categories_df, CATEGORIES, outdir=figs_dir)
+    boxplot_alphas(categories_df, CATEGORIES, outdir=figs_dir) 
     alphas_hist(categories_df, outdir=figs_dir)
     neuron_types_hist(categories_df, outdir=figs_dir)
     alphas_heat(categories_df, CATEGORIES, outdir=figs_dir)
