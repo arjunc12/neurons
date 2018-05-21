@@ -103,6 +103,7 @@ def make_neuron_pbs(cell_types, animal_species, regions, labs, names,\
         with open(fpath, 'w') as f:
             f.writelines(flines)
         command = 'qsub %s' % fpath
+        print command
         os.system(command)
 
 def main():
