@@ -30,6 +30,7 @@ def alphas_distribution(df):
     pylab.close()
 
 def neuron_builder_stats(steiner_df, models_df):
+    print len(steiner_df.index), "neurons"
     print pylab.mean(steiner_df['alpha'])
     df = models_df[models_df['model'] == 'neural']
     print pylab.mean(df['dist'])
