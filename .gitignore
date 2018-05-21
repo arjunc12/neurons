@@ -26,7 +26,7 @@ neuron_nmo
 
 .DS_Store
 
-tracings/*
+tracings
 
 .RData
 
@@ -36,9 +36,9 @@ neuron_builder
 
 *.swc
 
-figs/*
+figs
 
-imaris/*
+imaris
 
 steiner_figs
 
@@ -48,7 +48,7 @@ steiner_figs_synthetic
 
 paper_plots.txt
 
-boutons/*
+boutons
 
 NLMorphologyConverter
 
@@ -58,10 +58,12 @@ sandbox
 
 *.deb
 
-space_efficiency/*
+space_efficiency
 
 neural_computation_poster
 
 synapses
 
 BDA2018
+
+qsub_debug
