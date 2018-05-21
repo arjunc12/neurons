@@ -155,6 +155,114 @@ def pareto_genetic(G, axon=False, pop_size=POP_SIZE, generations=GENERATIONS,\
         best_trees.append((mcost, scost, T))
     return best_trees    
 
+def pareto_prim(G, alpha, axon=False):
+    root = G.graph['root']
+
+    H = nx.Graph()
+   
+    H.add_node(root)
+    H.graph['root'] = root
+    H.node[root]['droot'] = 0
+    H.node[root]['parent'] = None
+    root_coord = G.node[root]['coord']
+    H.node[root]['coord'] = root_coord
+    H.node[root]['label'] = 'root'
+    added_nodes = 1
+
+    in_nodes = set()
+    out_nodes = set(G.nodes())
+    in_nodes.add(root)
+    out_nodes.remove(root)
+   
+    graph_mcost = 0
+    graph_scost = 0
+
+    closest_neighbors = {}
+    is_sorted = 'sorted' in G.graph
+    for u in G.nodes_iter():
+        if is_sorted:
+            closest_neighbors[u] = G.node[u]['close_neighbors'][:]
+        else:
+            closest_neighbors[u] = k_nearest_neighbors(G, u, k=None, candidate_nodes=None)
+
+    unpaired_nodes = set([root])
+
+    node_index = max(G.nodes()) + 1
+
+    dist_error = 0
+
+    steps = 0
+
+    best_edges = []
+    while added_nodes < G.number_of_nodes():
+        assert len(out_nodes) > 0
+        best_edge = None
+        best_mcost = None
+        best_scost = None
+        best_cost = float("inf")
+
+        best_choice = None
+        best_midpoint = None
+
+        candidate_edges = []
+        for u in unpaired_nodes:
+            if axon and (u == H.graph['root']) and (H.degree(u) > 0):
+                continue
+
+            assert H.has_node(u)
+            assert 'droot' in H.node[u]
+        
+            invalid_neighbors = []
+            closest_neighbor = None
+            for i in xrange(len(closest_neighbors[u])):
+                v = closest_neighbors[u][i]
+                if H.has_node(v):
+                    invalid_neighbors.append(v)
+                else:
+                    closest_neighbor = v
+                    break
+
+            for invalid_neighbor in invalid_neighbors:
+                closest_neighbors[u].remove(invalid_neighbor)
+           
+            assert closest_neighbor != None
+            assert not H.has_node(closest_neighbor)
+            
+            p1 = H.node[u]['coord']
+            p2 = G.node[closest_neighbor]['coord']
+                
+            length = point_dist(p1, p2)
+            mcost = length
+            scost = length + H.node[u]['droot']
+            cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
+            insort(best_edges, (cost, u, closest_neighbor))
+
+        cost, u, v = best_edges.pop(0)
+
+        best_edges2 = []
+        unpaired_nodes = set([u, v])
+        for cost, x, y in best_edges:
+            if y == v:
+                unpaired_nodes.add(x)
+            else:
+                best_edges2.append((cost, x, y))
+        best_edges = best_edges2
+
+        assert H.has_node(u)
+        assert not H.has_node(v)
+        H.add_node(v)
+        H.node[v]['coord'] = G.node[v]['coord']
+        H.node[v]['label'] = 'synapse'
+        H.add_edge(u, v)
+        H[u][v]['length'] = node_dist(H, u, v)
+        H.node[v]['droot'] = H[u][v]['length'] + H.node[u]['droot']
+        in_nodes.add(v)
+        out_nodes.remove(v)
+
+        added_nodes += 1
+
+    return H
+
 def pareto_steiner(G, alpha, axon=False):
     return pareto_steiner_fast(G, alpha, axon=axon)
 
@@ -756,13 +864,13 @@ def main():
     G = random_point_graph(points)
 
     #algorithms = [pareto_steiner_space, pareto_steiner_space2, pareto_steiner_fast, pareto_steiner_old]
-    algorithms = [pareto_steiner_space2, pareto_steiner_fast]
+    algorithms = [pareto_steiner_fast, pareto_prim]
     for pareto_func in algorithms:
         start = time()
         tree = pareto_func(G, alpha)
         end = time()
-        #print graph_costs(tree, relevant_nodes=G.nodes())
-        print end - start 
+        print graph_costs(tree, relevant_nodes=G.nodes())
+        print end - start
 
 if __name__ == '__main__':
    main()
