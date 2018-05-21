@@ -279,6 +279,10 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
                      node_color=node_color, edge_color="brown", width=4, font_size=12,\
                      font_color='red', font_weight='bold')
     pylab.draw()
+    ax = pylab.gca()
+    ax.tick_params(axis='x', labelsize=20)
+    ax.tick_params(axis='y', labelsize=20)
+    pylab.tight_layout()
 
     try:
         xmin = kwargs['xmin']
