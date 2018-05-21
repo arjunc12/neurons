@@ -1,3 +1,4 @@
+from time import time, sleep
 import numpy as np
 import networkx as nx
 from sys import argv
@@ -8,7 +9,7 @@ import os
 from random import shuffle
 from itertools import combinations
 import argparse
-from khuller import khuller
+#from khuller import khuller
 from cost_functions import *
 from neuron_utils import *
 from read_imaris import *
@@ -17,11 +18,10 @@ from kruskal import *
 from neuron_builder import build_neuron_snider, read_tree
 from random_graphs import random_mst, barabasi_tree
 import math
-import seaborn as sns
+#import seaborn as sns
 from collections import defaultdict
 from numpy.random import permutation
-import pandas as pd
-from time import time
+#import pandas as pd
 
 SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported']
 
@@ -66,6 +66,8 @@ MARKERS = {'neural' : 'x', 'centroid' : 'o', 'random' : '^', 'barabasi' : 's'}
 
 PLOT_TREES = ['neural']
 LOG_PLOT_TREES = ['neural', 'centroid', 'barabasi', 'random']
+    
+ARBOR_TYPES = {'axon': 0, 'basal_dendrite' : 1, 'apical_dendrite' : 2, 'truncated_axon' : 3}
 
 def ceil_power_of_10(n):
     exp = math.log(n, 10)
@@ -77,18 +79,66 @@ def floor_power_of_10(n):
     exp = math.ceil(exp)
     return 10**exp
 
+def read_pareto_front(fronts_dir):
+    alphas = []
+    mcosts = []
+    scosts = []
+    with open('%s/pareto_front.csv' % fronts_dir) as pareto_front:
+        for line in pareto_front:
+            line = line.strip('\n')
+            line = line.split(', ')
+            if line[0] == 'alpha':
+                continue
+            alpha = float(line[0])
+            mcost = float(line[1])
+            scost = float(line[2])
+
+            alphas.append(alpha)
+            mcosts.append(mcost)
+            scosts.append(scost)
+
+    return alphas, mcosts, scosts
+
+def read_tree_costs(fronts_dir):
+    tree_costs = defaultdict(lambda : defaultdict(list))
+    with open('%s/tree_costs.csv' % fronts_dir) as tree_costs_file:
+        for line in tree_costs_file:
+            line = line.strip('\n')
+            line = line.split(', ')
+            if line[0] == 'tree':
+                continue
+            model = line[0]
+            mcost = float(line[1])
+            scost = float(line[2])
+            tree_costs[model]['mcost'].append(mcost)
+            tree_costs[model]['scost'].append(scost)
+
+    return tree_costs
+
 def pareto_plot(fronts_dir, figs_dir, log_plot=False):
+    import seaborn as sns
+    '''
     pareto_front = pd.read_csv('%s/pareto_front.csv' % fronts_dir,\
                                skipinitialspace=True)
     mcosts = pareto_front['mcost']
     scosts = pareto_front['scost']
+    '''
+    alphas, mcosts, scosts = read_pareto_front(fronts_dir)
+    
+    alphas = alphas[1:]
+    mcosts = mcosts[1:]
+    scosts = scosts[1:]
 
     if log_plot:
         mcosts = pylab.log10(pylab.array(mcosts))
         scosts = pylab.log10(pylab.array(scosts))
 
+    '''
     tree_costs = pd.read_csv('%s/tree_costs.csv' % fronts_dir,\
-                             skipinitialspace=True) 
+                             skipinitialspace=True)
+    '''
+    tree_costs = read_tree_costs(fronts_dir)
+
     pylab.figure()
     sns.set()
 
@@ -100,7 +150,8 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False):
         plot_trees = LOG_PLOT_TREES
     else:
         plot_trees = PLOT_TREES
-    for tree, costs in tree_costs.groupby('tree'):
+    #for tree, costs in tree_costs.groupby('tree'):
+    for tree, costs in tree_costs.iteritems():
         if tree in plot_trees:
             mcosts = costs['mcost']
             scosts = costs['scost']
@@ -122,6 +173,9 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False):
     pylab.legend()
     ax = pylab.gca()
     pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
+    ax.tick_params(axis='x', labelsize=20)
+    ax.tick_params(axis='y', labelsize=20)
+    pylab.tight_layout()
    
     pdf_name = ''
     if log_plot:
@@ -141,15 +195,18 @@ def pareto_tree_costs(G, point_graph, axon=False, viz_trees=False, figs_dir=None
     pareto_func = pareto_steiner
     if sandbox:
         pareto_func = pareto_steiner_sandbox
-    log_file = open('%s/logging.txt' % log_dir, 'w')
     total_time = 0
+    log_fname = '%s/logging.txt' % log_dir
     for i, alpha in enumerate(alphas):
         print alpha
         start = time()
         pareto_tree = pareto_func(point_graph, alpha, axon=axon)
         end = time()
         t = (end - start) / 60.0
+        log_file = open(log_fname, 'a')
         log_file.write('%f, %f\n' % (alpha, t))
+        log_file.close()
+
         total_time += t
         mcost = mst_cost(pareto_tree)
         scost = satellite_cost(pareto_tree, relevant_nodes=point_graph.nodes())
@@ -162,6 +219,7 @@ def pareto_tree_costs(G, point_graph, axon=False, viz_trees=False, figs_dir=None
         mcosts.append(mcost)
         scosts.append(scost)
 
+    log_file = open(log_fname, 'a')
     log_file.write('%f\n' % total_time)
     log_file.close()
     return alphas, mcosts, scosts
@@ -186,10 +244,13 @@ def pareto_front(G, point_graph, neuron_name, neuron_type,\
 
 # ---------------------------------------
     if (not first_time) and (not viz_trees):
+        '''
         df = pd.read_csv('%s/pareto_front.csv' % fronts_dir, skipinitialspace=True)
         alphas = pylab.array(df['alpha'])
         mcosts = pylab.array(df['mcost'])
         scosts = pylab.array(df['scost'])
+        '''
+        alphas, mcosts, scosts = read_pareto_front(fronts_dir)
     else:
         front_lines = []
         front_lines.append('alpha, mcost, scost\n')
@@ -308,11 +369,11 @@ def pareto_analysis(G, neuron_name, neuron_type,\
             tree_costs_file.write('%s, %f, %f\n' % ('centroid', centroid_mcost,\
                                                     centroid_scost))
 # ---------------------------------------
-    point_graph = complete_graph(point_graph)
+    #point_graph = complete_graph(point_graph)
     random_trials = 20
 
     for i in xrange(random_trials):
-        rand_mst = random_mst(point_graph)
+        rand_mst = random_mst(point_graph, euclidean=True)
         rand_mcost, rand_scost = graph_costs(rand_mst)
         rand_dist, rand_index = DIST_FUNC(mcosts, scosts, rand_mcost,\
                                           rand_scost)
@@ -372,6 +433,7 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
                            fronts_dir=IMARIS_FRONTS_DIR,\
                            figs_dir=IMARIS_FIGS_DIR,\
                            viz_trees=VIZ_TREES_IMARIS):
+    import seaborn as sns
     assert G.number_of_nodes() > 0
     assert is_tree(G)
 
@@ -413,7 +475,7 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
         random_trials = 20
 
         for i in xrange(random_trials):
-            rand_mst = random_mst(point_graph)
+            rand_mst = random_mst(point_graph, euclidean=True)
             rand_mcost, rand_scost = graph_costs(rand_mst)
 
             barabasi_mst = barabasi_tree(point_graph)
@@ -790,7 +852,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-min_nodes', type=int, default=MIN_NODES)
     parser.add_argument('-max_nodes', type=int, default=MAX_NODES)
-    #parser.add_argument('-a', '--algorithm', choices=['greedy', 'khuller'], default='greedy')
     parser.add_argument('-n', '--neuromorpho', action='store_true')
     parser.add_argument('-np', '--neuromorpho_plot', action='store_true')
     parser.add_argument('-v', '--viz_trees', action='store_true')
@@ -803,7 +864,7 @@ def main():
     parser.add_argument('-l', '--labs', nargs='+', default=None, dest='labs')
     parser.add_argument('-na', '--names', nargs='+', default=None, dest='names')
     parser.add_argument('-r', '--regions', nargs='+', default=None)
-    parser.add_argument('-nt', '--neuron_types', nargs='+', type=int, default=None)
+    parser.add_argument('-nt', '--neuron_types', nargs='+', default=None)
     parser.add_argument('-bt', '--boutons', action='store_true')
     parser.add_argument('--synthetic', action='store_true')
 
@@ -822,7 +883,15 @@ def main():
     regions = args.regions
     labs = args.labs
     names = args.names
-    neuron_types = args.neuron_types
+    ntypes = args.neuron_types
+    neuron_types = []
+    for ntype in ntypes:
+        if ntype.isdigit():
+            neuron_types.append(int(ntype))
+        elif ntype in ARBOR_TYPES:
+            neuron_types.append(ARBOR_TYPES[ntype])
+        else:
+            raise ValueError('invalid neuron type')
     boutons = args.boutons
     synthetic = args.synthetic
 
