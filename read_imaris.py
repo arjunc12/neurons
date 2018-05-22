@@ -1,7 +1,6 @@
 import os
 import matplotlib as mpl
 mpl.use('agg')
-import pandas as pd
 import networkx as nx
 from neuron_utils import *
 from collections import defaultdict
@@ -148,6 +147,7 @@ def draw_imaris():
             read_imaris(trace_pos, viz=True, outname=neuron)
 
 def plot_edge_lengths():
+    import pandas as pd
     df = pd.read_csv('imaris_lengths.csv', names = ['neuron', 'length'])
     pylab.hist(df['length'])
     pylab.savefig('imaris/imaris_lengths.pdf', format='pdf')
