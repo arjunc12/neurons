@@ -8,11 +8,12 @@ import os
 import seaborn as sns
 from itertools import combinations
 import numpy as np
-from scipy.stats import entropy, binom_test, ttest_1samp
+from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind
 from numpy.linalg import norm
 import numpy as np
 from stats_utils import *
 import argparse
+import neuron_density
 
 FIGS_DIR = 'steiner_stats'
 
@@ -25,11 +26,12 @@ MODELS_FNAME = 'models.csv'
 MODELS_FILE = '%s/%s' % (OUTPUT_DIR, MODELS_FNAME)
 
 CATEGORIES_FILE = '/iblsn/data/Arjun/neurons/neuron_categories/neuron_categories.csv'
+CATEGORIES_FILE_FILTERED = '/iblsn/data/Arjun/neurons/neuron_categories/neuron_categories_filtered.csv'
 CATEGORIES = ['cell type', 'species', 'region', 'neuron type', 'lab']
 
 METADATA_DIR = '/iblsn/data/Arjun/neurons/metadata'
 
-CATEGORY_MIN_COUNTS = {'species': 100, 'cell type' : 500, 'region' : 500, 'neuron type' : 100, 'lab' : 500}
+CATEGORY_MIN_COUNTS = {'species': 35, 'cell type' : 125, 'region' : 400, 'neuron type' : 100, 'lab' : 100}
 MIN_COUNT = 50
 
 MIN_POINTS = 100
@@ -55,7 +57,7 @@ def remove_small_counts(df, categories, min_count=MIN_COUNT):
     df2 = df2[df2['count'] >= min_count]
     return df2
 
-def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
+def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE_FILTERED,\
             models_file=MODELS_FILE):
     output_df = pd.read_csv(output_file, skipinitialspace=True)
     output_df = output_df[output_df['points'] >= MIN_POINTS]
@@ -72,6 +74,9 @@ def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
     cat_df = pd.read_csv(categories_file, skipinitialspace=True)
     categories_df = pd.merge(output_df, cat_df, on='neuron name')
     categories_df = pd.merge(categories_df, neural_df, on=['neuron name', 'neuron type'])
+
+    models_df.drop_duplicates(inplace=True)
+    categories_df.drop_duplicates(inplace=True)
 
     return models_df, categories_df
 
@@ -206,12 +211,14 @@ def dist_heat(df, category, alphas=None, dist_func=pseudo_kld, outdir=FIGS_DIR):
     dist_frame = dist_frame.pivot(category + '1', category + '2', 'distance')
     pylab.figure()
     ax = sns.heatmap(dist_frame, vmin=0, vmax=1)
-    pylab.xticks(rotation='vertical')
-    pylab.yticks(rotation='horizontal')
-    pylab.tight_layout()
+    ax.set_ylabel(category + ' 1', fontsize=20)
+    ax.set_xlabel(category + ' 2', fontsize=20)
+    pylab.xticks(rotation='vertical', fontsize=20)
+    pylab.yticks(rotation='horizontal', fontsize=20)
+    #pylab.tight_layout()
     pylab.savefig('%s/%s_heat_%s.pdf' % (outdir, DIST_FUNC_NAMES[dist_func],\
                                          category.replace(' ', '_')),
-                   format='pdf')
+                   format='pdf', bbox_inches='tight')
     pylab.close()
 
 def kld_heat(df, category, alphas=None):
@@ -283,11 +290,11 @@ def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=FIGS_D
         sns.set()
         dist_plot = plot_func(x='alpha', y=category, data=df2, orient='h', order=order)
         dist_plot.tick_params(axis='y', labelsize=20)
-        #pylab.tight_layout()
+        pylab.tight_layout()
         pylab.xlabel('alpha', fontsize=20)
         pylab.ylabel(category, fontsize=20)
         pylab.savefig('%s/%s_alphas_%s.pdf' % (outdir, category.replace(' ', '_'), plot_descriptor),
-                       format='pdf', bbox_inches='tight')
+                       format='pdf')#, bbox_inches='tight')
         pylab.close()
 
 def cluster_alphas(df, identifiers, outdir=FIGS_DIR):
@@ -305,9 +312,10 @@ def swarm_alphas(df, identifiers, outdir=FIGS_DIR):
 
 def category_dists(df, categories, outdir=FIGS_DIR):
     for category in categories:
-        df2 = df.drop_duplicates(subset=['neuron name', 'neuron type', category])
+        df2 = df.drop_duplicates(subset=list(set(['neuron name', 'neuron type', category])))
         df2 = remove_small_counts(df2, category,\
                                   min_count=CATEGORY_MIN_COUNTS[category])
+        df2['dist'] = pylab.log10(df2['dist'])
         cat_vals = []
         cat_means = []
         for cat_val, group in df2.groupby(category):
@@ -320,11 +328,13 @@ def category_dists(df, categories, outdir=FIGS_DIR):
         pylab.figure()
         sns.set()
         dist_plot = sns.barplot(x=category, y='dist', data=df2, order=sorted_vals)
-        pylab.xticks(rotation='vertical')
+        pylab.xticks(rotation='vertical', size=20)
+        pylab.xlabel(category, size=20)
+        pylab.ylabel('log-distance to Pareto front', size=20)
         pylab.tight_layout()
         pylab.savefig('%s/pareto_dists_%s.pdf' % (outdir,\
                                                   category.replace(' ', '_')),\
-                                                  format='pdf')
+                                                  format='pdf', bbox_inches='tight')
 
 def scatter_dists(models_df, outdir=FIGS_DIR):
     df = models_df[['neuron name', 'neuron type', 'model', 'dist']]
@@ -392,8 +402,10 @@ def alphas_hist(df, outdir=FIGS_DIR, categories=None):
         pylab.legend()
     curr_ax = pylab.gca()
     curr_ax.set_ylim((0, 1))
-    pylab.xlabel('alpha')
-    pylab.ylabel('proportion')
+    pylab.xlabel('alpha', size=20)
+    pylab.ylabel('proportion', size=20)
+    pylab.xticks(fontsize=20)
+    pylab.yticks(fontsize=20)
     pylab.tight_layout()
     name = 'alphas_hist'
     if categories != None:
@@ -461,19 +473,29 @@ def neuron_type_alphas(df):
     print "-----------------------------------------------------"
     df2 = df.drop_duplicates(subset=['neuron name', 'neuron type'])
     types = []
+    alphas = []
     dists = []
     for neuron_type, group in df2.groupby('neuron type'):
-        print neuron_type, pylab.mean(group['alpha']), '+/-', pylab.std(group['alpha'], ddof=1)
+        print "------------"
+        print neuron_type
+        print "mean alpha", pylab.mean(group['alpha']), '+/-',\
+                            pylab.std(group['alpha'], ddof=1)
+        print "mean distance", pylab.mean(group['dist']), '+/-',\
+                               pylab.std(group['dist'], ddof=1)
         types.append(neuron_type)
-        dists.append(pylab.array(group['alpha']))
+        alphas.append(pylab.array(group['alpha']))
+        dists.append(pylab.array(group['dist']))
     indices = range(len(types))
     for idx1, idx2 in combinations(indices, 2):
+        print "------------"
         type1, type2 = types[idx1], types[idx2]
-        dist1, dist2 = dists[idx1], dists[idx2]
+        alphas1, alphas2 = alphas[idx1], alphas[idx2]
+        dists1, dists2 = dists[idx1], dists[idx2]
         print type1 + ' vs. ' + type2
         #print ttest_ind(dist1, dist2, equal_var=False)
         #print mannwhitneyu(dist1, dist2, alternative='two-sided')
-        print ks_2samp(dist1, dist2)
+        print "alphas ks-test", ks_2samp(alphas1, alphas2)
+        print "dists welch's t-test", ttest_ind(dists1,dists2)
 
 def vals_correlation(df, val1, val2, outdir=FIGS_DIR, xtransform=None,\
                      ytransform=None, logtransform=False):
@@ -589,7 +611,7 @@ def main():
     parser.add_argument('-od', '--output_dir', default=OUTPUT_DIR)
     parser.add_argument('-o', '--output_fname', default=OUTPUT_FNAME)
     parser.add_argument('-m', '--models_fname', default=MODELS_FNAME)
-    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE)
+    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE_FILTERED)
     parser.add_argument('-f', '--figs_dir', default=FIGS_DIR)
     parser.add_argument('--synthetic', action='store_true')
     args = parser.parse_args()
@@ -612,9 +634,28 @@ def main():
     models_df, categories_df = get_dfs(output_file=output_file,\
                                        categories_file=categories_file,\
                                        models_file=models_file)
+    
+    density_df = neuron_density.get_df()
+    density_df.drop('points', inplace=True, axis=1)
 
-    if TEST_NEW_FUNCTION:
-        
+    tradeoff_file = '/iblsn/data/Arjun/neurons/pareto_steiner_output/tradeoff_ratio'
+    if synthetic:
+        tradeoff_file += '_synthetic'
+    tradeoff_file += '.csv'
+    tradeoff_df = pd.read_csv(tradeoff_file, skipinitialspace=True)
+    #print tradeoff_df
+
+    neurons_df = pd.merge(categories_df, density_df, on=['neuron name', 'neuron type'])
+    neurons_df = pd.merge(neurons_df, tradeoff_df, on=['neuron name', 'neuron type'])
+    print neurons_df
+
+    models_df.to_csv('/iblsn/data/Arjun/neurons/models_df.csv', index=False)
+    categories_df.to_csv('/iblsn/data/Arjun/neurons/categories_df.csv', index=False)
+    neurons_df.to_csv('/iblsn/data/Arjun/neurons/neurons_df.csv')
+
+    return None
+
+    if TEST_NEW_FUNCTION: 
         return None
     
     metadata(categories_df)
@@ -624,12 +665,13 @@ def main():
     neuron_type_alphas(categories_df)
     os.system('mkdir -p %s' % figs_dir)
     scatter_dists(models_df, outdir=figs_dir)
-    boxplot_alphas(categories_df, CATEGORIES, outdir=figs_dir) 
     alphas_hist(categories_df, outdir=figs_dir)
     neuron_types_hist(categories_df, outdir=figs_dir)
     alphas_heat(categories_df, CATEGORIES, outdir=figs_dir)
     dist_heats(categories_df, CATEGORIES, DIST_FUNCS, outdir=figs_dir)
     category_dists(categories_df, CATEGORIES, outdir=figs_dir)
+    boxplot_alphas(categories_df, CATEGORIES, outdir=figs_dir)
+    violin_alphas(categories_df, CATEGORIES, outdir=figs_dir)
     truncation_hist(categories_df, outdir=figs_dir)
     size_dist_correlation(categories_df, outdir=figs_dir)
     alpha_dist_correlation(categories_df, outdir=figs_dir)
