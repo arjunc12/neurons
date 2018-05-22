@@ -64,7 +64,10 @@ def random_mst(G, euclidean=False):
             in_tree[curr] = True
             next = successor[curr]
             H.add_edge(curr, next)
-            H[curr][next]['length'] = G[curr][next]['length']
+            if euclidean:
+                H[curr][next]['length'] = node_dist(G, curr, next)
+            else:
+                H[curr][next]['length'] = G[curr][next]['length']
             curr = next
     
     return H
@@ -87,8 +90,11 @@ def barabasi_tree(G):
 
 def main():
     G = random_point_graph()
+    G.remove_edges_from(G.edges())
     T = barabasi_tree(G)
+    T2 = random_mst(G, euclidean=True)
     assert is_tree(T)
+    assert is_tree(T2)
 
 if __name__ == '__main__':
     main()
