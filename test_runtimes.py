@@ -17,8 +17,12 @@ import os
 MIN_POINTS = 8
 MAX_POINTS = 50
 
+GENETIC = True
+
 def runtimes_stats():
     df = pd.read_csv('test_runtimes.csv', skipinitialspace=True)
+    print "total trials"
+    print len(df['algorithm']) / len(df['algorithm'].unique())
     pylab.figure()
     for algorithm, group in df.groupby('algorithm'):
         print algorithm
@@ -28,6 +32,8 @@ def runtimes_stats():
         print binom_test(dominated, comparisons)
         group = group.groupby('points', as_index=False).agg(pylab.mean)
         pylab.plot(group['points'], group['runtime'], label=algorithm)
+        print "cost comparisons", pylab.count_nonzero(~pylab.isnan(group['cost ratio']))
+        print "cost ratio", pylab.nanmean(group['cost ratio'])
 
     pylab.legend(loc=2)
     pylab.xlabel('number of points')
@@ -57,26 +63,28 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
             
             mcosts = defaultdict(list)
             scosts = defaultdict(list)
+            costs = defaultdict(list)
             times = defaultdict(float)
 
             delta = 0.01
             alphas = pylab.arange(delta, 1, delta)
-            '''
-            algorithms = [pareto_steiner, pareto_steiner_old, pareto_prim, pareto_khuller]
-            names = ['steiner', 'old steiner', 'prim', 'khuller']
-            '''
             algorithms = [pareto_steiner_space, pareto_steiner_space2, pareto_steiner_fast, pareto_steiner_old]
             names = ['space efficient', 'medium space efficient', 'fast', 'unoptimized']
+            algorithms += [pareto_prim, pareto_khuller]
+            names += ['prim', 'khuller']
+            baseline = 'fast'
             for alpha in alphas:
                 print "alpha", alpha
                 for algorithm, name in zip(algorithms, names):
                     mcost, scost, runtime = time_function(G, alpha, algorithm)
+                    cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
                     mcosts[name].append(mcost)
                     scosts[name].append(scost)
+                    costs[name].append(cost)
                     times[name] += runtime
 
-            '''
-            if num_points <= 50:
+            if num_points <= 50 and GENETIC:
+                algorithms.append(pareto_genetic)
                 names.append('genetic')
                 genetic_start = time()
                 genetic_trees = pareto_genetic(G)
@@ -88,7 +96,6 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
                 for mcost, scost, T in genetic_trees: 
                     mcosts['genetic'].append(mcost)
                     scosts['genetic'].append(scost)
-            '''
             
             pylab.figure()
             for name in names:
@@ -107,10 +114,10 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
 
             header_line = None
             if not os.path.exists('test_runtimes.csv'):
-                header_line = ['points', 'runtime', 'comparisons', 'dominated']
+                header_line = ['algorithm', 'points', 'runtime', 'comparisons', 'dominated']
                 header_line = ', '.join(header_line)
 
-            mcosts1, scosts1 = mcosts['steiner'], scosts['steiner']
+            mcosts1, scosts1, costs1 = mcosts[baseline], scosts[baseline], pylab.array(costs[baseline])
             with open('test_runtimes.csv', 'a') as outfile:
                 if header_line != None:
                     outfile.write('%s\n' % header_line)
@@ -124,6 +131,13 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
                         write_items += [comparisons, dominated]
                     else:
                         write_items += ['', '']
+                       
+                    if name in costs:
+                        costs2 = pylab.array(costs[name])
+                        cost_ratio = pylab.mean(costs2 / costs1)
+                        write_items.append(cost_ratio)
+                    else:
+                        write_items.append('')
      
                     write_items = map(str, write_items)
                     write_items = ', '.join(write_items)
