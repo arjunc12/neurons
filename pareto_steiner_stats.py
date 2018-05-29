@@ -8,7 +8,7 @@ import os
 import seaborn as sns
 from itertools import combinations
 import numpy as np
-from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind
+from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind, wasserstein_distance
 from numpy.linalg import norm
 import numpy as np
 from stats_utils import *
@@ -17,16 +17,22 @@ import neuron_density
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = False
+TEST_NEW_FUNCTION = True
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
+
 OUTPUT_FNAME = 'pareto_steiner.csv'
 OUTPUT_FILE = '%s/%s' % (OUTPUT_DIR, OUTPUT_FNAME)
+
 MODELS_FNAME = 'models.csv'
 MODELS_FILE = '%s/%s' % (OUTPUT_DIR, MODELS_FNAME)
 
+TRADEOFFS_FNAME = 'tradeoff_ratio.csv'
+TRADEOFFS_FILE = '%s/%s' % (OUTPUT_DIR, TRADEOFFS_FNAME)
+
 CATEGORIES_FILE = '/iblsn/data/Arjun/neurons/neuron_categories/neuron_categories.csv'
 CATEGORIES_FILE_FILTERED = '/iblsn/data/Arjun/neurons/neuron_categories/neuron_categories_filtered.csv'
+
 CATEGORIES = ['cell type', 'species', 'region', 'neuron type', 'lab']
 
 METADATA_DIR = '/iblsn/data/Arjun/neurons/metadata'
@@ -58,7 +64,7 @@ def remove_small_counts(df, categories, min_count=MIN_COUNT):
     return df2
 
 def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE_FILTERED,\
-            models_file=MODELS_FILE):
+            models_file=MODELS_FILE, tradeoffs_file=TRADEOFFS_FILE):
     output_df = pd.read_csv(output_file, skipinitialspace=True)
     output_df = output_df[output_df['points'] >= MIN_POINTS]
     output_df = output_df[(output_df['alpha'] >= MIN_ALPHA) & (output_df['alpha'] <= MAX_ALPHA)]
@@ -74,6 +80,13 @@ def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE_FILTERED,\
     cat_df = pd.read_csv(categories_file, skipinitialspace=True)
     categories_df = pd.merge(output_df, cat_df, on='neuron name')
     categories_df = pd.merge(categories_df, neural_df, on=['neuron name', 'neuron type'])
+
+    tradeoffs_df = pd.read_csv(tradeoffs_file, skipinitialspace=True)
+    categories_df = pd.merge(categories_df, tradeoffs_df, on=['neuron name', 'neuron type'])
+
+    density_df = neuron_density.get_df()
+    density_df.drop('points', inplace=True, axis=1)
+    categories_df = pd.merge(categories_df, density_df, on=['neuron name', 'neuron type'])
 
     models_df.drop_duplicates(inplace=True)
     categories_df.drop_duplicates(inplace=True)
@@ -201,18 +214,52 @@ def make_dist_frame(df, category, alphas=None, dist_func=pseudo_kld):
 
     return dist_frame
 
+def make_dist_frame_wasserstein(df, category):
+    df2 = df.drop_duplicates(subset=['neuron name', 'neuron type', category])
+    df2 = remove_small_counts(df2, category,\
+                              min_count=CATEGORY_MIN_COUNTS[category])
+ 
+    cat1 = []
+    cat2 = []
+    dist_vals = []
+    for val1, val2 in combinations(list(df2[category].unique()), 2):
+        sample1 = df2['alpha'][df2[category] == val1]
+        sample2 = df2['alpha'][df2[category] == val2]
+        dist1 = wasserstein_distance(sample1, sample2)
+        dist2 = wasserstein_distance(sample2, sample1)
+        cat1 += [val1, val2]
+        cat2 += [val2, val1]
+        dist_vals += [dist1, dist2]
+
+    dist_frame = pd.DataFrame()
+    dist_frame[category + '1'] = cat1
+    dist_frame[category + '2'] = cat2
+    dist_frame['distance'] = dist_vals
+
+    return dist_frame
+
 #DIST_FUNCS = [pseudo_kld, hellinger_distance]
 DIST_FUNCS = [hellinger_distance, JSD, total_variation_distance]
 DIST_FUNC_NAMES = {pseudo_kld : 'kld', hellinger_distance : 'hellinger',\
-                   JSD : 'jsd', total_variation_distance: 'tvd'}
+                   JSD : 'jsd', total_variation_distance: 'tvd',\
+                   'wasserstein' : 'wasserstein'}
 
 def dist_heat(df, category, alphas=None, dist_func=pseudo_kld, outdir=FIGS_DIR):
-    dist_frame = make_dist_frame(df, category, alphas, dist_func)
+    dist_frame = None
+    if dist_func == 'wasserstein':
+        dist_frame = make_dist_frame_wasserstein(df, category)
+    else:
+        dist_frame = make_dist_frame(df, category, alphas, dist_func)
+    
+    
     dist_frame = dist_frame.pivot(category + '1', category + '2', 'distance')
+    
     pylab.figure()
+    
     ax = sns.heatmap(dist_frame, vmin=0, vmax=1)
     ax.set_ylabel(category + ' 1', fontsize=20)
     ax.set_xlabel(category + ' 2', fontsize=20)
+    
     pylab.xticks(rotation='vertical', fontsize=20)
     pylab.yticks(rotation='horizontal', fontsize=20)
     #pylab.tight_layout()
@@ -222,18 +269,22 @@ def dist_heat(df, category, alphas=None, dist_func=pseudo_kld, outdir=FIGS_DIR):
     pylab.close()
 
 def kld_heat(df, category, alphas=None):
-    return dist_heat(df, category, alphas=alphas, dist_func=pseudo_kld)
+    dist_heat(df, category, alphas=alphas, dist_func=pseudo_kld)
 
 def hellinger_heat(df, category, alphas=None):
-    return dist_heat(df, category, alphas=alphas, dist_func=hellinger_distance)
+    dist_heat(df, category, alphas=alphas, dist_func=hellinger_distance)
 
 def jsd_heat(df, category, alphas=None):
-    return dist_heat(df, category, alphas=alphas, dist_func=JSD)
+    dist_heat(df, category, alphas=alphas, dist_func=JSD)
+
+def wasserstein_heat(df, category, outdir=FIGS_DIR):
+    dist_heat(df, category, alphas=None, dist_func='wasserstein', outdir=outdir)
 
 def dist_heats(df, categories, dist_funcs, alphas=None, outdir=FIGS_DIR):
     for category in categories:
         for dist_func in dist_funcs:
             dist_heat(df, category, alphas=alphas, dist_func=dist_func, outdir=outdir)
+        wasserstein_heat(df, category, outdir=outdir)
 
 def alphas_heat(df, categories, outdir=FIGS_DIR):
     for cat1, cat2 in combinations(categories, 2):
@@ -267,7 +318,7 @@ def cat_to_num(categories):
         cat_nums.append(cat_map[category])
     return cat_nums
 
-def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=FIGS_DIR):
+def val_distribution(df, val, categories, plot_func, plot_descriptor, outdir=FIGS_DIR):
     for category in categories:
         subset_cols = ['neuron name', 'neuron type', 'alpha']
         if category != 'neuron type':
@@ -279,7 +330,7 @@ def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=FIGS_D
         medians = []
         for name, group in df2.groupby(category):
             cat_vals.append(name)
-            medians.append(pylab.median(group['alpha']))
+            medians.append(pylab.median(group[val]))
         
         cat_vals = pylab.array(cat_vals)
         mean = pylab.array(medians)
@@ -288,28 +339,41 @@ def alpha_distribution(df, categories, plot_func, plot_descriptor, outdir=FIGS_D
 
         pylab.figure()
         sns.set()
-        dist_plot = plot_func(x='alpha', y=category, data=df2, orient='h', order=order)
+        dist_plot = plot_func(x=val, y=category, data=df2, orient='h', order=order)
         dist_plot.tick_params(axis='y', labelsize=20)
         pylab.tight_layout()
-        pylab.xlabel('alpha', fontsize=20)
+        pylab.xlabel(val, fontsize=20)
         pylab.ylabel(category, fontsize=20)
-        pylab.savefig('%s/%s_alphas_%s.pdf' % (outdir, category.replace(' ', '_'), plot_descriptor),
-                       format='pdf')#, bbox_inches='tight')
+        pylab.savefig('%s/%s_%ss_%s.pdf' % (outdir, category.replace(' ', '_'),\
+                                            val.replace(' ', '_'),\
+                                            plot_descriptor),
+                       format='pdf')
         pylab.close()
 
 def cluster_alphas(df, identifiers, outdir=FIGS_DIR):
-    alpha_distribution(df, identifiers, sns.stripplot, 'cluster', outdir=outdir)
+    val_distribution(df, 'alpha', identifiers, sns.stripplot, 'cluster', outdir=outdir)
 
 def boxplot_alphas(df, identifiers, outdir=FIGS_DIR):
-    alpha_distribution(df, identifiers, sns.boxplot, 'box', outdir=outdir)
+    val_distribution(df, 'alpha', identifiers, sns.boxplot, 'box', outdir=outdir)
 
 def violin_alphas(df, identifiers, outdir=FIGS_DIR):
-    alpha_distribution(df, identifiers, sns.violinplot, 'violin', outdir=outdir)
+    val_distribution(df, 'alpha', identifiers, sns.violinplot, 'violin', outdir=outdir)
 
 def swarm_alphas(df, identifiers, outdir=FIGS_DIR):
-    alpha_distribution(df, identifiers, sns.swarmplot, 'swarm', outdir=outdir)
-    
+    val_distribution(df, 'alpha', identifiers, sns.swarmplot, 'swarm', outdir=outdir)
 
+def cluster_tradeoffs(df, identifiers, outdir=FIGS_DIR):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.stripplot, 'cluster', outdir=outdir)
+
+def boxplot_tradeoffs(df, identifiers, outdir=FIGS_DIR):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.boxplot, 'box', outdir=outdir)
+
+def violin_tradeoffs(df, identifiers, outdir=FIGS_DIR):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.violinplot, 'violin', outdir=outdir)
+
+def swarm_tradeoffs(df, identifiers, outdir=FIGS_DIR):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.swarmplot, 'swarm', outdir=outdir)
+    
 def category_dists(df, categories, outdir=FIGS_DIR):
     for category in categories:
         df2 = df.drop_duplicates(subset=list(set(['neuron name', 'neuron type', category])))
@@ -340,9 +404,11 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
     df = models_df[['neuron name', 'neuron type', 'model', 'dist']]
     model_dists = defaultdict(list)
     for name, group in df.groupby(['neuron name', 'neuron type']):
+        if len(group['model'].unique()) != 4:
+            print group
         for model, group2 in group.groupby('model'):
             model_dists[model].append(pylab.mean(group2['dist']))
-
+    
     order = pylab.argsort(model_dists['neural'])
     x = pylab.arange(len(model_dists['neural']))
     pylab.figure()
@@ -606,12 +672,43 @@ def truncation_hist(df, outdir=FIGS_DIR):
     pylab.close()
 
 
+def triplet_analysis(df, categories=CATEGORIES):
+    df2 = df.drop_duplicates()
+    for category in categories:
+        groupby_cols = categories[:]
+        groupby_cols.remove(category)
+
+        fname = 'triplets_%s.csv' % category
+        fname = fname.replace(' ', '_')
+        with open(fname, 'w') as f:
+            for name, group in df2.groupby(groupby_cols):
+                unique_vals = group[category].unique()
+                group_items = ['--------------------', ', '.join(name), '--------------------']
+                write_items = []
+                for val1, val2 in combinations(group[category].unique(), 2):
+                    sample1 = group['alpha'][group[category] == val1]
+                    sample2 = group['alpha'][group[category] == val2]
+                    n1 = len(sample1)
+                    n2 = len(sample2)
+                    if n1 > 25 and n2 > 25:
+                        dist = wasserstein_distance(sample1, sample2)
+                        write_items.append((dist, n1, n2, val1, val2))
+                        #write_items.append('%s (%d), %s (%d), %f' % (val1, n1, val2, n2, dist))
+                if len(write_items) > 0:
+                    f.write('-----------------------\n')
+                    f.write(', '.join(name) + '\n')
+                    f.write('-----------------------\n')
+                    write_items = reversed(sorted(write_items))
+                    for dist, n1, n2, val1, val2 in write_items:
+                        f.write('%s (%d), %s (%d), %f\n' % (val1, n1, val2, n2, dist))
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-od', '--output_dir', default=OUTPUT_DIR)
     parser.add_argument('-o', '--output_fname', default=OUTPUT_FNAME)
     parser.add_argument('-m', '--models_fname', default=MODELS_FNAME)
-    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE_FILTERED)
+    parser.add_argument('-t', '--tradeoffs_fname', default=TRADEOFFS_FNAME)
+    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE)
     parser.add_argument('-f', '--figs_dir', default=FIGS_DIR)
     parser.add_argument('--synthetic', action='store_true')
     args = parser.parse_args()
@@ -619,43 +716,31 @@ def main():
     output_dir = args.output_dir
     output_fname = args.output_fname
     models_fname = args.models_fname
-    categories_file = args.categories_file 
+    tradeoffs_fname = args.tradeoffs_fname
+    categories_file = args.categories_file
     figs_dir = args.figs_dir
     synthetic = args.synthetic
 
     if synthetic:
         output_fname = output_fname.replace('.csv', '_synthetic.csv')
         models_fname = models_fname.replace('.csv', '_synthetic.csv')
+        tradeoffs_fname = tradeoffs_fname.replace('.csv', '_synthetic.csv')
         figs_dir += '_synthetic'
 
     output_file = '%s/%s' % (output_dir, output_fname)
     models_file = '%s/%s' % (output_dir, models_fname)
+    tradeoffs_file = '%s/%s' % (output_dir, tradeoffs_fname)
     
     models_df, categories_df = get_dfs(output_file=output_file,\
                                        categories_file=categories_file,\
-                                       models_file=models_file)
+                                       models_file=models_file,\
+                                       tradeoffs_file=tradeoffs_file)
     
-    density_df = neuron_density.get_df()
-    density_df.drop('points', inplace=True, axis=1)
 
-    tradeoff_file = '/iblsn/data/Arjun/neurons/pareto_steiner_output/tradeoff_ratio'
-    if synthetic:
-        tradeoff_file += '_synthetic'
-    tradeoff_file += '.csv'
-    tradeoff_df = pd.read_csv(tradeoff_file, skipinitialspace=True)
-    #print tradeoff_df
-
-    neurons_df = pd.merge(categories_df, density_df, on=['neuron name', 'neuron type'])
-    neurons_df = pd.merge(neurons_df, tradeoff_df, on=['neuron name', 'neuron type'])
-    print neurons_df
-
-    models_df.to_csv('/iblsn/data/Arjun/neurons/models_df.csv', index=False)
-    categories_df.to_csv('/iblsn/data/Arjun/neurons/categories_df.csv', index=False)
-    neurons_df.to_csv('/iblsn/data/Arjun/neurons/neurons_df.csv')
-
-    return None
-
-    if TEST_NEW_FUNCTION: 
+    if TEST_NEW_FUNCTION:
+        cats = CATEGORIES[:]
+        cats.remove('lab')
+        triplet_analysis(categories_df, cats)
         return None
     
     metadata(categories_df)
@@ -671,7 +756,7 @@ def main():
     dist_heats(categories_df, CATEGORIES, DIST_FUNCS, outdir=figs_dir)
     category_dists(categories_df, CATEGORIES, outdir=figs_dir)
     boxplot_alphas(categories_df, CATEGORIES, outdir=figs_dir)
-    violin_alphas(categories_df, CATEGORIES, outdir=figs_dir)
+    violin_tradeoffs(categories_df, CATEGORIES, outdir=figs_dir)
     truncation_hist(categories_df, outdir=figs_dir)
     size_dist_correlation(categories_df, outdir=figs_dir)
     alpha_dist_correlation(categories_df, outdir=figs_dir)
