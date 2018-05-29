@@ -22,6 +22,7 @@ import math
 from collections import defaultdict
 from numpy.random import permutation
 #import pandas as pd
+from tradeoff_ratio import tradeoff_ratio
 
 SKIP_TYPES = ['Unknown_neurotransmitter', 'Not_reported']
 
@@ -308,20 +309,25 @@ def pareto_analysis(G, neuron_name, neuron_type,\
    
 # ---------------------------------------
     tree_costs_fname = '%s/tree_costs.csv' % fronts_dir
-   
+
     models_fname = '%s/models_%s.csv' % (output_dir, neuron_name)
-    
     output_fname = '%s/pareto_steiner_%s.csv' %  (output_dir, neuron_name)
+    tradeoff_fname = '%s/tradeoff_%s.csv' % (output_dir, neuron_name)
+
+
 
 # ---------------------------------------
     alphas, mcosts, scosts, first_time = pareto_front(G, point_graph,\
                                                       neuron_name, neuron_type,\
                                                       fronts_dir, figs_dir,\
                                                       viz_trees) 
+
+    opt_mcost, opt_scost = min(mcosts), min(scosts)
 # ---------------------------------------
     
-    neural_mcost = mst_cost(G)
-    neural_scost = satellite_cost(G, relevant_nodes=point_graph.nodes())
+    #neural_mcost = mst_cost(G)
+    #neural_scost = satellite_cost(G, relevant_nodes=point_graph.nodes())
+    neural_mcost, neural_scost = graph_costs(G, relevant_nodes=point_graph.nodes())
     
     neural_dist, neural_index = DIST_FUNC(mcosts, scosts, neural_mcost,\
                                           neural_scost)
@@ -329,12 +335,15 @@ def pareto_analysis(G, neuron_name, neuron_type,\
     neural_closes = scosts[neural_index]
     neural_alpha = alphas[neural_index]
 
+# ---------------------------------------
+    tradeoff = tradeoff_ratio(neural_mcost, opt_mcost, neural_scost, opt_scost)
     
 # ---------------------------------------
     centroid_tree = centroid_mst(point_graph)
 
-    centroid_mcost = mst_cost(centroid_tree)
-    centroid_scost = satellite_cost(centroid_tree, relevant_nodes=point_graph.nodes())
+    #centroid_mcost = mst_cost(centroid_tree)
+    #centroid_scost = satellite_cost(centroid_tree, relevant_nodes=point_graph.nodes())
+    centroid_mcost, centroid_scost = graph_costs(G, relevant_nodes=point_graph.nodes())
     
     centroid_dist, centroid_index = DIST_FUNC(mcosts, scosts,\
                                               centroid_mcost,\
@@ -428,6 +437,9 @@ def pareto_analysis(G, neuron_name, neuron_type,\
         write_items = ', '.join(write_items)
         with open(output_fname, 'a') as output_file:
             output_file.write('%s\n' % write_items)
+        
+        with open(tradeoff_fname, 'a') as tradeoff_file:
+            tradeoff_file.write('%s, %s, %f\n' % (neuron_name, neuron_type, tradeoff))
 
 def pareto_analysis_imaris(G, neuron_name, neuron_type,\
                            fronts_dir=IMARIS_FRONTS_DIR,\
@@ -884,14 +896,16 @@ def main():
     labs = args.labs
     names = args.names
     ntypes = args.neuron_types
-    neuron_types = []
-    for ntype in ntypes:
-        if ntype.isdigit():
-            neuron_types.append(int(ntype))
-        elif ntype in ARBOR_TYPES:
-            neuron_types.append(ARBOR_TYPES[ntype])
-        else:
-            raise ValueError('invalid neuron type')
+    neuron_types = None
+    if ntypes != None:
+        neuron_types = []
+        for ntype in ntypes:
+            if ntype.isdigit():
+                neuron_types.append(int(ntype))
+            elif ntype in ARBOR_TYPES:
+                neuron_types.append(ARBOR_TYPES[ntype])
+            else:
+                raise ValueError('invalid neuron type')
     boutons = args.boutons
     synthetic = args.synthetic
 
