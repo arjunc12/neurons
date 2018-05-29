@@ -45,6 +45,11 @@ def filter_categories():
             counts = list(group['count'])
             vals = list(group[category])
             count_vals = zip(counts, vals)
+            if (category == 'cell type'):
+                count_vals2 = filter(lambda (count, val) : val != 'principal cell', count_vals)
+                if len(count_vals2) > 0:
+                    #count_vals = count_vals2
+                    pass
             max_count, max_val = max(count_vals)
             max_vals[name] = max_val
         df['max ' + category] = df['neuron name'].map(max_vals)
@@ -52,6 +57,9 @@ def filter_categories():
         df.drop('max ' + category, axis=1, inplace=True)
 
     df.to_csv(CATEGORIES_FILE_FILTERED, index=False)
+
+    for name, group in df.groupby('cell type'):
+        print name, len(group.index)
 
 def main():
     #write_categories()
