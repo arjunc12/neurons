@@ -8,7 +8,7 @@ import os
 import seaborn as sns
 from itertools import combinations
 import numpy as np
-from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind, wasserstein_distance
+from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind, ttest_rel, wasserstein_distance
 from numpy.linalg import norm
 import numpy as np
 from stats_utils import *
@@ -702,6 +702,47 @@ def triplet_analysis(df, categories=CATEGORIES):
                     for dist, n1, n2, val1, val2 in write_items:
                         f.write('%s (%d), %s (%d), %f\n' % (val1, n1, val2, n2, dist))
 
+def paired_categories_test(df, categories=CATEGORIES):
+    for category in categories:
+        print '----------------'
+        print category
+        print '----------------'
+        subset_cols = ['neuron name', 'neuron type']
+        if category != 'neuron type':
+            subset_cols.append(category)
+        df2 = df.drop_duplicates(subset=subset_cols)
+        df2 = df2[subset_cols + ['alpha']]
+        
+        groupby_cols = subset_cols[:]
+        groupby_cols.remove(category)
+
+        for val1, val2 in combinations(df2[category].unique(), 2):
+            print val1, val2
+            sample1, sample2 = [], []
+            for name, group in df2.groupby(groupby_cols):
+                g1 = group[group[category] == val1]
+                g2 = group[group[category] == val2]
+
+
+                alpha1 = g1['alpha']
+                alpha2 = g2['alpha']
+                
+                if len(alpha1) > 0 and len(alpha2) > 0:
+                    s1 = pylab.mean(alpha1)
+                    s2 = pylab.mean(alpha2)
+
+                    sample1.append(pylab.mean(alpha1))
+                    sample2.append(pylab.mean(alpha2))
+
+            assert len(sample1) == len(sample2)
+            if len(sample1) > 0:
+                sample1 = pylab.array(sample1)
+                sample2 = pylab.array(sample2)
+                print "%s vs. %s" % (val1, val2)
+                differences = sample1 - sample2
+                print len(differences), pylab.mean(differences), pylab.std(differences, ddof=1)
+                print ttest_rel(sample1, sample2)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-od', '--output_dir', default=OUTPUT_DIR)
@@ -738,9 +779,7 @@ def main():
     
 
     if TEST_NEW_FUNCTION:
-        cats = CATEGORIES[:]
-        cats.remove('lab')
-        triplet_analysis(categories_df, cats)
+        paired_categories_test(categories_df, categories=['neuron type'])
         return None
     
     metadata(categories_df)
@@ -748,19 +787,32 @@ def main():
     print "mean neural dist", pylab.mean(models_df['dist'][models_df['model'] == 'neural'])
     null_models_analysis(models_df)
     neuron_type_alphas(categories_df)
+    
     os.system('mkdir -p %s' % figs_dir)
+    
     scatter_dists(models_df, outdir=figs_dir)
+    
     alphas_hist(categories_df, outdir=figs_dir)
     neuron_types_hist(categories_df, outdir=figs_dir)
+    
     alphas_heat(categories_df, CATEGORIES, outdir=figs_dir)
     dist_heats(categories_df, CATEGORIES, DIST_FUNCS, outdir=figs_dir)
+    
     category_dists(categories_df, CATEGORIES, outdir=figs_dir)
+    
     boxplot_alphas(categories_df, CATEGORIES, outdir=figs_dir)
+    
     violin_tradeoffs(categories_df, CATEGORIES, outdir=figs_dir)
+    
     truncation_hist(categories_df, outdir=figs_dir)
+    
     size_dist_correlation(categories_df, outdir=figs_dir)
     alpha_dist_correlation(categories_df, outdir=figs_dir)
     size_alpha_correlation(categories_df, outdir=figs_dir)
+    
+    cats = CATEGORIES[:]
+    cats.remove('lab')
+    triplet_analysis(categories_df, cats)
     
 if __name__ == '__main__':
     main()
