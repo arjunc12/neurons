@@ -225,7 +225,16 @@ def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
     trial_length = kwargs['trial_length']
     r_puncta = kwargs['radius_puncta']
     r_remove = kwargs['radius_remove']
-    u = choice(G.nodes())
+    p_root = kwargs['proot']
+    u = None
+    root = G.graph['root']
+    candidates = G.nodes()
+    assert root in candidates
+    if random() <= p_root or len(candidates) == 1:
+        u = G.graph['root']
+    else:
+        candidates.remove(root)
+        u = choice(candidates)
     new_extension = add_bifurcations(G, u, dim=dim, bifurcations=1, dist=trial_length)[0]
     new_synapse = connect_to_synapses(G, new_extension, unmarked_points,\
                                       puncta_radius=r_puncta, remove_radius=r_remove)
@@ -410,6 +419,7 @@ def main():
     parser.add_argument('-ra', '--radius_annihilation', default=1, type=float)
     parser.add_argument('-p', '--branching_prob', default=0.1, type=float)
     parser.add_argument('-v', '--video', action='store_true')
+    parser.add_argument('-proot', '--prob_root', default=0.1, type=float)
     
     args = parser.parse_args()
     algorithm = args.algorithm
