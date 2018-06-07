@@ -17,7 +17,7 @@ import neuron_density
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = True
+TEST_NEW_FUNCTION = False
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -749,7 +749,7 @@ def main():
     parser.add_argument('-o', '--output_fname', default=OUTPUT_FNAME)
     parser.add_argument('-m', '--models_fname', default=MODELS_FNAME)
     parser.add_argument('-t', '--tradeoffs_fname', default=TRADEOFFS_FNAME)
-    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE)
+    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE_FILTERED)
     parser.add_argument('-f', '--figs_dir', default=FIGS_DIR)
     parser.add_argument('--synthetic', action='store_true')
     args = parser.parse_args()
