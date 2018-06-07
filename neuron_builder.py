@@ -225,7 +225,7 @@ def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
     trial_length = kwargs['trial_length']
     r_puncta = kwargs['radius_puncta']
     r_remove = kwargs['radius_remove']
-    p_root = kwargs['proot']
+    p_root = kwargs['prob_root']
     u = None
     root = G.graph['root']
     candidates = G.nodes()
@@ -336,6 +336,8 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
         return None
 
     trees_dir = '%s/%s/trees' % (OUTDIR, algorithm)
+    print trees_dir
+    os.system('mkdir -p %s' % trees_dir)
     tree_dir = '%s/tree%d' % (trees_dir, len(os.listdir(trees_dir)) + 1)
     print tree_dir
     os.system('mkdir -p %s' % tree_dir)
