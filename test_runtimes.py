@@ -23,6 +23,13 @@ def runtimes_stats():
     df = pd.read_csv('test_runtimes.csv', skipinitialspace=True)
     print "total trials"
     print len(df['algorithm']) / len(df['algorithm'].unique())
+
+    ratios = []
+    labels = []
+    weights = []
+    hist_algorithms = ['prim', 'khuller']
+    algorithm_labels = {'prim' : 'spanning', 'khuller' : 'khuller'}
+
     pylab.figure()
     for algorithm, group in df.groupby('algorithm'):
         print algorithm
@@ -32,13 +39,29 @@ def runtimes_stats():
         print binom_test(dominated, comparisons)
         group = group.groupby('points', as_index=False).agg(pylab.mean)
         pylab.plot(group['points'], group['runtime'], label=algorithm)
-        print "cost comparisons", pylab.count_nonzero(~pylab.isnan(group['cost ratio']))
-        print "cost ratio", pylab.nanmean(group['cost ratio'])
+        ratio = group['cost ratio']
+        ratio = ratio[~pylab.isnan(ratio)]
+        print "cost comparisons", len(ratio)
+        print "cost ratio", pylab.nanmean(ratio), "+/-", pylab.nanstd(ratio, ddof=1)
+
+        if algorithm in hist_algorithms:
+            ratios.append(ratio)
+            labels.append(algorithm_labels[algorithm])
+            weight = pylab.ones_like(ratio) / float(len(ratio))
+            weights.append(weight)
 
     pylab.legend(loc=2)
     pylab.xlabel('number of points')
     pylab.ylabel('rumtime (minutes)')
     pylab.savefig('test_runtimes/runtimes.pdf', format='pdf')
+    pylab.close()
+
+    pylab.figure()
+    pylab.hist(ratios, label=labels, weights=weights)
+    pylab.xlabel('cost ratio', size=20)
+    pylab.ylabel('proportion', size=20)
+    pylab.legend()
+    pylab.savefig('test_runtimes/cost_ratio_hist.pdf', format='pdf')
     pylab.close()
     
 def time_function(G, alpha, pareto_func):
