@@ -94,19 +94,34 @@ def greedy_eval(G):
 def greedy_eval_stats():
     df = pd.read_csv('greedy_eval.csv', skipinitialspace=True)
 
+    mcost_ratios = []
+    scost_ratios = []
+    cost_ratios = []
+    algorithm_labels = {'steiner' : 'steiner', 'prim' : 'spanning', 'khuller' : 'khuller'}
+    labels = []
+
     for algorithm, group in df.groupby('algorithm'):
         print algorithm 
         print "success rate", pylab.mean(group['success'])
         print "error rate", pylab.mean(group['error'])
         #print group[group['error'] == 1]
+
+        mcost_ratio = group['mcost'] / group['optimal mcost']
+        scost_ratio = group['scost'] / group['optimal scost']
+        cost_ratio = group['cost'] / group['optimal cost']
+
+        print "mcost ratio", pylab.mean(mcost_ratio), "+/-", pylab.std(mcost_ratio, ddof=1)
+        print "scost ratio", pylab.mean(scost_ratio), "+/-", pylab.std(scost_ratio, ddof=1)
+        print "cost ratio", pylab.mean(cost_ratio), "+/-", pylab.std(cost_ratio, ddof=1)
         
-        print "mcost ratio", pylab.mean(group['mcost'] / group['optimal mcost'])
-        print "scost ratio", pylab.mean(group['scost'] / group['optimal scost'])
-        print "cost ratio", pylab.mean(group['cost'] / group['optimal cost'])
-        
-        print "max mcost ratio", max(group['mcost'] / group['optimal mcost'])
-        print "max scost ratio", max(group['scost'] / group['optimal scost'])
-        print "max cost ratio", max(group['cost'] / group['optimal cost'])
+        print "max mcost ratio", max(mcost_ratio)
+        print "max scost ratio", max(scost_ratio)
+        print "max cost ratio", max(cost_ratio)
+
+        mcost_ratios.append(mcost_ratio)
+        scost_ratios.append(scost_ratio)
+        cost_ratios.append(cost_ratio)
+        labels.append(algorithm_labels[algorithm])
 
     pylab.figure()
     pylab.scatter(df['mcost'], df['optimal mcost'])
@@ -122,6 +137,29 @@ def greedy_eval_stats():
     pylab.scatter(df['cost'], df['optimal cost'])
     pylab.savefig('greedy_eval/greedy_eval_cost.pdf', format='pdf')
     pylab.close()
+
+    for ratios, fname in zip([mcost_ratios, scost_ratios, cost_ratios], ['mcost', 'scost', 'cost']):
+        pylab.figure()
+        weights = []
+        for ratio, label in zip(ratios, labels):
+            wt = pylab.ones_like(ratio) / float(len(ratio))
+            weights.append(wt)
+        pylab.hist(ratios, weights=weights, label=labels)
+        pylab.legend()
+        pylab.savefig('greedy_eval/%s_ratios_hist.pdf' % fname, format='pdf')
+        pylab.close()
+   
+    '''
+    for ratios, fname in zip([mcost_ratios, scost_ratios, cost_ratios], ['mcost', 'scost', 'cost']):
+        pylab.figure()
+        for ratio, label in zip(ratios, labels):
+            wt = pylab.ones_like(ratio) / float(len(ratio))
+            pylab.hist(ratio, weights=wt, label=label, alpha=0.5)
+        pylab.legend()
+        pylab.savefig('greedy_eval/%s_ratios_hist.pdf' % fname, format='pdf')
+        pylab.close()
+    '''
+
 
 def main():
     parser = argparse.ArgumentParser()
