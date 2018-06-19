@@ -35,14 +35,15 @@ def runtimes_stats():
         print algorithm
         comparisons = group['comparisons'].sum()
         dominated = group['dominated'].sum()
-        print float(dominated) / float(comparisons)
+        print float(dominated) / float(comparisons), "(", dominated, "/", comparisons, ")"
         print binom_test(dominated, comparisons)
         group = group.groupby('points', as_index=False).agg(pylab.mean)
         pylab.plot(group['points'], group['runtime'], label=algorithm)
         ratio = group['cost ratio']
         ratio = ratio[~pylab.isnan(ratio)]
+        ratio = ratio - 1
         print "cost comparisons", len(ratio)
-        print "cost ratio", pylab.nanmean(ratio), "+/-", pylab.nanstd(ratio, ddof=1)
+        print "cost ratio", pylab.mean(ratio), "+/-", pylab.std(ratio, ddof=1)
 
         if algorithm in hist_algorithms:
             ratios.append(ratio)
@@ -58,10 +59,10 @@ def runtimes_stats():
 
     pylab.figure()
     pylab.hist(ratios, label=labels, weights=weights)
-    pylab.xlabel('cost ratio', size=20)
+    pylab.xlabel('percent better/worse than Steiner', size=20)
     pylab.ylabel('proportion', size=20)
     pylab.legend()
-    pylab.savefig('test_runtimes/cost_ratio_hist.pdf', format='pdf')
+    pylab.savefig('test_runtimes/cost_ratios_hist.pdf', format='pdf')
     pylab.close()
     
 def time_function(G, alpha, pareto_func):
