@@ -108,7 +108,7 @@ def best_mst_cost(G):
 
 def mst_cost(G):
     total_length = 0
-    for u, v in G.edges_iter():
+    for u, v in G.edges():
         total_length += G[u][v]['length']
     return total_length
 
