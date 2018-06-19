@@ -43,6 +43,8 @@ NEUROMORPHO_FIGS_DIR = '%s/pareto_steiner_output/steiner_figs' % DATA_DRIVE
 NEUROMORPHO_OUTPUT_DIR = '%s/pareto_steiner_output' % DATA_DRIVE
 NEUROMORPHO_FRONTS_DIR = '%s/pareto_fronts' % NEUROMORPHO_OUTPUT_DIR
 NEUROMORPHO_TEMP_DIR = '%s/pareto_steiner_temp' % NEUROMORPHO_OUTPUT_DIR
+NEUROMORPHO_PLOTS_DIR = '%s/pareto_front_plots' % NEUROMORPHO_OUTPUT_DIR
+NEUROMORPHO_LOG_PLOTS_DIR = '%s/pareto_front_log_plots' % NEUROMORPHO_OUTPUT_DIR
 
 IMARIS_DRIVE = '%s/imaris' % DATA_DRIVE
 IMARIS_TRACINGS_DIR = '%s/tracings' % IMARIS_DRIVE
@@ -64,6 +66,7 @@ NEURON_TYPES = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite',\
 
 COLORS = {'neural' : 'r', 'centroid' : 'g', 'random' : 'm', 'barabasi' : 'c'}
 MARKERS = {'neural' : 'x', 'centroid' : 'o', 'random' : '^', 'barabasi' : 's'}
+LABELS = {'neural' : 'Neural arbor', 'centroid' : 'Centroid', 'random' : 'Random', 'barabasi' : 'Barabasi-Albert'}
 
 PLOT_TREES = ['neural']
 LOG_PLOT_TREES = ['neural', 'centroid', 'barabasi', 'random']
@@ -116,7 +119,8 @@ def read_tree_costs(fronts_dir):
 
     return tree_costs
 
-def pareto_plot(fronts_dir, figs_dir, log_plot=False):
+def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
+                neuron_name=None, neuron_type=None, synthetic=False):
     import seaborn as sns
     '''
     pareto_front = pd.read_csv('%s/pareto_front.csv' % fronts_dir,\
@@ -144,7 +148,7 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False):
     sns.set()
 
     pylab.plot(mcosts, scosts, c='b', label='_nolegend_')
-    pylab.scatter(mcosts, scosts, c='b', label='Pareto optimal')
+    pylab.scatter(mcosts, scosts, c='b', label='Pareto front')
  
     plot_trees = None
     if log_plot:
@@ -159,23 +163,29 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False):
             if log_plot:
                 mcosts = pylab.log10(pylab.array(mcosts))
                 scosts = pylab.log10(pylab.array(scosts))
-            pylab.scatter(mcosts, scosts, label=tree,\
+            pylab.scatter(mcosts, scosts, label=LABELS[tree],\
                           marker=MARKERS[tree], s=175, c=COLORS[tree])
     
-    xlab = ''
-    ylab = ''
+    xlab = 'Wiring Cost'
+    ylab = 'Conduction Delay'
     if log_plot:
-        xlab += 'log-'
-        ylab += 'log-'
-    xlab += 'wiring cost'
-    ylab += 'conduction delay'
-    pylab.xlabel(xlab, fontsize=25)
-    pylab.ylabel(ylab, fontsize=25)
-    pylab.legend()
+        xlab = 'log(' + xlab + ')'
+        ylab = 'log(' + ylab + ')'
+    
+    pylab.xlabel(xlab, fontsize=35)
+    pylab.ylabel(ylab, fontsize=35)
+    leg = pylab.legend(frameon=True)
+    
     ax = pylab.gca()
-    pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
+    
+    pylab.setp(ax.get_legend().get_texts(), fontsize=30) # for legend text
+    
+    leg.get_frame().set_linewidth(5)
+    leg.get_frame().set_edgecolor('k')
+    
     ax.tick_params(axis='x', labelsize=20)
     ax.tick_params(axis='y', labelsize=20)
+    
     pylab.tight_layout()
    
     pdf_name = ''
@@ -184,6 +194,23 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False):
     pdf_name += 'pareto_front.pdf'
     fname = '%s/%s' % (figs_dir, pdf_name)
     pylab.savefig(fname, format='pdf')
+
+    if neuron_name != None and neuron_type != None:
+        plot_dir = None
+        if log_plot:
+            plot_dir = NEUROMORPHO_LOG_PLOTS_DIR
+        else:
+            plot_dir = NEUROMORPHO_PLOTS_DIR
+        if synthetic:
+            plot_dir += '_synthetic'
+        neuron_name = neuron_name.replace(' ', '_')
+        neuron_type = neuron_type.replace(' ', '_')
+        plot_dir = '%s/%s/%s' % (plot_dir, neuron_name, neuron_type)
+        print plot_dir
+        os.system('mkdir -p %s' % plot_dir)
+        fname = '%s/%s' % (plot_dir, pdf_name)
+        pylab.savefig(fname, format='pdf')
+
     pylab.close()
 
 def pareto_tree_costs(G, point_graph, axon=False, viz_trees=False, figs_dir=None,\
@@ -624,8 +651,14 @@ def pareto_analysis_neuromorpho(min_nodes=MIN_NODES, max_nodes=MAX_NODES,\
                                                 figs_dir=figs_dir,\
                                                 viz_trees=viz_trees)
                                 if plot:
-                                    pareto_plot(fronts_dir, figs_dir)
-                                    pareto_plot(fronts_dir, figs_dir, log_plot=True)
+                                    pareto_plot(fronts_dir, figs_dir,\
+                                                neuron_name=neuron_name,\
+                                                neuron_type=neuron_type,\
+                                                synthetic=synthetic)
+                                    pareto_plot(fronts_dir, figs_dir, log_plot=True,\
+                                                neuron_name=neuron_name,\
+                                                neuron_type=neuron_type,\
+                                                synthetic=synthetic)
 
 
                             except RuntimeError as r:
