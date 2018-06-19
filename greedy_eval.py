@@ -102,13 +102,13 @@ def greedy_eval_stats():
 
     for algorithm, group in df.groupby('algorithm'):
         print algorithm 
-        print "success rate", pylab.mean(group['success'])
+        print "success rate", pylab.mean(group['success']), "(", sum(group['success']), "/", len(group['success']), ")"
         print "error rate", pylab.mean(group['error'])
         #print group[group['error'] == 1]
 
-        mcost_ratio = group['mcost'] / group['optimal mcost']
-        scost_ratio = group['scost'] / group['optimal scost']
-        cost_ratio = group['cost'] / group['optimal cost']
+        mcost_ratio = (group['mcost'] / group['optimal mcost']) - 1
+        scost_ratio = (group['scost'] / group['optimal scost']) - 1
+        cost_ratio = (group['cost'] / group['optimal cost']) - 1
 
         print "mcost ratio", pylab.mean(mcost_ratio), "+/-", pylab.std(mcost_ratio, ddof=1)
         print "scost ratio", pylab.mean(scost_ratio), "+/-", pylab.std(scost_ratio, ddof=1)
@@ -146,6 +146,8 @@ def greedy_eval_stats():
             weights.append(wt)
         pylab.hist(ratios, weights=weights, label=labels)
         pylab.legend()
+        pylab.xlabel('percent better/worse than brute force', size=20)
+        pylab.ylabel('proportion', size=20)
         pylab.savefig('greedy_eval/%s_ratios_hist.pdf' % fname, format='pdf')
         pylab.close()
    
