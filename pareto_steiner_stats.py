@@ -63,6 +63,9 @@ def remove_small_counts(df, categories, min_count=MIN_COUNT):
     df2 = df2[df2['count'] >= min_count]
     return df2
 
+def count_unique_neurons(df):
+    return len(set(zip(df['neuron name'], df['neuron type'])))
+
 def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE_FILTERED,\
             models_file=MODELS_FILE, tradeoffs_file=TRADEOFFS_FILE):
     output_df = pd.read_csv(output_file, skipinitialspace=True)
@@ -186,6 +189,9 @@ def hellinger_distance(dist1, dist2):
 
     return dist
 
+def dist_pval(counts1, counts2, dist_func):
+    pass
+
 def make_dist_frame(df, category, alphas=None, dist_func=pseudo_kld):
     df2 = df.drop_duplicates(subset=['neuron name', 'neuron type', category])
     df2 = remove_small_counts(df2, category,\
@@ -199,13 +205,18 @@ def make_dist_frame(df, category, alphas=None, dist_func=pseudo_kld):
     for val1, val2 in combinations(counts.keys(), 2):
         counts1 = counts[val1]
         counts2 = counts[val2]
-        #kld = entropy(counts1, counts2)
-        dist1 = dist_func(counts1, counts2)
-        dist2 = dist_func(counts2, counts1)
-        #kld = jsdiv(counts1, counts2)
+
+        distribution1 = normalize_distribution(counts1)
+        distribution2 = normalize_distribution(counts2)
+        
+        #distance1 = dist_func(counts1, counts2)
+        #distance2 = dist_func(counts2, counts1)
+        distance1 = dist_func(distribution1, distribution2)
+        distance2 = dist_func(distribution2, distribution1)
+        
         cat1 += [val1, val2]
         cat2 += [val2, val1]
-        dist_vals += [dist1, dist2]
+        dist_vals += [distance1, distance2]
 
     dist_frame = pd.DataFrame()
     dist_frame[category + '1'] = cat1
@@ -407,6 +418,7 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
         if len(group['model'].unique()) != 4:
             print group
         for model, group2 in group.groupby('model'):
+            #group2 = group2.head(n=20)
             model_dists[model].append(pylab.mean(group2['dist']))
     
     order = pylab.argsort(model_dists['neural'])
@@ -414,21 +426,35 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
     pylab.figure()
     sns.set()
     pylab.tight_layout()
+    
+    model_colors = {'neural' : 'r', 'centroid' : 'g', 'random' : 'm', 'barabasi' : 'c'}
+    model_markers = {'neural' : 'x', 'centroid' : 'o', 'random' : '^', 'barabasi' : 's'}
+    model_labels = {'neural': 'Neural arbor', 'centroid' : 'Centroid', 'random' : 'Random', 'barabasi' : 'Barabasi-Albert'}
+   
+    max_dist = float('-inf')
     for model, dists in model_dists.iteritems():
         dists = pylab.array(dists)
         y = dists[order]
         if LOG_DIST:
-            y = pylab.log10(y)
-        pylab.scatter(x, y, label=model)
-    pylab.xlabel('neuron index', fontsize=25)
-    ylab = ''
+            y = pylab.log10(y) 
+        max_dist = max(max_dist, max(y))
+
+        color = model_colors[model]
+        marker = model_markers[model]
+        label = model_labels[model]
+        pylab.scatter(x, y, label=label, c=color, marker=marker)
+    pylab.xlabel('neuron index', fontsize=20)
+    ylab = 'distance to Pareto front'
     if LOG_DIST:
-        ylab += 'log-'
-    ylab += 'distance to Pareto front'
-    pylab.ylabel(ylab, fontsize=25)
-    pylab.legend(ncol=2)
+        ylab = 'log(' + ylab + ')'
+    pylab.ylabel(ylab, fontsize=20)
+    leg = pylab.legend(ncol=2, frameon=True)
+    leg.get_frame().set_linewidth(5)
+    leg.get_frame().set_edgecolor('k')
     ax = pylab.gca()
     pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
+    pylab.ylim(0, max_dist + 0.6)
+
     pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf')
 
 def alphas_hist(df, outdir=FIGS_DIR, categories=None):
@@ -508,12 +534,38 @@ def null_models_analysis(models_df):
     df2 = models_df[models_df['model'] != 'neural']
     for model, group in df2.groupby('model'):
         print '***%s***' % model
-        ntrials = len(group['success'])
-        success_rate = pylab.mean(group['success'])
-        print "success rate", success_rate, "trials", len(group['success'])
-        print "binomial p-value", binom_test(success_rate, ntrials)
-        print "neural to %s ratio" % model, pylab.mean(group['ratio'])
-        print "t-test p-value", ttest_1samp(group['ratio'], popmean=1)
+        trials = len(group['success'])
+        successes = sum(group['success'])
+        #success_rate = pylab.mean(group['success'])
+
+        ratios = group['ratio']
+    
+        '''
+        successes = 0
+        trials = 0
+        ratios = []
+        for (neuron_name, neuron_type), group2 in group.groupby(['neuron name', 'neuron type']):
+            group2 = group2.head(n=20)
+            successes += sum(group2['success'])
+            trials += len(group2['success'])
+            ratios.append(pylab.mean(group2['ratio']))
+        '''
+
+        print "success rate", float(successes) / float(trials), "trials", trials
+        print "binomial p-value", binom_test(successes, trials)
+        print "neural to %s ratio" % model, pylab.mean(ratios)
+        print "t-test p-value", ttest_1samp(ratios, popmean=1)
+
+def null_models_check(models_df):
+    df2 = models_df[models_df['model'] != 'neural']
+    for (neuron_name, neuron_type), group in df2.groupby(['neuron name', 'neuron type']):
+        ratios = group['ratio']
+        models = group['model']
+        r1 = list(ratios[models == 'centroid'])[:20]
+        r2 = list(ratios[models == 'barabasi'])[:20]
+        
+        if pylab.mean(r1) > pylab.mean(r2):
+            print neuron_name, neuron_type
 
 def infmean(arr):
     return pylab.mean(masked_invalid(arr))
@@ -568,12 +620,14 @@ def vals_correlation(df, val1, val2, outdir=FIGS_DIR, xtransform=None,\
     print "-----------------------------------------------------"
     print "%s-%s correlation" % (val1, val2)
     df2 = df.drop_duplicates(subset=['neuron name', 'neuron type'])
-    v1 = df2[val1]
-    v2 = df2[val2]
     
     if logtransform:
         xtransform = pylab.log10
         ytransform = pylab.log10
+        df2 = df2[(df2[val1] > 0) & (df2[val2] > 0)]
+    
+    v1 = df2[val1]
+    v2 = df2[val2]
     
     if xtransform != None:
         v1 = xtransform(v1)
@@ -752,6 +806,7 @@ def main():
     parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE_FILTERED)
     parser.add_argument('-f', '--figs_dir', default=FIGS_DIR)
     parser.add_argument('--synthetic', action='store_true')
+    parser.add_argument('--triplet', action='store_true')
     args = parser.parse_args()
     
     output_dir = args.output_dir
@@ -761,6 +816,7 @@ def main():
     categories_file = args.categories_file
     figs_dir = args.figs_dir
     synthetic = args.synthetic
+    triplet = args.triplet
 
     if synthetic:
         output_fname = output_fname.replace('.csv', '_synthetic.csv')
@@ -779,17 +835,18 @@ def main():
     
 
     if TEST_NEW_FUNCTION:
-        paired_categories_test(categories_df, categories=['neuron type'])
         return None
     
     metadata(categories_df)
     print "-----------------------------------------------------"
     print "mean neural dist", pylab.mean(models_df['dist'][models_df['model'] == 'neural'])
     null_models_analysis(models_df)
+    
     neuron_type_alphas(categories_df)
     
     os.system('mkdir -p %s' % figs_dir)
     
+    null_models_analysis(models_df)
     scatter_dists(models_df, outdir=figs_dir)
     
     alphas_hist(categories_df, outdir=figs_dir)
@@ -806,13 +863,16 @@ def main():
     
     truncation_hist(categories_df, outdir=figs_dir)
     
-    size_dist_correlation(categories_df, outdir=figs_dir)
+    size_dist_correlation(categories_df, outdir=figs_dir) 
     alpha_dist_correlation(categories_df, outdir=figs_dir)
     size_alpha_correlation(categories_df, outdir=figs_dir)
     
     cats = CATEGORIES[:]
     cats.remove('lab')
-    triplet_analysis(categories_df, cats)
+    if triplet:
+        triplet_analysis(categories_df, cats)
+        
+    paired_categories_test(categories_df, categories=['neuron type'])
     
 if __name__ == '__main__':
     main()
