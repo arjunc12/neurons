@@ -32,7 +32,7 @@ def satellite_tree(G):
     satellite = G.copy()
     satellite.remove_edges_from(G.edges())
 
-    for u in satellite.nodes_iter():
+    for u in satellite.nodes():
         if u != root:
             satellite.add_edge(u, root)
             p1, p2 = satellite.node[u]['coord'], satellite.node[root]['coord']
@@ -831,7 +831,7 @@ def centroid(G):
     root = G.graph['root']
     root_coord = G.node[root]['coord']
     centroid = np.zeros(len(root_coord))
-    for u in G.nodes_iter():
+    for u in G.nodes():
         point = G.node[u]['coord']
         assert len(point) == len(root_coord)
         if u != root:
@@ -847,7 +847,7 @@ def centroid_mst(G):
     cent_mst.add_node('centroid')
     cent_mst.node['centroid']['label'] = 'centroid'
     cent_mst.node['centroid']['coord'] = centroidp
-    for u in G.nodes_iter():
+    for u in G.nodes():
         cent_mst.add_edge(u, 'centroid')
         cent_mst[u]['centroid']['length'] = point_dist(cent_mst.node[u]['coord'], centroidp)
     return cent_mst

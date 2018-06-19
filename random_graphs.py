@@ -45,14 +45,14 @@ def random_mst(G, euclidean=False):
     successor = {}
     successor[root] = None
 
-    vertices = H.nodes()
+    vertices = list(H.nodes())
     shuffle(vertices)
     for u in vertices:
         curr = u
         while not in_tree[curr]:
             candidates = None
             if euclidean:
-                candidates = G.nodes()
+                candidates = list(G.nodes())
                 candidates.remove(u)
             else:
                 candidates = G.neighbors(curr)
@@ -81,7 +81,7 @@ def barabasi_tree(G):
     H = G.copy()
     H.remove_edges_from(G.edges())
 
-    for a, b in ba.edges_iter():
+    for a, b in ba.edges():
         u, v = node_map[a], node_map[b]
         H.add_edge(u, v)
         H[u][v]['length'] = node_dist(H, u, v)
