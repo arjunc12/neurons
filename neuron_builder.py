@@ -100,7 +100,7 @@ def retract_branch(G, u):
             
 def retract_graph(G):
     leaves = []
-    for u in G.nodes_iter():
+    for u in G.nodes():
         if (G.node[u]['label'] not in ['synapse', 'root']) and (G.degree(u) == 1):
             leaves.append(u)
     
@@ -192,7 +192,7 @@ def annihilate(G, u, detection_radius):
     return False
 
 def can_extend(G, unmarked_points, trial_length, r_puncta):
-    for u in G.nodes_iter():
+    for u in G.nodes():
         coord1 = G.node[u]['coord']
         for coord2 in unmarked_points:
             if point_dist(coord1, coord2) <= trial_length + r_puncta:
@@ -228,7 +228,7 @@ def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
     p_root = kwargs['prob_root']
     u = None
     root = G.graph['root']
-    candidates = G.nodes()
+    candidates = list(G.nodes())
     assert root in candidates
     if random() <= p_root or len(candidates) == 1:
         u = G.graph['root']
@@ -400,7 +400,7 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
             x, y, z = zip(*unmarked_points[frame])
             plt.scatter(x, y, s=250)
         pos = {}
-        for u in G.nodes_iter():
+        for u in G.nodes():
             coord = G.node[u]['coord']
             pos[u] = (coord[0], coord[1])
         viz_tree(G, save=False)
