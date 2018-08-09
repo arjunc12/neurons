@@ -404,10 +404,11 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
             coord = G.node[u]['coord']
             pos[u] = (coord[0], coord[1])
         viz_tree(G, save=False)
-        
+
     ani = animation.FuncAnimation(fig, redraw2d, init_func=init, frames=len(graphs), \
                                   interval = 1000)
-    ani.save('neuron_builder/neuron_builder.mp4')
+    mywriter = animation.AVConvWriter()
+    ani.save('neuron_builder/neuron_builder.mp4', writer=mywriter)
             
     plt.close()
         
