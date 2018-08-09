@@ -17,69 +17,41 @@ import os
 MIN_POINTS = 8
 MAX_POINTS = 50
 
-def runtimes_stats():
-    df = pd.read_csv('test_runtimes.csv', skipinitialspace=True)
-    print "total trials"
-    print len(df['algorithm']) / len(df['algorithm'].unique())
+def compare_algorithms_stats():
+    df = pd.read_csv('compare_algorithms.csv', skipinitialspace=True)
+    algorithm_costs = {}
 
-    ratios = []
-    labels = []
-    weights = []
-    hist_algorithms = ['prim', 'khuller']
-    algorithm_labels = {'prim' : 'spanning', 'khuller' : 'khuller'}
+    for name, group in df.groupby('algorithm'):
+        algorithm_costs[name] = pylab.array(group['cost'])
+
+    algorithm_labels = {'khuller' : 'khuller', 'prim' : 'greedy spanning', 'steiner' : 'greedy steiner'}
+
+    baseline = algorithm_costs['steiner']
+    order = pylab.argsort(baseline)
+    baseline = baseline[order]
+    x = range(len(order))
 
     pylab.figure()
-    for algorithm, group in df.groupby('algorithm'):
+    for algorithm in sorted(algorithm_costs.keys()):
+        costs = algorithm_costs[algorithm]
+        costs = costs[order]
+        pylab.scatter(x, 100 * (costs - baseline) / baseline, label=algorithm_labels[algorithm])
+        
         print algorithm
-        comparisons = group['comparisons'].sum()
-        dominated = group['dominated'].sum()
-        print float(dominated) / float(comparisons), "(", dominated, "/", comparisons, ")"
-        print binom_test(dominated, comparisons)
-        group = group.groupby('points', as_index=False).agg(pylab.mean)
-        pylab.plot(group['points'], group['runtime'], label=algorithm)
-        ratio = group['cost ratio']
-        ratio = ratio[~pylab.isnan(ratio)]
-        ratio = ratio - 1
-        print "cost comparisons", len(ratio)
-        print "cost ratio", pylab.mean(ratio), "+/-", pylab.std(ratio, ddof=1)
+        print ((costs < baseline).sum()) / float(len(baseline))
 
-        if algorithm in hist_algorithms:
-            ratios.append(ratio)
-            labels.append(algorithm_labels[algorithm])
-            weight = pylab.ones_like(ratio) / float(len(ratio))
-            weights.append(weight)
-
-    pylab.legend(loc=2)
-    pylab.xlabel('number of points')
-    pylab.ylabel('rumtime (minutes)')
-    pylab.savefig('test_runtimes/runtimes.pdf', format='pdf')
-    pylab.close()
-
-    pylab.figure()
-    pylab.hist(ratios, label=labels, weights=weights)
-    pylab.xlabel('percent better/worse than Steiner', size=20)
-    pylab.ylabel('proportion', size=20)
     pylab.legend()
-    pylab.savefig('test_runtimes/cost_ratios_hist.pdf', format='pdf')
+    pylab.xlabel('test set')
+    pylab.ylabel('pareto cost vs steiner pareto cost (percent increase/decrease)')
+    pylab.savefig('compare_algorithms/compare_algorithms.pdf', format='pdf')
     pylab.close()
-    
-def time_function(G, alpha, pareto_func):
-    start = time()
-    mst = pareto_func(G, alpha)
-    end = time()
-    runtime = (end - start) / 60.0
-    mcost = mst_cost(mst)
-    scost = satellite_cost(mst, relevant_nodes=G.nodes())
-    return mcost, scost, runtime
 
-def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):    
+def compare_algorithms(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):    
     for i in xrange(num_iters):
         print "iteration", i
         for num_points in xrange(min_points, max_points + 1):
             print "num_points", num_points
-            G = random_point_graph(num_points=num_points)
-            
-            sat_tree = satellite_tree(G)
+            G = random_point_graph(num_points=num_points)            
             
             sort_neighbors(G)
             
@@ -90,34 +62,19 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
 
             delta = 0.01
             alphas = pylab.arange(delta, 1, delta)
-            algorithms = [pareto_steiner_space, pareto_steiner_space2, pareto_steiner_fast, pareto_steiner_old]
-            names = ['space efficient', 'medium space efficient', 'fast', 'unoptimized']
-            algorithms += [pareto_prim, pareto_khuller]
-            names += ['prim', 'khuller']
+            algorithms = [pareto_steiner, pareto_prim, pareto_khuller]
+            names = ['steiner', 'prim', 'khuller']
             for alpha in alphas:
                 print "alpha", alpha
                 for algorithm, name in zip(algorithms, names):
-                    mcost, scost, runtime = time_function(G, alpha, algorithm)
+                    pareto_tree = algorithm(G, alpha)
+                    assert is_tree(pareto_tree)
+                    mcost, scost, = graph_costs(pareto_tree, relevant_nodes=G.nodes())
                     cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
                     mcosts[name].append(mcost)
                     scosts[name].append(scost)
                     costs[name].append(cost)
-                    times[name] += runtime
-
-            if num_points <= 50 and GENETIC:
-                algorithms.append(pareto_genetic)
-                names.append('genetic')
-                genetic_start = time()
-                genetic_trees = pareto_genetic(G)
-                genetic_end = time()
-
-                genetic_runtime = (genetic_end - genetic_start) / 60.0
-                times['genetic'] = genetic_runtime
-               
-                for mcost, scost, T in genetic_trees: 
-                    mcosts['genetic'].append(mcost)
-                    scosts['genetic'].append(scost)
-            
+ 
             pylab.figure()
             for name in names:
                 mcost = mcosts[name]
@@ -134,55 +91,46 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
             pylab.close()
 
             header_line = None
-            if not os.path.exists('test_runtimes.csv'):
-                header_line = ['algorithm', 'points', 'runtime', 'comparisons', 'dominated']
+            if not os.path.exists('compare_algorithms.csv'):
+                header_line = ['algorithm', 'points', 'alpha', 'mcost', 'scost', 'cost']
                 header_line = ', '.join(header_line)
 
-            mcosts1, scosts1, costs1 = mcosts[baseline], scosts[baseline], pylab.array(costs[baseline])
-            with open('test_runtimes.csv', 'a') as outfile:
+            with open('compare_algorithms.csv', 'a') as outfile:
                 if header_line != None:
                     outfile.write('%s\n' % header_line)
-                for name in names:
-                    write_items = [name, num_points, times[name]]
-                    if name in mcosts:
-                        assert name in scosts
-                        mcosts2, scosts2 = mcosts[name], scosts[name]
-                        comparisons, dominated = prop_dominated(mcosts1, scosts1,\
-                                                                mcosts2, scosts2)
-                        write_items += [comparisons, dominated]
-                    else:
-                        write_items += ['', '']
-                       
-                    if name in costs:
-                        costs2 = pylab.array(costs[name])
-                        cost_ratio = pylab.mean(costs2 / costs1)
-                        write_items.append(cost_ratio)
-                    else:
-                        write_items.append('')
-     
-                    write_items = map(str, write_items)
-                    write_items = ', '.join(write_items)
-                    outfile.write('%s\n' % write_items)
+                for i in xrange(len(alphas)):
+                    alpha = alphas[i]
+                    for name in names:
+                        write_items = [name, num_points, alpha]
+                        mcost = mcosts[name][i]
+                        scost = scosts[name][i]
+                        cost = costs[name][i]
+                        write_items += [mcost, scost, cost]
+
+                        write_items = map(str, write_items)
+                        write_items = ', '.join(write_items)
+                        outfile.write('%s\n' % write_items)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--test', action='store_true')
+    parser.add_argument('-c', '--compare', action='store_true')
     parser.add_argument('-n', '--num_iters', type=int, default=10)
     parser.add_argument('-s', '--stats', action='store_true')
     parser.add_argument('--min_points', type=int, default=8)
     parser.add_argument('--max_points', type=int, default=50)
 
     args = parser.parse_args()
-    test = args.test
+    compare = args.compare
     num_iters = args.num_iters
     stats = args.stats
     min_points = args.min_points
     max_points = args.max_points
-    if test:
-        test_runtimes(num_iters=num_iters,\
-                      min_points=min_points, max_points=max_points)
+    
+    if compare:
+        compare_algorithms(num_iters=num_iters,\
+                           min_points=min_points, max_points=max_points)
     if stats:
-        runtimes_stats()
+        compare_algorithms_stats()
 
 if __name__ == '__main__':
     main()
