@@ -4,7 +4,7 @@ import os
 from neuron_utils import get_neuron_points, viz_tree
 import argparse
 
-DATASETS_DIR = 'datasets'
+DATASETS_DIR = '/iblsn/data/Arjun/neurons/datasets'
 
 def truncation_stats():
     df = get_df()
@@ -63,6 +63,7 @@ def truncation_plots():
                                         name1 = name + '-axon1'
                                         name2 = name + '-axon2'
                                         print name1, name2, outdir
+                                        '''
                                         axon.graph['synapses'] = []
                                         truncated_axon.graph['synapses'] = []
                                         for u in axon.nodes():
@@ -71,6 +72,7 @@ def truncation_plots():
                                             if truncated_axon.has_node(u):
                                                 truncated_axon.graph['synapses'].append(u)
                                                 truncated_axon.node[u]['label'] = 'synapse'
+                                        '''
                                         root1 = axon.graph['root']
                                         root2 = truncated_axon.graph['root']
                                         axon.node[root1]['label'] = 'root'
