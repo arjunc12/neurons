@@ -17,8 +17,6 @@ import os
 MIN_POINTS = 8
 MAX_POINTS = 50
 
-GENETIC = True
-
 def runtimes_stats():
     df = pd.read_csv('test_runtimes.csv', skipinitialspace=True)
     print "total trials"
@@ -96,7 +94,6 @@ def test_runtimes(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS):
             names = ['space efficient', 'medium space efficient', 'fast', 'unoptimized']
             algorithms += [pareto_prim, pareto_khuller]
             names += ['prim', 'khuller']
-            baseline = 'fast'
             for alpha in alphas:
                 print "alpha", alpha
                 for algorithm, name in zip(algorithms, names):
