@@ -1,4 +1,3 @@
-import pandas as pd
 import os
 
 FRONTS_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_fronts_synthetic'
@@ -7,6 +6,7 @@ def tradeoff_ratio(mcost, opt_mcost, scost, opt_scost):
     return (mcost / opt_mcost) / (scost / opt_scost)
 
 def write_ratios():
+    import pandas as pd
     bad_fronts = open('bad_fronts.csv', 'w')
     with open('/iblsn/data/Arjun/neurons/pareto_steiner_output/tradeoff_ratio.csv', 'w') as tradeoff_file:
         tradeoff_file.write('neuron name, neuron type, tradeoff ratio\n')
