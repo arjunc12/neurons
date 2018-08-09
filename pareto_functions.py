@@ -179,7 +179,7 @@ def pareto_prim(G, alpha, axon=False):
 
     closest_neighbors = {}
     is_sorted = 'sorted' in G.graph
-    for u in G.nodes_iter():
+    for u in G.nodes():
         if is_sorted:
             closest_neighbors[u] = G.node[u]['close_neighbors'][:]
         else:
@@ -515,7 +515,7 @@ def pareto_steiner_fast(G, alpha, axon=False):
     root = G.graph['root']
 
     H = nx.Graph()
-   
+  
     H.add_node(root)
     H.graph['root'] = root
     H.node[root]['droot'] = 0
@@ -535,7 +535,7 @@ def pareto_steiner_fast(G, alpha, axon=False):
 
     closest_neighbors = {}
     is_sorted = 'sorted' in G.graph
-    for u in G.nodes_iter():
+    for u in G.nodes():
         if is_sorted:
             closest_neighbors[u] = G.node[u]['close_neighbors'][:]
         else:
