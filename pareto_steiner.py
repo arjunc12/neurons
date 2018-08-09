@@ -202,7 +202,7 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
         else:
             plot_dir = NEUROMORPHO_PLOTS_DIR
         if synthetic:
-            plot_dir += '_synthetic'
+            plot_dir += '_synthetic%0.1f' % DENDRITE_RATE
         neuron_name = neuron_name.replace(' ', '_')
         neuron_type = neuron_type.replace(' ', '_')
         plot_dir = '%s/%s/%s' % (plot_dir, neuron_name, neuron_type)
@@ -286,8 +286,9 @@ def pareto_front(G, point_graph, neuron_name, neuron_type,\
         axon = neuron_type == 'axon'
 
         log_dir = fronts_dir
-        alphas, mcosts, scosts = pareto_tree_costs(G, point_graph, axon,\
-                                                   viz_trees, figs_dir=figs_dir,\
+        alphas, mcosts, scosts = pareto_tree_costs(G, point_graph, axon=axon,\
+                                                   viz_trees=viz_trees,\
+                                                   figs_dir=figs_dir,\
                                                    sandbox=sandbox,\
                                                    log_dir=log_dir)
 
@@ -370,7 +371,7 @@ def pareto_analysis(G, neuron_name, neuron_type,\
 
     #centroid_mcost = mst_cost(centroid_tree)
     #centroid_scost = satellite_cost(centroid_tree, relevant_nodes=point_graph.nodes())
-    centroid_mcost, centroid_scost = graph_costs(G, relevant_nodes=point_graph.nodes())
+    centroid_mcost, centroid_scost = graph_costs(centroid_tree, relevant_nodes=point_graph.nodes())
     
     centroid_dist, centroid_index = DIST_FUNC(mcosts, scosts,\
                                               centroid_mcost,\
@@ -542,7 +543,7 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
     
     centroid_dist, centroid_index = DIST_FUNC(mcosts, scosts, centroid_mcost,\
                                               centroid_scost)
-    
+ 
     for scale_factor, tree in zip([neural_dist, centroid_dist], ['neural', 'centroid']):
         color = COLORS[tree]
         x = scale_factor * pylab.array(mcosts)
@@ -607,7 +608,7 @@ def pareto_analysis_neuromorpho(min_nodes=MIN_NODES, max_nodes=MAX_NODES,\
                             else:
                                 H = G.copy()
                                 H.graph['synapses'] = []
-                                for u in H.nodes_iter():
+                                for u in H.nodes():
                                     if u != H.graph['root']:
                                         H.graph['synapses'].append(u)
                          
@@ -634,10 +635,10 @@ def pareto_analysis_neuromorpho(min_nodes=MIN_NODES, max_nodes=MAX_NODES,\
                            
                             if synthetic:
                                 fronts_dir = fronts_dir.replace('/pareto_fronts/',\
-                                                                '/pareto_fronts_synthetic/')
-                                output_dir += '_synthetic'
+                                                                '/pareto_fronts_synthetic%0.1f/' % DENDRITE_RATE)
+                                output_dir += '_synthetic%0.1f' % DENDRITE_RATE
                                 figs_dir = figs_dir.replace('/steiner_figs/',\
-                                                            '/steiner_figs_synthetic/')
+                                                            '/steiner_figs_synthetic%0.1f/' % DENDRITE_RATE)
 
                             os.system('mkdir -p %s' % fronts_dir)
                             os.system('mkdir -p %s' % output_dir)
