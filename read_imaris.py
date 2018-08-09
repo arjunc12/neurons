@@ -120,14 +120,14 @@ def read_imaris(trace_pos, viz=VIZ_TREE, outname='imaris'):
             G.node[end_id]['label'] = 'isolated_end'
 
     if viz:
-        viz_tree(G, outname, 'imaris')
+        viz_tree(G, outname, '/iblsn/data/Arjun/neurons/imaris/drawings')
     print G.number_of_nodes()
     print G.number_of_edges()
     print nx.is_connected(G)
 
     f = open('imaris_lengths.csv', 'a')
     edge_lengths = []
-    for u, v in G.edges_iter():
+    for u, v in G.edges():
         length = G[u][v]['length']
         edge_lengths.append(length)
         f.write('%s, %f\n' % (outname, length))
