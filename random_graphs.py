@@ -27,7 +27,7 @@ def random_point_graph(num_points=10, xmin=-10, xmax=10,\
     for i, point in enumerate(points):
         G.add_node(i)
         G.node[i]['coord'] = point
-    G.graph['root'] = choice(G.nodes())
+    G.graph['root'] = choice(list(G.nodes()))
     
     for u, v in combinations(G.nodes(), 2):
         G.add_edge(u, v)
