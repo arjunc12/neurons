@@ -15,8 +15,12 @@ SYNAPSE_RATE = 1.8661051308416368
 EXPONENTIAL = False
 UNIFORM = True
 
-SYNAPSE_RATES = {'dendrite' : 0.2, 'axon' : 4, 'apical dendrite' : 0.2,\
-                'basal dendrite' : 0.2, 'truncated axon' : 4}
+
+DENDRITE_RATE = 0.2
+AXON_RATE = 4
+SYNAPSE_RATES = {'dendrite' : DENDRITE_RATE, 'axon' : AXON_RATE,\
+                 'apical dendrite' : DENDRITE_RATE,\
+                 'basal dendrite' : DENDRITE_RATE, 'truncated axon' : AXON_RATE}
 
 INIT_OFFSET = 0.5
 
@@ -125,7 +129,7 @@ def get_neuron_points(filename, dim='3D'):
     #for arbor_type in ["2","3","4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
     graphs = []
     for arbor_type in ["2", "3", "4"]: # 2 = axon, 3 = basal dendrite, 4 = apical dendrite.
-        print "Arbor tybe", arbor_type
+        #print "Arbor tybe", arbor_type
         
         # Reads in 3D arborization.
         G = nx.Graph()
@@ -248,7 +252,7 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
             node_size.append(350)
         elif label == 'synapse':
             node_color.append('green')
-            node_size.append(15)
+            node_size.append(1)
         elif label == 'tip':
             node_color.append('blue')
             node_size.append(10)
@@ -279,9 +283,14 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
                      node_color=node_color, edge_color="brown", width=4, font_size=12,\
                      font_color='red', font_weight='bold')
     pylab.draw()
+    
     ax = pylab.gca()
     ax.tick_params(axis='x', labelsize=20)
     ax.tick_params(axis='y', labelsize=20)
+    
+    pylab.xlabel('X coordinate (microns)', size=20)
+    pylab.ylabel('Y coordinate (microns)', size=20)
+
     pylab.tight_layout()
 
     try:
@@ -307,9 +316,11 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
     return kwargs
 
 def main():
-    filename = '/iblsn/data/Arjun/neurons/datasets/amacrine/human/retina/kantor/humret_CR_AII_63x_1.CNG.swc'
+    #filename = '/iblsn/data/Arjun/neurons/datasets/amacrine/human/retina/kantor/humret_CR_AII_63x_1.CNG.swc'
+    filename = '/iblsn/data/Arjun/neurons/datasets/somatic/mouse/peripheral_nervous_system/badea/Badea2012Fig6A-C-R.CNG.swc'
     graphs = get_neuron_points(filename)
-    G = graphs[2]
+    #G = graphs[2]
+    G = graphs[0]
     viz_tree(G, name='no_synapses')
     G = add_synapses(G)
     viz_tree(G, name='synapses')
