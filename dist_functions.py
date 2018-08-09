@@ -26,7 +26,7 @@ def root_dist(G, u):
 
 def k_nearest_neighbors(G, u, k=None, candidate_nodes=None):
     if candidate_nodes == None:
-        candidate_nodes = G.nodes()
+        candidate_nodes = list(G.nodes())
         candidate_nodes.remove(u)
     nearest_neighbors = sorted(candidate_nodes, key = lambda v : node_dist(G, u, v))
     if k != None:
@@ -35,7 +35,7 @@ def k_nearest_neighbors(G, u, k=None, candidate_nodes=None):
     return nearest_neighbors
 
 def sort_neighbors(G, k=None):
-    for u in G.nodes_iter():
+    for u in G.nodes():
         #G.node[u]['close_neighbors'] = sorted(G.neighbors(u), key = lambda v : G[u][v]['length'])
         #G.node[u]['close_neighbors'] = sorted(G.nodes(), key=lambda v : node_dist(G, u, v))
         #G.node[u]['close_neighbors'].remove(u)
