@@ -9,7 +9,7 @@ TEST_NEURON = 'datasets/bipolar/rat/neocortex/markram/RP140319-CHC-3-IDA.CNG.swc
 
 def initialize(KT):
     root = KT.graph['root']
-    for u in KT.nodes_iter():
+    for u in KT.nodes():
         if u == KT.graph['root']:
             KT.node[u]['droot'] = 0
         else:
@@ -71,7 +71,7 @@ def khuller(G, T_span, T_sat, beta):
     initialize(KT)
     DFS(G, KT, T_span, T_sat, G.graph['root'], beta)
     KT.remove_edges_from(G.edges())
-    for u in KT.nodes_iter():
+    for u in KT.nodes():
         if u != KT.graph['root']:
             parent = KT.node[u]['parent']
             assert parent != None
