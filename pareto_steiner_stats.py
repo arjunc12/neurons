@@ -8,16 +8,17 @@ import os
 import seaborn as sns
 from itertools import combinations
 import numpy as np
-from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind, ttest_rel, wasserstein_distance
+from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind, ttest_rel, wasserstein_distance, mannwhitneyu, wilcoxon
 from numpy.linalg import norm
 import numpy as np
 from stats_utils import *
 import argparse
 import neuron_density
+from neuron_utils import DENDRITE_RATE
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = False
+TEST_NEW_FUNCTION = True
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -329,7 +330,8 @@ def cat_to_num(categories):
         cat_nums.append(cat_map[category])
     return cat_nums
 
-def val_distribution(df, val, categories, plot_func, plot_descriptor, outdir=FIGS_DIR):
+def val_distribution(df, val, categories, plot_func, plot_descriptor,\
+                     outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
     for category in categories:
         subset_cols = ['neuron name', 'neuron type', 'alpha']
         if category != 'neuron type':
@@ -337,6 +339,10 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor, outdir=FIG
         df2 = df.drop_duplicates(subset=subset_cols)
         df2 = remove_small_counts(df2, category,\
                                   min_count=CATEGORY_MIN_COUNTS[category])
+
+        if category_subset != None:
+            df2 = df2[df2[category].isin(category_subset)]
+
         cat_vals = []
         medians = []
         for name, group in df2.groupby(category):
@@ -414,15 +420,21 @@ def category_dists(df, categories, outdir=FIGS_DIR):
 def scatter_dists(models_df, outdir=FIGS_DIR):
     df = models_df[['neuron name', 'neuron type', 'model', 'dist']]
     model_dists = defaultdict(list)
+    unique_neurons = 0
     for name, group in df.groupby(['neuron name', 'neuron type']):
         if len(group['model'].unique()) != 4:
             print group
         for model, group2 in group.groupby('model'):
             #group2 = group2.head(n=20)
             model_dists[model].append(pylab.mean(group2['dist']))
+        unique_neurons += 1
+
+    print "-------------"
+    print "unique scatter neurons", unique_neurons
+    print "-------------"
     
     order = pylab.argsort(model_dists['neural'])
-    x = pylab.arange(len(model_dists['neural']))
+    #x = pylab.arange(len(model_dists['neural']))
     pylab.figure()
     sns.set()
     pylab.tight_layout()
@@ -436,13 +448,18 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
         dists = pylab.array(dists)
         y = dists[order]
         if LOG_DIST:
-            y = pylab.log10(y) 
+            y = pylab.log10(y)
+
+        #y = y[::5]
+        x = pylab.arange(len(y))
+
         max_dist = max(max_dist, max(y))
 
         color = model_colors[model]
         marker = model_markers[model]
         label = model_labels[model]
         pylab.scatter(x, y, label=label, c=color, marker=marker)
+    
     pylab.xlabel('neuron index', fontsize=20)
     ylab = 'distance to Pareto front'
     if LOG_DIST:
@@ -573,7 +590,7 @@ def infmean(arr):
 def metadata(df):
     print "-----------------------------------------------------"
     print "unique neurons"
-    print len(df.groupby(['neuron name', 'neuron type']))
+    print len(set(zip(df['neuron name'], df['neuron type'])))
 
     for category in CATEGORIES:
         print "unique " + category
@@ -613,6 +630,7 @@ def neuron_type_alphas(df):
         #print ttest_ind(dist1, dist2, equal_var=False)
         #print mannwhitneyu(dist1, dist2, alternative='two-sided')
         print "alphas ks-test", ks_2samp(alphas1, alphas2)
+        print "alphas mann-whitney test", mannwhitneyu(alphas1, alphas2)
         print "dists welch's t-test", ttest_ind(dists1,dists2)
 
 def vals_correlation(df, val1, val2, outdir=FIGS_DIR, xtransform=None,\
@@ -696,27 +714,39 @@ def size_alpha_correlation(df, outdir=FIGS_DIR):
 
 def truncation_hist(df, outdir=FIGS_DIR):
     df2 = df[df['neuron type'].isin(['axon', 'truncated axon'])]
+    df2 = df2.drop_duplicates(['neuron name', 'neuron type'])
+
+    type_alphas = defaultdict(list)
+    for neuron_name, group in df2.groupby('neuron name'):
+        if len(group['neuron type']) < 2:
+            continue
+        for neuron_type, group2 in group.groupby('neuron type'):
+            type_alphas[neuron_type] += list(group2['alpha'])
+
     alphas = []
     weights = []
     labels = []
-    for neuron_type, group in df2.groupby('neuron type'):
-        alpha = group['alpha']
-        weight = pylab.ones_like(alpha) / len(alpha)
+    for neuron_type in type_alphas:
+        alpha = type_alphas[neuron_type]
         alphas.append(alpha)
-        weights.append(weight)
+        weights.append(pylab.ones_like(alpha) / float(len(alpha)))
         labels.append(neuron_type)
 
     pylab.figure()
     sns.set()
     
     pylab.hist(alphas, range=(0, 1), weights=weights, label=labels)
-    pylab.legend()
+    leg = pylab.legend(frameon=True)
+    pylab.setp(leg.get_texts(), fontsize=20)
+    leg_frame = leg.get_frame()
+    leg_frame.set_linewidth(5)
+    leg_frame.set_edgecolor('k')
     
     curr_ax = pylab.gca()
     curr_ax.set_ylim((0, 1))
     
-    pylab.xlabel('alpha')
-    pylab.ylabel('proportion')
+    pylab.xlabel('alpha', size=30)
+    pylab.ylabel('proportion', size=30)
     pylab.tight_layout()
     
     name = 'truncation_hist'
@@ -725,6 +755,15 @@ def truncation_hist(df, outdir=FIGS_DIR):
     pylab.savefig('%s/%s.pdf' % (outdir, name), format='pdf')
     pylab.close()
 
+    axons = pylab.array(type_alphas['axon'])
+    truncated_axons = pylab.array(type_alphas['truncated axon'])
+    differences = axons - truncated_axons
+    print '-------------------------'
+    print "Truncation test"
+    print min(differences), pylab.median(differences), max(differences)
+    print pylab.mean(differences), "+/-", pylab.std(differences, ddof=1)
+    print wilcoxon(axons, truncated_axons)
+    print ttest_rel(axons, truncated_axons)
 
 def triplet_analysis(df, categories=CATEGORIES):
     df2 = df.drop_duplicates()
@@ -819,9 +858,9 @@ def main():
     triplet = args.triplet
 
     if synthetic:
-        output_fname = output_fname.replace('.csv', '_synthetic.csv')
-        models_fname = models_fname.replace('.csv', '_synthetic.csv')
-        tradeoffs_fname = tradeoffs_fname.replace('.csv', '_synthetic.csv')
+        output_fname = output_fname.replace('.csv', '_synthetic%0.1f.csv' % DENDRITE_RATE)
+        models_fname = models_fname.replace('.csv', '_synthetic%0.1f.csv' % DENDRITE_RATE)
+        tradeoffs_fname = tradeoffs_fname.replace('.csv', '_synthetic%0.1f.csv' % DENDRITE_RATE)
         figs_dir += '_synthetic'
 
     output_file = '%s/%s' % (output_dir, output_fname)
@@ -835,19 +874,19 @@ def main():
     
 
     if TEST_NEW_FUNCTION:
+        scatter_dists(models_df, outdir=figs_dir)
+        null_models_analysis(models_df)
+        truncation_hist(categories_df, outdir=figs_dir)
         return None
     
     metadata(categories_df)
     print "-----------------------------------------------------"
     print "mean neural dist", pylab.mean(models_df['dist'][models_df['model'] == 'neural'])
-    null_models_analysis(models_df)
     
     neuron_type_alphas(categories_df)
     
     os.system('mkdir -p %s' % figs_dir)
     
-    null_models_analysis(models_df)
-    scatter_dists(models_df, outdir=figs_dir)
     
     alphas_hist(categories_df, outdir=figs_dir)
     neuron_types_hist(categories_df, outdir=figs_dir)
@@ -861,7 +900,6 @@ def main():
     
     violin_tradeoffs(categories_df, CATEGORIES, outdir=figs_dir)
     
-    truncation_hist(categories_df, outdir=figs_dir)
     
     size_dist_correlation(categories_df, outdir=figs_dir) 
     alpha_dist_correlation(categories_df, outdir=figs_dir)
