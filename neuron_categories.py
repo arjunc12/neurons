@@ -25,8 +25,10 @@ def write_categories():
                             if neuron_file[-8:] != ".CNG.swc": 
                                 continue
                             name = neuron_file[:-8]
-                            write_items = [name, cell_type.lower(), species.lower(), region.lower(), lab.lower()]
+                            write_items = [cell_type.lower(), species.lower(), region.lower(), lab.lower()]
                             write_items = map(remove_commas, write_items)
+                            write_items = map(remove_sep, write_items)
+                            write_items = [name] + write_items
                             write_items = ', '.join(write_items)
                             f.write('%s\n' % write_items)
 
