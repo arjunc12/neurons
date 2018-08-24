@@ -14,7 +14,9 @@ import numpy as np
 from stats_utils import *
 import argparse
 import neuron_density
+
 from neuron_utils import DENDRITE_RATE
+from check_robustness import INTERESTING_CELL_TYPES, INTERESTING_TRANSMITTERS
 
 FIGS_DIR = 'steiner_stats'
 
@@ -337,11 +339,12 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
         if category != 'neuron type':
             subset_cols.append(category)
         df2 = df.drop_duplicates(subset=subset_cols)
-        df2 = remove_small_counts(df2, category,\
-                                  min_count=CATEGORY_MIN_COUNTS[category])
 
         if category_subset != None:
             df2 = df2[df2[category].isin(category_subset)]
+        else:
+            df2 = remove_small_counts(df2, category,\
+                                      min_count=CATEGORY_MIN_COUNTS[category])
 
         cat_vals = []
         medians = []
@@ -361,42 +364,63 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
         pylab.tight_layout()
         pylab.xlabel(val, fontsize=20)
         pylab.ylabel(category, fontsize=20)
-        pylab.savefig('%s/%s_%ss_%s.pdf' % (outdir, category.replace(' ', '_'),\
-                                            val.replace(' ', '_'),\
-                                            plot_descriptor),
-                       format='pdf')
+
+        fname = '%s_%ss_%s' % (category.replace(' ', '_'),\
+                              val.replace(' ', '_'), plot_descriptor)
+        if fig_suffix != None:
+            fname += '_%s' % fig_suffix
+        pylab.savefig('%s/%s.pdf' % (outdir, fname), format='pdf')
         pylab.close()
 
-def cluster_alphas(df, identifiers, outdir=FIGS_DIR):
-    val_distribution(df, 'alpha', identifiers, sns.stripplot, 'cluster', outdir=outdir)
+def cluster_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+    val_distribution(df, 'alpha', identifiers, sns.stripplot, 'cluster',\
+                     outdir, fig_suffix, category_subset)
 
-def boxplot_alphas(df, identifiers, outdir=FIGS_DIR):
-    val_distribution(df, 'alpha', identifiers, sns.boxplot, 'box', outdir=outdir)
+def boxplot_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+    val_distribution(df, 'alpha', identifiers, sns.boxplot, 'box', outdir,\
+                     fig_suffix, category_subset)
 
-def violin_alphas(df, identifiers, outdir=FIGS_DIR):
-    val_distribution(df, 'alpha', identifiers, sns.violinplot, 'violin', outdir=outdir)
+def violin_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+    val_distribution(df, 'alpha', identifiers, sns.violinplot, 'violin',\
+                     outdir, fig_suffix, category_subset)
 
-def swarm_alphas(df, identifiers, outdir=FIGS_DIR):
-    val_distribution(df, 'alpha', identifiers, sns.swarmplot, 'swarm', outdir=outdir)
+def swarm_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+    val_distribution(df, 'alpha', identifiers, sns.swarmplot, 'swarm', outdir,\
+                     fig_suffix, category_subset)
 
-def cluster_tradeoffs(df, identifiers, outdir=FIGS_DIR):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.stripplot, 'cluster', outdir=outdir)
+def cluster_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.stripplot,\
+                     'cluster', outdir, fig_suffix, category_subset)
 
-def boxplot_tradeoffs(df, identifiers, outdir=FIGS_DIR):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.boxplot, 'box', outdir=outdir)
+def boxplot_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.boxplot, 'box',\
+                     outdir, fig_suffix, category_subset)
 
-def violin_tradeoffs(df, identifiers, outdir=FIGS_DIR):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.violinplot, 'violin', outdir=outdir)
+def violin_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.violinplot,\
+                     'violin', outdir, fig_suffix, category_subset)
 
-def swarm_tradeoffs(df, identifiers, outdir=FIGS_DIR):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.swarmplot, 'swarm', outdir=outdir)
+def swarm_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.swarmplot, 'swarm', outdir, fig_suffix, category_subset)
     
-def category_dists(df, categories, outdir=FIGS_DIR):
+def category_dists(df, categories, outdir=FIGS_DIR, fig_suffix=None,\
+                   category_subset=None):
     for category in categories:
         df2 = df.drop_duplicates(subset=list(set(['neuron name', 'neuron type', category])))
-        df2 = remove_small_counts(df2, category,\
-                                  min_count=CATEGORY_MIN_COUNTS[category])
+        
+        if category_subset != None:
+            df2 = df2[df2[category].isin(category_subset)]
+        else:
+            df2 = remove_small_counts(df2, category,\
+                                      min_count=CATEGORY_MIN_COUNTS[category])
+
+
+        if category_subset != None:
+            df2 = df2[df2[category].isin(category_subset)]
+
         df2['dist'] = pylab.log10(df2['dist'])
+        
+        
         cat_vals = []
         cat_means = []
         for cat_val, group in df2.groupby(category):
@@ -412,10 +436,11 @@ def category_dists(df, categories, outdir=FIGS_DIR):
         pylab.xticks(rotation='vertical', size=20)
         pylab.xlabel(category, size=20)
         pylab.ylabel('log-distance to Pareto front', size=20)
-        pylab.tight_layout()
-        pylab.savefig('%s/pareto_dists_%s.pdf' % (outdir,\
-                                                  category.replace(' ', '_')),\
-                                                  format='pdf', bbox_inches='tight')
+        #pylab.tight_layout()
+        fname = 'pareto_dists_%s' % category.replace(' ', '_')
+        if fig_suffix != None:
+            fname += '_%s' % fig_suffix
+        pylab.savefig('%s/%s.pdf' % (outdir, fname), bbox_inches='tight')
 
 def scatter_dists(models_df, outdir=FIGS_DIR):
     df = models_df[['neuron name', 'neuron type', 'model', 'dist']]
@@ -488,7 +513,7 @@ def alphas_hist(df, outdir=FIGS_DIR, categories=None):
     
     if categories == None:
         alphas = list(df2['alpha'])
-        print "all neurons mean alpha", pylab.mean(alphas)
+        print "all neurons mean alpha", pylab.mean(alphas), "+/-", pylab.std(alphas, ddof=1)
         weights = pylab.ones_like(alphas) / len(alphas)
     else:
         alphas = []
@@ -842,7 +867,7 @@ def main():
     parser.add_argument('-o', '--output_fname', default=OUTPUT_FNAME)
     parser.add_argument('-m', '--models_fname', default=MODELS_FNAME)
     parser.add_argument('-t', '--tradeoffs_fname', default=TRADEOFFS_FNAME)
-    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE_FILTERED)
+    parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE)
     parser.add_argument('-f', '--figs_dir', default=FIGS_DIR)
     parser.add_argument('--synthetic', action='store_true')
     parser.add_argument('--triplet', action='store_true')
@@ -874,9 +899,7 @@ def main():
     
 
     if TEST_NEW_FUNCTION:
-        scatter_dists(models_df, outdir=figs_dir)
-        null_models_analysis(models_df)
-        truncation_hist(categories_df, outdir=figs_dir)
+        alphas_hist(categories_df, outdir=figs_dir)
         return None
     
     metadata(categories_df)
@@ -888,7 +911,10 @@ def main():
     os.system('mkdir -p %s' % figs_dir)
     
     
-    alphas_hist(categories_df, outdir=figs_dir)
+    scatter_dists(models_df, outdir=figs_dir)
+    null_models_analysis(models_df)
+    truncation_hist(categories_df, outdir=figs_dir)
+    
     neuron_types_hist(categories_df, outdir=figs_dir)
     
     alphas_heat(categories_df, CATEGORIES, outdir=figs_dir)
@@ -900,6 +926,19 @@ def main():
     
     violin_tradeoffs(categories_df, CATEGORIES, outdir=figs_dir)
     
+    category_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                   fig_suffix='main',\
+                   category_subset=INTERESTING_CELL_TYPES)
+    category_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                   fig_suffix='transmitters',\
+                   category_subset=INTERESTING_TRANSMITTERS)
+    
+    boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
+                   fig_suffix='main',\
+                   category_subset=INTERESTING_CELL_TYPES)
+    boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
+                   fig_suffix='transmitters',\
+                   category_subset=INTERESTING_TRANSMITTERS)
     
     size_dist_correlation(categories_df, outdir=figs_dir) 
     alpha_dist_correlation(categories_df, outdir=figs_dir)
