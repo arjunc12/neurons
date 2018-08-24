@@ -3,6 +3,8 @@ import pylab
 import os
 import pandas as pd
 from itertools import combinations
+from numpy import degrees
+import argparse
 
 OUTDIR = '/iblsn/data/Arjun/neurons/branch_angles'
 FNAME = 'branch_angles.csv'
@@ -107,10 +109,31 @@ def write_angles():
 
 def angles_stats():
     df = pd.read_csv('%s/%s' % (OUTDIR, FNAME), skipinitialspace=True)
+    df['degrees'] = degrees(df['angle'])
+
+    deg = pylab.array(df['degrees'])
+    weight = pylab.ones_like(deg) / float(len(deg))
+
+    pylab.figure()
+    pylab.hist(deg, weights=weight)
+    pylab.xlabel('degree')
+    pylab.ylabel('proportion')
+    pylab.savefig('branch_angles/branch_angles.pdf', format='pdf')
+    pylab.close()
 
 def main():
-    #write_angles()
-    angles_stats()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-w', '--write', action='store_true')
+    parser.add_argument('-s', '--stats', action='store_true')
+    
+    args = parser.parse_args()
+    write = args.write
+    stats = args.stats
+
+    if write:
+        write_angles()
+    if stats:
+        angles_stats()
 
 if __name__ == '__main__':
     main()
