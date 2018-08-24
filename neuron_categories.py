@@ -25,6 +25,7 @@ def write_categories():
                             if neuron_file[-8:] != ".CNG.swc": 
                                 continue
                             name = neuron_file[:-8]
+                            print name
                             write_items = [cell_type.lower(), species.lower(), region.lower(), lab.lower()]
                             write_items = map(remove_commas, write_items)
                             write_items = map(remove_sep, write_items)
@@ -64,8 +65,8 @@ def filter_categories():
         print name, len(group.index)
 
 def main():
-    #write_categories()
-    filter_categories()
+    write_categories()
+    #filter_categories()
 
 if __name__ == '__main__':
     main()
