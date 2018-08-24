@@ -24,7 +24,7 @@ def compare_algorithms_stats():
     for name, group in df.groupby('algorithm'):
         algorithm_costs[name] = pylab.array(group['cost'])
 
-    algorithm_labels = {'khuller' : 'khuller', 'prim' : 'greedy spanning', 'steiner' : 'greedy steiner'}
+    algorithm_labels = {'khuller' : 'khuller', 'prim' : 'Karger', 'steiner' : 'greedy steiner'}
 
     baseline = algorithm_costs['steiner']
     order = pylab.argsort(baseline)
