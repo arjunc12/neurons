@@ -10,6 +10,7 @@ import argparse
 import pandas as pd
 from collections import defaultdict
 import os
+import seaborn as sns
 
 def greedy_eval(G):
     print "sorting neighbors"
@@ -97,7 +98,7 @@ def greedy_eval_stats():
     mcost_ratios = []
     scost_ratios = []
     cost_ratios = []
-    algorithm_labels = {'steiner' : 'steiner', 'prim' : 'spanning', 'khuller' : 'khuller'}
+    algorithm_labels = {'steiner' : 'Steiner', 'prim' : 'Karger', 'khuller' : 'Khuller'}
     labels = []
 
     for algorithm, group in df.groupby('algorithm'):
@@ -123,19 +124,24 @@ def greedy_eval_stats():
         cost_ratios.append(cost_ratio)
         labels.append(algorithm_labels[algorithm])
 
+    sns.set()
+    
     pylab.figure()
     pylab.scatter(df['mcost'], df['optimal mcost'])
     pylab.savefig('greedy_eval/greedy_eval_mcost.pdf', format='pdf')
+    pylab.tight_layout()
     pylab.close()
 
     pylab.figure()
     pylab.scatter(df['scost'], df['optimal scost'])
     pylab.savefig('greedy_eval/greedy_eval_scost.pdf', format='pdf')
+    pylab.tight_layout()
     pylab.close()
 
     pylab.figure()
     pylab.scatter(df['cost'], df['optimal cost'])
     pylab.savefig('greedy_eval/greedy_eval_cost.pdf', format='pdf')
+    pylab.tight_layout()
     pylab.close()
 
     for ratios, fname in zip([mcost_ratios, scost_ratios, cost_ratios], ['mcost', 'scost', 'cost']):
@@ -146,8 +152,11 @@ def greedy_eval_stats():
             weights.append(wt)
         pylab.hist(ratios, weights=weights, label=labels)
         pylab.legend()
+        ax = pylab.gca()
+        pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
         pylab.xlabel('percent better/worse than brute force', size=20)
         pylab.ylabel('proportion', size=20)
+        pylab.tight_layout()
         pylab.savefig('greedy_eval/%s_ratios_hist.pdf' % fname, format='pdf')
         pylab.close()
    
