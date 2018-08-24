@@ -13,6 +13,7 @@ import pandas as pd
 from scipy.stats import binom_test
 from collections import defaultdict
 import os
+import seaborn as sns
 
 MIN_POINTS = 8
 MAX_POINTS = 50
@@ -26,7 +27,9 @@ def runtimes_stats():
     labels = []
     weights = []
     hist_algorithms = ['prim', 'khuller']
-    algorithm_labels = {'prim' : 'spanning', 'khuller' : 'khuller'}
+    algorithm_labels = {'prim' : 'Karger', 'khuller' : 'Khuller'}
+
+    sns.set()
 
     pylab.figure()
     for algorithm, group in df.groupby('algorithm'):
@@ -60,6 +63,9 @@ def runtimes_stats():
     pylab.xlabel('percent better/worse than Steiner', size=20)
     pylab.ylabel('proportion', size=20)
     pylab.legend()
+    ax = pylab.gca()
+    pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
+    pylab.tight_layout()
     pylab.savefig('test_runtimes/cost_ratios_hist.pdf', format='pdf')
     pylab.close()
     
