@@ -3,13 +3,13 @@ from random import uniform, choice
 from itertools import combinations
 from neuron_utils import point_dist
 from collections import defaultdict
-from random import choice, shuffle
+from random import choice, shuffle, gauss
 from numpy.random import permutation
 from graph_utils import is_tree
 from dist_functions import node_dist
 
-def random_points(num_points=10, xmin=-10, xmax=10, ymin=-10, ymax=10,\
-                                 zmin=-10, zmax=10):
+def random_points_uniform(num_points=10, xmin=-10, xmax=10, ymin=-10, ymax=10,\
+                          zmin=-10, zmax=10):
     points = []
     for i in xrange(num_points):
         x = uniform(xmin, xmax)
@@ -19,10 +19,17 @@ def random_points(num_points=10, xmin=-10, xmax=10, ymin=-10, ymax=10,\
 
     return points
 
-def random_point_graph(num_points=10, xmin=-10, xmax=10,\
-                                      ymin=-10, ymax=10,\
-                                      zmin=-10, zmax=10):
-    points = random_points(num_points, xmin, xmax, ymin, ymax, zmin, zmax)
+def random_points_normal(num_points=10, mux=0, muy=0, muz=0, sigmax=1, sigmay=1, sigmaz=1):
+    points = []
+    for i in xrange(num_points):
+        x = gauss(mux, sigmax)
+        y = gauss(muy, sigmay)
+        z = gauss(muz, sigmaz)
+        points.append((x, y, z))
+
+    return points
+
+def random_point_graph(points):
     G = nx.Graph()
     for i, point in enumerate(points):
         G.add_node(i)
@@ -34,6 +41,18 @@ def random_point_graph(num_points=10, xmin=-10, xmax=10,\
         G[u][v]['length'] = point_dist(points[u], points[v])
 
     return G
+
+def random_point_graph_uniform(num_points=10, xmin=-10, xmax=10,\
+                               ymin=-10, ymax=10,\
+                               zmin=-10, zmax=10):
+    points = random_points_uniform(num_points, xmin, xmax, ymin, ymax, zmin, zmax)
+    return random_point_graph(points)
+
+def random_point_graph_normal(num_points=10, mux=0, muy=0, muz=0,\
+                              sigmax=1, sigmay=1, sigmaz=1):
+    points = random_points_normal(num_points, mux, muy, muz,\
+                                  sigmax, sigmay, sigmaz)
+    return random_point_graph(points)
 
 def random_mst(G, euclidean=False):
     H = G.copy()
