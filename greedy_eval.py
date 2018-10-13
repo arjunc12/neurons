@@ -1,6 +1,6 @@
 from pareto_functions import *
 import networkx as nx
-from random_graphs import random_point_graph
+from random_graphs import random_point_graph_uniform, random_point_graph_normal
 from neuron_utils import *
 from enumerate_trees import find_all_spanning_trees
 import pylab
@@ -11,174 +11,214 @@ import pandas as pd
 from collections import defaultdict
 import os
 import seaborn as sns
+from time import time
 
-def greedy_eval(G):
-    print "sorting neighbors"
-    sort_neighbors(G)
-    print "getting trees"
-    all_trees = find_all_spanning_trees(G, root=G.graph['root'])
-    
-    span_trees = []
-    for tree in all_trees:
-        span_tree = G.copy()
-        span_tree.remove_edges_from(G.edges())
-        for u, v in tree.edges():
-            span_tree.add_edge(u, v)
-            span_tree[u][v] = G[u][v]
-            span_tree[v][u] = G[v][u]
-        span_trees.append(span_tree)
+MIN_POINTS = 5
+MAX_POINTS = 8
 
-    mst_cost = best_mst_cost(G)
-    sat_cost = best_satellite_cost(G)
+BASELINE = 'brute force'
+
+def percent_delta(x, y):
+    return 100 * (x - y) / y
+
+def greedy_eval(num_iters=10, min_points=MIN_POINTS, max_points=MAX_POINTS, model='uniform'):
+    for i in xrange(num_iters):
+        for num_points in xrange(min_points, max_points + 1):
+            G = None
+            if model == 'uniform':
+                G = random_point_graph_uniform(num_points=num_points)
+            elif model == 'normal':
+                G = random_point_graph_normal(num_points=num_points)
+            
+            print "sorting neighbors"
+            sort_neighbors(G)
+            print "getting trees"
+            all_trees = find_all_spanning_trees(G, root=G.graph['root'])
+            
+            span_trees = []
+            for tree in all_trees:
+                span_tree = G.copy()
+                span_tree.remove_edges_from(G.edges())
+                for u, v in tree.edges():
+                    span_tree.add_edge(u, v)
+                    for item, val in G[u][v].iteritems():
+                        span_tree[u][v][item] = val
+                span_trees.append(span_tree)
+
+            mst_cost = best_mst_cost(G)
+            sat_cost = best_satellite_cost(G)
+         
+            mcosts = []
+            scosts = []
+            opt_mcosts = []
+            opt_scosts = []
+            
+            attempts = 0
+            successes = 0
+            errors = 0
+            
+            delta = 0.01
+            alphas = pylab.arange(delta, 1, delta)
+            
+            prev_mcost = None
+            prev_scost = None
+            
+            prev_opt_mcost = None
+            prev_opt_scost = None
+            
+            def brute_force(G, alpha):
+                return pareto_brute_force(G, alpha, trees=span_trees)
+
+            algorithms = [brute_force, pareto_prim, pareto_khuller, pareto_steiner]
+            names = ['brute force', 'prim', 'khuller', 'steiner']
+            mcosts = defaultdict(list)
+            scosts = defaultdict(list)
+            costs = defaultdict(list)
+            times = defaultdict(list)
+            
+            for alpha in alphas:
+                print "alpha", alpha
+                attempts += 1
  
-    mcosts = []
-    scosts = []
-    opt_mcosts = []
-    opt_scosts = []
-    
-    attempts = 0
-    successes = 0
-    errors = 0
-    
-    delta = 0.01
-    alphas = pylab.arange(0.01, 1, delta)
-    fname = 'greedy_eval.csv'
-    first_time = not os.path.exists(fname)
-    f = open('greedy_eval.csv', 'a')
-    if first_time:
-        f.write('algorithm, points, alpha, mcost, scost, cost, optimal mcost, ' +\
-                 'optimal scost, optimal cost, success, error\n')
-    num_points = G.number_of_nodes()
-    
-    prev_mcost = None
-    prev_scost = None
-    
-    prev_opt_mcost = None
-    prev_opt_scost = None
-    
-    algorithms = [pareto_prim, pareto_khuller, pareto_steiner]
-    names = ['prim', 'khuller', 'steiner']
-    
-    for alpha in alphas:
-        print "alpha", alpha
-        attempts += 1
+                for algorithm, name in zip(algorithms, names):
+                    start = time()
+                    tree = algorithm(G, alpha)
+                    end = time()
+                    mcost, scost = graph_costs(tree, relevant_nodes=G.nodes())
+                    cost = pareto_cost(mcost, scost, alpha)
+                    algorithm_time = end - start
 
-        opt_tree = pareto_brute_force(G, alpha, trees=span_trees)
-        opt_mcost, opt_scost = graph_costs(opt_tree, relevant_nodes=G.nodes())
-        opt_cost = pareto_cost(opt_mcost, opt_scost, alpha)
-        
-        for algorithm, name in zip(algorithms, names):
-            tree = algorithm(G, alpha)
-            mcost, scost = graph_costs(tree, relevant_nodes=G.nodes())
-            cost = pareto_cost(mcost, scost, alpha)
+                    mcosts[name].append(mcost)
+                    scosts[name].append(scost)
+                    costs[name].append(cost)
+                    times[name].append(algorithm_time)
 
-            success = cost == opt_cost
-            error = cost < opt_cost
-            if error:
-                pass
-                '''
-                print "error", algorithm
-                print "mcost", mcost, opt_mcost
-                print "scost", scost, opt_scost
-                print "cost", cost, opt_cost
-                '''
-    
-            write_items = [name, num_points, alpha, mcost, scost, cost,\
-                           opt_mcost, opt_scost, opt_cost,\
-                           int(success), int(error)]
-            write_items = map(str, write_items)
-            write_items = ', '.join(write_items)
-            f.write('%s\n' % write_items)
+            baseline_mcosts = mcosts[BASELINE]
+            baseline_scosts = scosts[BASELINE]
+            baseline_costs = costs[BASELINE]
+            baseline_times = times[BASELINE]
 
-    f.close()
+            header_line = None
+            outfname = 'greedy_eval_%s.csv' % model
+            if not os.path.exists(outfname):
+                header_line = ['algorithm', 'points', 'alpha', 'mcost', 'scost', 'cost', 'time',\
+                               'mcost ratio', 'scost ratio', 'cost ratio', 'time ratio', 'dominated']
+                header_line = ', '.join(header_line)
 
-def greedy_eval_stats():
-    df = pd.read_csv('greedy_eval.csv', skipinitialspace=True)
+            with open(outfname, 'a') as outfile:
+                if header_line != None:
+                    outfile.write('%s\n' % header_line)
+                for i in xrange(len(alphas)):
+                    for name in names:
+                        alpha = alphas[i]
+                        write_items = [name, num_points, alpha]
+
+                        mcost = mcosts[name][i]
+                        scost = scosts[name][i]
+                        cost = costs[name][i]
+                        algorithm_time = times[name][i]
+                        write_items += [mcost, scost, cost, algorithm_time]
+
+                        baseline_mcost = baseline_mcosts[i]
+                        baseline_scost = baseline_scosts[i]
+                        baseline_cost = baseline_costs[i]
+                        baseline_time = baseline_times[i]
+
+                        mcost_ratio = percent_delta(mcost, baseline_mcost)
+                        scost_ratio = percent_delta(scost, baseline_scost)
+                        cost_ratio = percent_delta(cost, baseline_cost)
+                        time_ratio = percent_delta(algorithm_time, baseline_time)
+                        write_items += [mcost_ratio, scost_ratio, cost_ratio, time_ratio]
+
+                        is_dominated = 0
+                        for name2 in names:
+                            mcosts2 = mcosts[name2]
+                            scosts2 = scosts[name2]
+                            comparisons, dominated = prop_dominated(mcosts2, scosts2, [mcost], [scost])
+                            if dominated > 0:
+                                is_dominated = 1
+                        write_items.append(is_dominated)
+                        
+                        write_items = map(str, write_items)
+                        write_items = ', '.join(write_items)
+                        outfile.write('%s\n' % write_items)
+
+def greedy_eval_stats(model='uniform'):
+    df = pd.read_csv('greedy_eval_%s.csv' % model, skipinitialspace=True)
+    df['success'] = df['cost ratio'] == 0
+    df['error'] = df['cost ratio'] < 0
 
     mcost_ratios = []
     scost_ratios = []
     cost_ratios = []
-    algorithm_labels = {'steiner' : 'Steiner', 'prim' : 'Karger', 'khuller' : 'Khuller'}
+    time_ratios = []
+    algorithm_labels = {'brute force' : 'Brute force', 'steiner' : 'Greedy', 'prim' : 'Karger', 'khuller' : 'Khuller'}
     labels = []
 
     for algorithm, group in df.groupby('algorithm'):
-        print algorithm 
-        print "success rate", pylab.mean(group['success']), "(", sum(group['success']), "/", len(group['success']), ")"
+        print algorithm
+        alpha = group['alpha']
+        print len(alpha) / len(alpha.unique()), "point sets", len(alpha), "trials"
+        print "success rate", pylab.mean(group['success'])
         print "error rate", pylab.mean(group['error'])
-        #print group[group['error'] == 1]
-
-        mcost_ratio = (group['mcost'] / group['optimal mcost']) - 1
-        scost_ratio = (group['scost'] / group['optimal scost']) - 1
-        cost_ratio = (group['cost'] / group['optimal cost']) - 1
-
-        print "mcost ratio", pylab.mean(mcost_ratio), "+/-", pylab.std(mcost_ratio, ddof=1)
-        print "scost ratio", pylab.mean(scost_ratio), "+/-", pylab.std(scost_ratio, ddof=1)
-        print "cost ratio", pylab.mean(cost_ratio), "+/-", pylab.std(cost_ratio, ddof=1)
+        print "dominated", pylab.mean(group['dominated'])
         
-        print "max mcost ratio", max(mcost_ratio)
-        print "max scost ratio", max(scost_ratio)
-        print "max cost ratio", max(cost_ratio)
+        mcost_ratio = group['mcost ratio']
+        scost_ratio = group['scost ratio']
+        cost_ratio = group['cost ratio']
+        time_ratio = group['time ratio']
+
+        print "mcost ratio", pylab.nanmean(mcost_ratio), "+/-", pylab.nanstd(mcost_ratio, ddof=1)
+        print "scost ratio", pylab.nanmean(scost_ratio), "+/-", pylab.nanstd(scost_ratio, ddof=1)
+        print "cost ratio", pylab.nanmean(cost_ratio), "+/-", pylab.nanstd(cost_ratio, ddof=1)
+        print "time ratio", pylab.nanmean(time_ratio), "+/-", pylab.nanstd(time_ratio, ddof=1)
+        
+        print "max mcost ratio", pylab.nanmax(mcost_ratio)
+        print "max scost ratio", pylab.nanmax(scost_ratio)
+        print "max cost ratio", pylab.nanmax(cost_ratio)
+        print "max time ratio", pylab.nanmax(time_ratio)
 
         mcost_ratios.append(mcost_ratio)
         scost_ratios.append(scost_ratio)
         cost_ratios.append(cost_ratio)
+        time_ratios.append(time_ratio)
         labels.append(algorithm_labels[algorithm])
+
+        for points, points_group in group.groupby('points'):
+            print points, pylab.mean(points_group['time'])
 
     sns.set()
     
-    pylab.figure()
-    pylab.scatter(df['mcost'], df['optimal mcost'])
-    pylab.savefig('greedy_eval/greedy_eval_mcost.pdf', format='pdf')
-    pylab.tight_layout()
-    pylab.close()
-
-    pylab.figure()
-    pylab.scatter(df['scost'], df['optimal scost'])
-    pylab.savefig('greedy_eval/greedy_eval_scost.pdf', format='pdf')
-    pylab.tight_layout()
-    pylab.close()
-
-    pylab.figure()
-    pylab.scatter(df['cost'], df['optimal cost'])
-    pylab.savefig('greedy_eval/greedy_eval_cost.pdf', format='pdf')
-    pylab.tight_layout()
-    pylab.close()
-
-    for ratios, fname in zip([mcost_ratios, scost_ratios, cost_ratios], ['mcost', 'scost', 'cost']):
+    axis_text = {'mcost' : 'wiring cost', 'scost' : 'conduction delay', 'cost' : 'Pareto cost', 'time' : 'runtime'}
+    for ratios, fname in zip([mcost_ratios, scost_ratios, cost_ratios, time_ratios], ['mcost', 'scost', 'cost', 'time']):
         pylab.figure()
+        x = []
         weights = []
         for ratio, label in zip(ratios, labels):
+            ratio = pylab.array(ratio)
+            ratio = ratio[~pylab.isnan(ratio)]
+            x.append(ratio)
             wt = pylab.ones_like(ratio) / float(len(ratio))
             weights.append(wt)
-        pylab.hist(ratios, weights=weights, label=labels)
+        pylab.hist(x, weights=weights, label=labels)
         pylab.legend()
         ax = pylab.gca()
         pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
-        pylab.xlabel('percent better/worse than brute force', size=20)
+        ax_text = axis_text[fname]
+        pylab.xlabel('%s (percent higher/lower than %s)' % (ax_text, BASELINE), size=20)
         pylab.ylabel('proportion', size=20)
         pylab.tight_layout()
         pylab.savefig('greedy_eval/%s_ratios_hist.pdf' % fname, format='pdf')
         pylab.close()
-   
-    '''
-    for ratios, fname in zip([mcost_ratios, scost_ratios, cost_ratios], ['mcost', 'scost', 'cost']):
-        pylab.figure()
-        for ratio, label in zip(ratios, labels):
-            wt = pylab.ones_like(ratio) / float(len(ratio))
-            pylab.hist(ratio, weights=wt, label=label, alpha=0.5)
-        pylab.legend()
-        pylab.savefig('greedy_eval/%s_ratios_hist.pdf' % fname, format='pdf')
-        pylab.close()
-    '''
-
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--min_points', type=int, default=5)
-    parser.add_argument('--max_points', type=int, default=9)
+    parser.add_argument('--min_points', type=int, default=MIN_POINTS)
+    parser.add_argument('--max_points', type=int, default=MAX_POINTS)
     parser.add_argument('-x', '--num_iters', type=int, default=10)
     parser.add_argument('-e', '--evaluate', action='store_true')
     parser.add_argument('-s', '--stats', action='store_true')
+    parser.add_argument('-m', '--model', choices=['uniform', 'normal'], default='uniform')
 
     args = parser.parse_args()
     min_points = args.min_points
@@ -186,15 +226,13 @@ def main():
     num_iters = args.num_iters
     evaluate = args.evaluate
     stats = args.stats
+    model = args.model
 
     if stats:
-        greedy_eval_stats()
+        greedy_eval_stats(model)
 
     if evaluate:
-        for i in xrange(num_iters):
-            for num_points in xrange(min_points, max_points + 1):
-                G = random_point_graph(num_points=num_points)
-                greedy_eval(G)
+        greedy_eval(num_iters, min_points, max_points, model)
 
 if __name__ == '__main__':
     main()
