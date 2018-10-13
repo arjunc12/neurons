@@ -147,6 +147,7 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
     pylab.figure()
     sns.set()
 
+    #pylab.plot(mcosts, scosts, c='b', label='Pareto front')
     pylab.plot(mcosts, scosts, c='b', label='_nolegend_')
     pylab.scatter(mcosts, scosts, c='b', label='Pareto front')
  
@@ -165,6 +166,7 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
                 scosts = pylab.log10(pylab.array(scosts))
             pylab.scatter(mcosts, scosts, label=LABELS[tree],\
                           marker=MARKERS[tree], s=175, c=COLORS[tree])
+            print tree, "tree", len(mcosts)
     
     xlab = 'Wiring Cost'
     ylab = 'Conduction Delay'
@@ -174,17 +176,15 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
     
     pylab.xlabel(xlab, fontsize=35)
     pylab.ylabel(ylab, fontsize=35)
+    
     leg = pylab.legend(frameon=True)
-    
     ax = pylab.gca()
-    
     pylab.setp(ax.get_legend().get_texts(), fontsize=30) # for legend text
-    
     leg.get_frame().set_linewidth(5)
     leg.get_frame().set_edgecolor('k')
     
-    ax.tick_params(axis='x', labelsize=20)
-    ax.tick_params(axis='y', labelsize=20)
+    ax.tick_params(axis='x', labelsize=30)
+    ax.tick_params(axis='y', labelsize=30)
     
     pylab.tight_layout()
    
@@ -536,22 +536,39 @@ def pareto_analysis_imaris(G, neuron_name, neuron_type,\
     sns.set()
     
     pylab.plot(mcosts, scosts, c = 'b', label='_nolegend_')
-    pylab.scatter(mcosts, scosts, c='b', label='pareto front')
+    pylab.scatter(mcosts, scosts, c='b', label='Pareto front')
     
-    neural_dist, neural_index = DIST_FUNC(mcosts, scosts, neural_mcost,\
-                                          neural_scost)
     
-    centroid_dist, centroid_index = DIST_FUNC(mcosts, scosts, centroid_mcost,\
-                                              centroid_scost)
- 
-    for scale_factor, tree in zip([neural_dist, centroid_dist], ['neural', 'centroid']):
-        color = COLORS[tree]
-        x = scale_factor * pylab.array(mcosts)
-        y = scale_factor * pylab.array(scosts)
-        pylab.plot(x, y, c=color, linestyle='-')
-        pylab.scatter(x, y, c=color, label='s = %0.2f' % scale_factor)
+    tree_costs = zip(['neural', 'centroid'],\
+                     [neural_mcost, centroid_mcost],\
+                     [neural_scost, centroid_scost])
 
-    pylab.legend()
+    for tree, mcost, scost in tree_costs: 
+        dist, index = DIST_FUNC(mcosts, scosts, mcost, scost)
+ 
+        x = dist * pylab.array(mcosts)
+        y = dist * pylab.array(scosts)
+        
+        label = LABELS[tree]
+        marker = MARKERS[tree]
+        color = COLORS[tree]
+        
+        pylab.scatter([mcost], [scost], label=label, marker=marker, s=175,\
+                                                     c=color)
+        pylab.plot(x, y, c=color, linestyle='-')
+        pylab.scatter(x, y, c=color, label='s = %0.2f' % dist)
+
+    pylab.xlabel('Wiring Cost', size=20)
+    pylab.ylabel('Conduction Delay', size=20)
+    pylab.xticks(fontsize=20)
+    pylab.yticks(fontsize=20)
+ 
+    leg = pylab.legend(frameon=True)
+    ax = pylab.gca()
+    pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
+    leg.get_frame().set_linewidth(5)
+    leg.get_frame().set_edgecolor('k')
+    pylab.tight_layout()
 
     pylab.savefig('%s/pareto_front_scaled.pdf' % figs_dir, format='pdf')
     pylab.close()
