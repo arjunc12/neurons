@@ -550,6 +550,7 @@ def pareto_steiner_fast(G, alpha, axon=False):
     steps = 0
 
     best_edges = []
+
     while added_nodes < G.number_of_nodes():
         assert len(out_nodes) > 0
         best_edge = None
@@ -636,6 +637,88 @@ def pareto_steiner_fast(G, alpha, axon=False):
             midpoint_nodes.append(midpoint_node)
 
             unpaired_nodes.add(midpoint_node)
+
+        line_nodes = [v] + list(reversed(midpoint_nodes)) + [u]
+        for i in xrange(-1, -len(line_nodes), -1):
+            n1 = line_nodes[i]
+            n2 = line_nodes[i - 1]
+            H.add_edge(n1, n2)
+            H[n1][n2]['length'] = node_dist(H, n1, n2)
+            assert 'droot' in H.node[n1]
+            H.node[n2]['parent'] = n1
+            H.node[n2]['droot'] = node_dist(H, n2, u) + H.node[u]['droot']
+            if not G.has_node(n2):
+                H.node[n2]['label'] = 'steiner_midpoint'
+
+        added_nodes += 1
+    return H
+
+def pareto_steiner_naive(G, alpha, axon=False):
+    root = G.graph['root']
+
+    H = nx.Graph()
+  
+    H.add_node(root)
+    H.graph['root'] = root
+    H.node[root]['droot'] = 0
+    H.node[root]['parent'] = None
+    root_coord = G.node[root]['coord']
+    H.node[root]['coord'] = root_coord
+    H.node[root]['label'] = 'root'
+    added_nodes = 1
+
+    in_nodes = set()
+    out_nodes = set(G.nodes())
+    in_nodes.add(root)
+    out_nodes.remove(root)
+    
+    node_index = max(G.nodes()) + 1
+
+    while added_nodes < G.number_of_nodes():
+        assert len(out_nodes) > 0
+        best_edge = None
+        best_delta = float("inf")
+
+        for v in out_nodes:
+            assert not H.has_node(v)
+            if axon and (u == H.graph['root']) and (H.degree(u) > 0):
+                continue
+
+            for u in in_nodes:
+                assert H.has_node(u)
+                coord1 = H.node[u]['coord']
+                coord2 = G.node[v]['coord']
+                dist = point_dist(coord1, coord2)
+                mcost = dist
+                scost = dist + H.node[u]['droot']
+                delta = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
+                if delta < best_delta:
+                    best_delta = delta
+                    best_edge = (u, v)
+
+        assert best_edge != None
+        u, v = best_edge
+
+        assert H.has_node(u)
+        assert not H.has_node(v)
+        H.add_node(v)
+        H.node[v]['coord'] = G.node[v]['coord']
+        H.node[v]['label'] = 'synapse'
+        in_nodes.add(v)
+        out_nodes.remove(v)
+
+        p1 = H.node[u]['coord']
+        p2 = H.node[v]['coord']
+        midpoints = steiner_points(p1, p2, npoints=STEINER_MIDPOINTS)
+        midpoint_nodes = []
+        for midpoint in midpoints:
+            midpoint_node = node_index
+            node_index += 1
+            H.add_node(midpoint_node)
+            H.node[midpoint_node]['coord'] = midpoint
+            in_nodes.add(midpoint_node)
+
+            midpoint_nodes.append(midpoint_node)
 
         line_nodes = [v] + list(reversed(midpoint_nodes)) + [u]
         for i in xrange(-1, -len(line_nodes), -1):
@@ -864,13 +947,12 @@ def main():
     G = random_point_graph(points)
 
     #algorithms = [pareto_steiner_space, pareto_steiner_space2, pareto_steiner_fast, pareto_steiner_old]
-    algorithms = [pareto_steiner_fast, pareto_prim]
+    algorithms = [pareto_steiner_fast, pareto_steiner_naive]
     for pareto_func in algorithms:
-        start = time()
         tree = pareto_func(G, alpha)
-        end = time()
-        print graph_costs(tree, relevant_nodes=G.nodes())
-        print end - start
+        mcost, scost = graph_costs(tree, relevant_nodes=G.nodes())
+        cost = pareto_cost(mcost=mcost, scost=scost, alpha=alpha)
+        print pareto_func, cost
 
 if __name__ == '__main__':
    main()
