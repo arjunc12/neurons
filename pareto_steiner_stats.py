@@ -20,7 +20,8 @@ from check_robustness import INTERESTING_CELL_TYPES, INTERESTING_TRANSMITTERS
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = True
+TEST_NEW_FUNCTION = False
+PAPER_PLOTS = True
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -69,11 +70,9 @@ def remove_small_counts(df, categories, min_count=MIN_COUNT):
 def count_unique_neurons(df):
     return len(set(zip(df['neuron name'], df['neuron type'])))
 
-def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE_FILTERED,\
+def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
             models_file=MODELS_FILE, tradeoffs_file=TRADEOFFS_FILE):
     output_df = pd.read_csv(output_file, skipinitialspace=True)
-    output_df = output_df[output_df['points'] >= MIN_POINTS]
-    output_df = output_df[(output_df['alpha'] >= MIN_ALPHA) & (output_df['alpha'] <= MAX_ALPHA)]
 
     models_df = pd.read_csv(models_file, skipinitialspace=True)
     models_cols = models_df.columns.values
@@ -333,7 +332,8 @@ def cat_to_num(categories):
     return cat_nums
 
 def val_distribution(df, val, categories, plot_func, plot_descriptor,\
-                     outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+                     outdir=FIGS_DIR, fig_suffix=None, category_subset=None,\
+                     **kwargs):
     for category in categories:
         subset_cols = ['neuron name', 'neuron type', 'alpha']
         if category != 'neuron type':
@@ -347,23 +347,30 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
                                       min_count=CATEGORY_MIN_COUNTS[category])
 
         cat_vals = []
-        medians = []
+        order_vals = []
+        order_val = kwargs['order_val']
         for name, group in df2.groupby(category):
             cat_vals.append(name)
-            medians.append(pylab.median(group[val]))
+            if order_val == None:
+                order_val.append(pylab.median(group[val]))
+            else:
+                order_vals.append(pylab.mean(group['dist']))
+            print name, val, pylab.mean(group[val]), "+/-", pylab.std(group[val], ddof=1)
         
         cat_vals = pylab.array(cat_vals)
-        mean = pylab.array(medians)
-        order = pylab.argsort(medians)
+        #mean = pylab.array(medians)
+        order = pylab.argsort(order_vals)
         order = cat_vals[order]
 
         pylab.figure()
         sns.set()
-        dist_plot = plot_func(x=val, y=category, data=df2, orient='h', order=order)
+        dist_plot = plot_func(x=category, y=val, data=df2, order=order)
+        dist_plot.tick_params(axis='x', labelsize=20, rotation=75)
         dist_plot.tick_params(axis='y', labelsize=20)
+        #pylab.xlabel(category, fontsize=20)
+        dist_plot.xaxis.label.set_visible(False)
+        pylab.ylabel(val, fontsize=20)
         pylab.tight_layout()
-        pylab.xlabel(val, fontsize=20)
-        pylab.ylabel(category, fontsize=20)
 
         fname = '%s_%ss_%s' % (category.replace(' ', '_'),\
                               val.replace(' ', '_'), plot_descriptor)
@@ -372,39 +379,48 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
         pylab.savefig('%s/%s.pdf' % (outdir, fname), format='pdf')
         pylab.close()
 
-def cluster_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+def cluster_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                   category_subset=None, **kwargs):
     val_distribution(df, 'alpha', identifiers, sns.stripplot, 'cluster',\
-                     outdir, fig_suffix, category_subset)
+                     outdir, fig_suffix, category_subset, **kwargs)
 
-def boxplot_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+def boxplot_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                   category_subset=None, **kwargs):
     val_distribution(df, 'alpha', identifiers, sns.boxplot, 'box', outdir,\
-                     fig_suffix, category_subset)
+                     fig_suffix, category_subset, **kwargs)
 
-def violin_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+def violin_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                  category_subset=None, **kwargs):
     val_distribution(df, 'alpha', identifiers, sns.violinplot, 'violin',\
-                     outdir, fig_suffix, category_subset)
+                     outdir, fig_suffix, category_subset, **kwargs)
 
-def swarm_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+def swarm_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                 category_subset=None, **kwargs):
     val_distribution(df, 'alpha', identifiers, sns.swarmplot, 'swarm', outdir,\
-                     fig_suffix, category_subset)
+                     fig_suffix, category_subset, **kwargs)
 
-def cluster_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+def cluster_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                      category_subset=None, **kwargs):
     val_distribution(df, 'tradeoff ratio', identifiers, sns.stripplot,\
-                     'cluster', outdir, fig_suffix, category_subset)
+                     'cluster', outdir, fig_suffix, category_subset, **kwargs)
 
-def boxplot_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+def boxplot_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                      category_subset=None, **kwargs):
     val_distribution(df, 'tradeoff ratio', identifiers, sns.boxplot, 'box',\
-                     outdir, fig_suffix, category_subset)
+                     outdir, fig_suffix, category_subset, **kwargs)
 
-def violin_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
+def violin_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                     category_subset=None, **kwargs):
     val_distribution(df, 'tradeoff ratio', identifiers, sns.violinplot,\
-                     'violin', outdir, fig_suffix, category_subset)
+                     'violin', outdir, fig_suffix, category_subset, **kwargs)
 
-def swarm_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None, category_subset=None):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.swarmplot, 'swarm', outdir, fig_suffix, category_subset)
+def swarm_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                    category_subset=None, **kwargs):
+    val_distribution(df, 'tradeoff ratio', identifiers, sns.swarmplot,\
+                     'swarm', outdir, fig_suffix, category_subset, **kwargs)
     
 def category_dists(df, categories, outdir=FIGS_DIR, fig_suffix=None,\
-                   category_subset=None):
+                   category_subset=None, log_plot=True, **kwargs):
     for category in categories:
         df2 = df.drop_duplicates(subset=list(set(['neuron name', 'neuron type', category])))
         
@@ -418,25 +434,54 @@ def category_dists(df, categories, outdir=FIGS_DIR, fig_suffix=None,\
         if category_subset != None:
             df2 = df2[df2[category].isin(category_subset)]
 
-        df2['dist'] = pylab.log10(df2['dist'])
+        if log_plot:
+            df2['dist'] = pylab.log10(df2['dist'])
         
         
         cat_vals = []
         cat_means = []
+        
         for cat_val, group in df2.groupby(category):
+            dist = pylab.array(group['dist'])
+
             cat_vals.append(cat_val)
-            cat_mean = pylab.mean(group['dist'])
+            cat_mean = pylab.mean(dist)
             cat_means.append(cat_mean)
+
+            '''
+            if log_plot:
+                dist = 10 ** dist
+            print cat_val, pylab.mean(dist), "+/-", pylab.std(dist, ddof=1)
+            '''
+
         order = pylab.argsort(cat_means)
         cat_vals = pylab.array(cat_vals)
+        cat_means = pylab.array(cat_means)
         sorted_vals = cat_vals[order]
+        sorted_means = cat_means[order]
+        
         pylab.figure()
         sns.set()
+        
         dist_plot = sns.barplot(x=category, y='dist', data=df2, order=sorted_vals)
-        pylab.xticks(rotation='vertical', size=20)
-        pylab.xlabel(category, size=20)
-        pylab.ylabel('log-distance to Pareto front', size=20)
-        #pylab.tight_layout()
+        
+        pylab.xticks(rotation=75, size=20)
+        pylab.yticks(size=20)
+
+        #pylab.xlabel(category, size=20)
+        dist_plot.xaxis.label.set_visible(False)
+        ylab = 'Distance to Pareto front'
+        if log_plot:
+            ylab = 'log(' + ylab + ')'
+        pylab.ylabel(ylab, size=20)
+
+        if 'ymin' in kwargs:
+            pylab.ylim(ymin=kwargs['ymin'])
+        if 'ymax' in kwargs:
+            pylab.ylim(ymax=kwargs['ymax'])
+        
+        pylab.tight_layout()
+        
         fname = 'pareto_dists_%s' % category.replace(' ', '_')
         if fig_suffix != None:
             fname += '_%s' % fig_suffix
@@ -469,7 +514,10 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
     model_labels = {'neural': 'Neural arbor', 'centroid' : 'Centroid', 'random' : 'Random', 'barabasi' : 'Barabasi-Albert'}
    
     max_dist = float('-inf')
-    for model, dists in model_dists.iteritems():
+
+    plot_order = ['random', 'barabasi', 'centroid', 'neural']
+    for model in plot_order:
+        dists = model_dists[model]
         dists = pylab.array(dists)
         y = dists[order]
         if LOG_DIST:
@@ -485,7 +533,7 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
         label = model_labels[model]
         pylab.scatter(x, y, label=label, c=color, marker=marker)
     
-    pylab.xlabel('neuron index', fontsize=20)
+    pylab.xlabel('neural arbor index', fontsize=20)
     ylab = 'distance to Pareto front'
     if LOG_DIST:
         ylab = 'log(' + ylab + ')'
@@ -496,6 +544,9 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
     ax = pylab.gca()
     pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
     pylab.ylim(0, max_dist + 0.6)
+
+    pylab.xticks(fontsize=15)
+    pylab.yticks(fontsize=15)
 
     pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf')
 
@@ -595,7 +646,7 @@ def null_models_analysis(models_df):
 
         print "success rate", float(successes) / float(trials), "trials", trials
         print "binomial p-value", binom_test(successes, trials)
-        print "neural to %s ratio" % model, pylab.mean(ratios)
+        print "neural to %s ratio" % model, pylab.mean(ratios), "+/-", pylab.std(ratios, ddof=1)
         print "t-test p-value", ttest_1samp(ratios, popmean=1)
 
 def null_models_check(models_df):
@@ -622,7 +673,7 @@ def metadata(df):
         print len(df[category].unique())
         df2 = df.drop_duplicates(subset=['neuron name', category])
         df2 = add_count_col(df2, category)
-        df2 = df2[df2['count'] >= 25]
+        #df2 = df2[df2['count'] >= 25]
         category_str = category.replace(' ', '_')
         f = open('%s/%s.txt' % (METADATA_DIR, category_str), 'w')
         with pd.option_context('display.max_rows', None, 'display.max_columns', 3):
@@ -656,22 +707,31 @@ def neuron_type_alphas(df):
         #print mannwhitneyu(dist1, dist2, alternative='two-sided')
         print "alphas ks-test", ks_2samp(alphas1, alphas2)
         print "alphas mann-whitney test", mannwhitneyu(alphas1, alphas2)
-        print "dists welch's t-test", ttest_ind(dists1,dists2)
+        print "alphas earth movers distance", wasserstein_distance(alphas1, alphas2)
+        #print "alphas welchs t-test", ttest_ind(alphas1, alphas2, equal_var=False)
+        print "dists welch's t-test", ttest_ind(dists1, dists2, equal_var=False)
 
-def vals_correlation(df, val1, val2, outdir=FIGS_DIR, xtransform=None,\
-                     ytransform=None, logtransform=False):
+def vals_correlation(df, val1, val2, **kwargs):
     print "-----------------------------------------------------"
     print "%s-%s correlation" % (val1, val2)
     df2 = df.drop_duplicates(subset=['neuron name', 'neuron type'])
     
-    if logtransform:
+    if 'logtransform' in kwargs and kwargs['logtransform']:
         xtransform = pylab.log10
         ytransform = pylab.log10
         df2 = df2[(df2[val1] > 0) & (df2[val2] > 0)]
     
     v1 = df2[val1]
     v2 = df2[val2]
-    
+   
+    xtransform = None
+    ytransform = None
+
+    if 'xtransform' in kwargs:
+        xtransform = kwargs['xtransform']
+    if 'ytransform' in kwargs:
+        ytransform = kwargs['ytransform']
+        
     if xtransform != None:
         v1 = xtransform(v1)
     if ytransform != None:
@@ -684,9 +744,23 @@ def vals_correlation(df, val1, val2, outdir=FIGS_DIR, xtransform=None,\
     add_regression_cols(regression_df, val1, val2, xtransform=xtransform,\
                         ytransform=ytransform)
 
+    grouping = None
+    if 'grouping' in kwargs:
+        grouping = kwargs['grouping']
+    else:
+        grouping = 'neuron type'
+    
+    grouping_subset = None
+    if 'grouping_subset' in kwargs:
+        assert 'grouping' in kwargs
+        grouping_subset = kwargs['grouping_subset']
+    else:
+        #grouping_subset = ['axon', 'truncated axon', 'apical dendrite', 'basal dendrite']
+        grouping_subset = df2[grouping].unique()
+    
     sns.set()
     pylab.figure()
-    nrows = len(df2['neuron type'].unique()) + 1
+    nrows = len(grouping_subset) + 1
     pylab.subplot(nrows, 1, 1)
     pylab.scatter(v1, v2)
     x = v1
@@ -697,8 +771,10 @@ def vals_correlation(df, val1, val2, outdir=FIGS_DIR, xtransform=None,\
     pylab.plot(x, y, c='g')
 
     row = 2
-    for neuron_type, group in df2.groupby('neuron type'):
-        print neuron_type
+
+    df3 = df2[df2[grouping].isin(grouping_subset)]
+    for name, group in df3.groupby(grouping):
+        print name
         pylab.subplot(nrows, 1, row)
         row += 1
         v1 = pylab.array(group[val1])
@@ -723,19 +799,25 @@ def vals_correlation(df, val1, val2, outdir=FIGS_DIR, xtransform=None,\
         pylab.plot(x, y, c='g')
     
     pylab.tight_layout()
+
+    outdir = None
+    if 'outdir' in kwargs:
+        outdir = kwargs['outdir']
+    else:
+        outdir = FIGS_DIR
     figname = '%s/%s_%s.pdf' % (outdir, val1, val2)
     pylab.savefig('%s/%s_%s.pdf' % (outdir, val1, val2), format='pdf')
 
     pylab.close()
 
-def size_dist_correlation(df, outdir=FIGS_DIR):
-    vals_correlation(df, 'points', 'dist', outdir=outdir, logtransform=True)
+def size_dist_correlation(df, **kwargs):
+    vals_correlation(df, 'points', 'dist', **kwargs)
 
-def alpha_dist_correlation(df, outdir=FIGS_DIR):
-    vals_correlation(df, 'alpha', 'dist', outdir=outdir, logtransform=True)
+def alpha_dist_correlation(df, **kwargs):
+    vals_correlation(df, 'alpha', 'dist', **kwargs)
 
-def size_alpha_correlation(df, outdir=FIGS_DIR):
-    vals_correlation(df, 'alpha', 'points', outdir=outdir, logtransform=True)
+def size_alpha_correlation(df, **kwargs):
+    vals_correlation(df, 'alpha', 'points', **kwargs)
 
 def truncation_hist(df, outdir=FIGS_DIR):
     df2 = df[df['neuron type'].isin(['axon', 'truncated axon'])]
@@ -870,6 +952,7 @@ def main():
     parser.add_argument('-c', '--categories_file', default=CATEGORIES_FILE)
     parser.add_argument('-f', '--figs_dir', default=FIGS_DIR)
     parser.add_argument('--synthetic', action='store_true')
+    parser.add_argument('-r', '--rate', default=DENDRITE_RATE)
     parser.add_argument('--triplet', action='store_true')
     args = parser.parse_args()
     
@@ -881,12 +964,18 @@ def main():
     figs_dir = args.figs_dir
     synthetic = args.synthetic
     triplet = args.triplet
+    rate = float(args.rate)
 
     if synthetic:
-        output_fname = output_fname.replace('.csv', '_synthetic%0.1f.csv' % DENDRITE_RATE)
-        models_fname = models_fname.replace('.csv', '_synthetic%0.1f.csv' % DENDRITE_RATE)
-        tradeoffs_fname = tradeoffs_fname.replace('.csv', '_synthetic%0.1f.csv' % DENDRITE_RATE)
+        output_dir += '%0.1f' % rate
+        output_fname = output_fname.replace('.csv', '_synthetic%0.1f.csv' % rate)
+        models_fname = models_fname.replace('.csv', '_synthetic%0.1f.csv' % rate)
+        tradeoffs_fname = tradeoffs_fname.replace('.csv', '_synthetic%0.1f.csv' % rate)
         figs_dir += '_synthetic'
+        if rate != DENDRITE_RATE:
+            figs_dir += '%0.1f' % rate
+    
+    os.system('mkdir -p %s' % figs_dir)
 
     output_file = '%s/%s' % (output_dir, output_fname)
     models_file = '%s/%s' % (output_dir, models_fname)
@@ -897,25 +986,55 @@ def main():
                                        models_file=models_file,\
                                        tradeoffs_file=tradeoffs_file)
     
+    metadata(categories_df)
+    
+    categories_df = categories_df[categories_df['points'] >= MIN_POINTS]
+    categories_df = categories_df[(categories_df['alpha'] >= MIN_ALPHA) & (categories_df['alpha'] <= MAX_ALPHA)]
+    
 
     if TEST_NEW_FUNCTION:
-        alphas_hist(categories_df, outdir=figs_dir)
+        return None
+        
+    if PAPER_PLOTS:
+        neuron_type_alphas(categories_df)
+        #null_models_analysis(models_df)
+    
+        #scatter_dists(models_df, outdir=figs_dir)
+        
+        category_dists(categories_df, ['neuron type'], outdir=figs_dir, ymin=0, ymax=0.2)
+        category_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                       fig_suffix='main',\
+                       category_subset=INTERESTING_CELL_TYPES)
+        category_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                       fig_suffix='transmitters',\
+                       category_subset=INTERESTING_TRANSMITTERS)
+       
+        boxplot_alphas(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist')
+        boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
+                       fig_suffix='main',\
+                       category_subset=INTERESTING_CELL_TYPES, order_val='dist')
+        boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
+                       fig_suffix='transmitters',\
+                       category_subset=INTERESTING_TRANSMITTERS, order_val='dist')
+    
+        alpha_dist_correlation(categories_df, outdir=figs_dir)
+        alpha_dist_correlation(categories_df, outdir=figs_dir, grouping='cell type', grouping_subset=INTERESTING_CELL_TYPES)
+        alpha_dist_correlation(categories_df, outdir=figs_dir, grouping='cell type', grouping_subset=INTERESTING_TRANSMITTERS)
         return None
     
-    metadata(categories_df)
     print "-----------------------------------------------------"
     print "mean neural dist", pylab.mean(models_df['dist'][models_df['model'] == 'neural'])
     
-    neuron_type_alphas(categories_df)
     
     os.system('mkdir -p %s' % figs_dir)
-    
-    
-    scatter_dists(models_df, outdir=figs_dir)
+     
     null_models_analysis(models_df)
     truncation_hist(categories_df, outdir=figs_dir)
+        
+    scatter_dists(models_df, outdir=figs_dir)
     
     neuron_types_hist(categories_df, outdir=figs_dir)
+    alphas_hist(categories_df, outdir=figs_dir)
     
     alphas_heat(categories_df, CATEGORIES, outdir=figs_dir)
     dist_heats(categories_df, CATEGORIES, DIST_FUNCS, outdir=figs_dir)
@@ -926,22 +1045,8 @@ def main():
     
     violin_tradeoffs(categories_df, CATEGORIES, outdir=figs_dir)
     
-    category_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                   fig_suffix='main',\
-                   category_subset=INTERESTING_CELL_TYPES)
-    category_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                   fig_suffix='transmitters',\
-                   category_subset=INTERESTING_TRANSMITTERS)
-    
-    boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
-                   fig_suffix='main',\
-                   category_subset=INTERESTING_CELL_TYPES)
-    boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
-                   fig_suffix='transmitters',\
-                   category_subset=INTERESTING_TRANSMITTERS)
     
     size_dist_correlation(categories_df, outdir=figs_dir) 
-    alpha_dist_correlation(categories_df, outdir=figs_dir)
     size_alpha_correlation(categories_df, outdir=figs_dir)
     
     cats = CATEGORIES[:]
