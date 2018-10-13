@@ -102,7 +102,7 @@ def graph_costs(G, relevant_nodes=None):
 def best_mst_cost(G):
     mst = nx.minimum_spanning_tree(G, weight='length')
     best_cost = 0
-    for u, v in mst.edges_iter():
+    for u, v in mst.edges():
         best_cost += G[u][v]['length']
     return best_cost
 
