@@ -8,7 +8,7 @@ import os
 import seaborn as sns
 from itertools import combinations
 import numpy as np
-from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind, ttest_rel, wasserstein_distance, mannwhitneyu, wilcoxon
+from scipy.stats import entropy, binom_test, ttest_1samp, ttest_ind, ttest_rel, wasserstein_distance, mannwhitneyu, wilcoxon, chisquare
 from numpy.linalg import norm
 import numpy as np
 from stats_utils import *
@@ -20,8 +20,8 @@ from check_robustness import INTERESTING_CELL_TYPES, INTERESTING_TRANSMITTERS
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = False
-PAPER_PLOTS = True
+TEST_NEW_FUNCTION = True
+PAPER_PLOTS = False
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -73,11 +73,12 @@ def count_unique_neurons(df):
 def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
             models_file=MODELS_FILE, tradeoffs_file=TRADEOFFS_FILE):
     output_df = pd.read_csv(output_file, skipinitialspace=True)
+    points_df = output_df[['neuron name', 'neuron type', 'points']]
+    #print count_unique_neurons(output_df)
 
     models_df = pd.read_csv(models_file, skipinitialspace=True)
-    models_cols = models_df.columns.values
-    models_df = pd.merge(models_df, output_df, on=['neuron name', 'neuron type'])
-    models_df = models_df[models_cols]
+    models_df = pd.merge(models_df, points_df)
+    #print count_unique_neurons(models_df)
     
     neural_df = models_df[models_df['model'] == 'neural']
     neural_df = neural_df[['neuron name', 'neuron type', 'dist']]
@@ -85,18 +86,21 @@ def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
     cat_df = pd.read_csv(categories_file, skipinitialspace=True)
     categories_df = pd.merge(output_df, cat_df, on='neuron name')
     categories_df = pd.merge(categories_df, neural_df, on=['neuron name', 'neuron type'])
+    #print count_unique_neurons(categories_df)
 
     tradeoffs_df = pd.read_csv(tradeoffs_file, skipinitialspace=True)
-    categories_df = pd.merge(categories_df, tradeoffs_df, on=['neuron name', 'neuron type'])
+    tradeoffs_df = pd.merge(tradeoffs_df, points_df)
+    #print count_unique_neurons(categories_df)
 
     density_df = neuron_density.get_df()
-    density_df.drop('points', inplace=True, axis=1)
-    categories_df = pd.merge(categories_df, density_df, on=['neuron name', 'neuron type'])
+    #print count_unique_neurons(categories_df)
 
     models_df.drop_duplicates(inplace=True)
     categories_df.drop_duplicates(inplace=True)
+    tradeoffs_df.drop_duplicates(inplace=True)
+    density_df.drop_duplicates(inplace=True)
 
-    return models_df, categories_df
+    return models_df, categories_df, tradeoffs_df, density_df
 
 def get_filtered_df(df=None):
     if df is None:
@@ -370,6 +374,9 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
         #pylab.xlabel(category, fontsize=20)
         dist_plot.xaxis.label.set_visible(False)
         pylab.ylabel(val, fontsize=20)
+
+        #sns.violinplot(x=category, y=val, data=df2, order=order)
+
         pylab.tight_layout()
 
         fname = '%s_%ss_%s' % (category.replace(' ', '_'),\
@@ -442,17 +449,15 @@ def category_dists(df, categories, outdir=FIGS_DIR, fig_suffix=None,\
         cat_means = []
         
         for cat_val, group in df2.groupby(category):
-            dist = pylab.array(group['dist'])
+            dist = pylab.array(group['dist']).copy()
 
             cat_vals.append(cat_val)
             cat_mean = pylab.mean(dist)
             cat_means.append(cat_mean)
 
-            '''
             if log_plot:
                 dist = 10 ** dist
             print cat_val, pylab.mean(dist), "+/-", pylab.std(dist, ddof=1)
-            '''
 
         order = pylab.argsort(cat_means)
         cat_vals = pylab.array(cat_vals)
@@ -487,17 +492,20 @@ def category_dists(df, categories, outdir=FIGS_DIR, fig_suffix=None,\
             fname += '_%s' % fig_suffix
         pylab.savefig('%s/%s.pdf' % (outdir, fname), bbox_inches='tight')
 
-def scatter_dists(models_df, outdir=FIGS_DIR):
+def scatter_dists(models_df, outdir=FIGS_DIR, subset=False):
     df = models_df[['neuron name', 'neuron type', 'model', 'dist']]
     model_dists = defaultdict(list)
     unique_neurons = 0
     for name, group in df.groupby(['neuron name', 'neuron type']):
         if len(group['model'].unique()) != 4:
             print group
+            continue
+        unique_neurons += 1
+        if subset and unique_neurons % 5 != 0:
+            continue
         for model, group2 in group.groupby('model'):
             #group2 = group2.head(n=20)
             model_dists[model].append(pylab.mean(group2['dist']))
-        unique_neurons += 1
 
     print "-------------"
     print "unique scatter neurons", unique_neurons
@@ -507,7 +515,6 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
     #x = pylab.arange(len(model_dists['neural']))
     pylab.figure()
     sns.set()
-    pylab.tight_layout()
     
     model_colors = {'neural' : 'r', 'centroid' : 'g', 'random' : 'm', 'barabasi' : 'c'}
     model_markers = {'neural' : 'x', 'centroid' : 'o', 'random' : '^', 'barabasi' : 's'}
@@ -548,7 +555,12 @@ def scatter_dists(models_df, outdir=FIGS_DIR):
     pylab.xticks(fontsize=15)
     pylab.yticks(fontsize=15)
 
-    pylab.savefig('%s/pareto_dists.pdf' % outdir, format='pdf')
+    fname = 'pareto_dists'
+    if subset:
+        fname += '_subset'
+    
+    pylab.tight_layout()
+    pylab.savefig('%s/%s.pdf' % (outdir, fname), format='pdf')
 
 def alphas_hist(df, outdir=FIGS_DIR, categories=None):
     subset_cols = ['neuron name', 'neuron type']
@@ -697,6 +709,26 @@ def neuron_type_alphas(df):
         alphas.append(pylab.array(group['alpha']))
         dists.append(pylab.array(group['dist']))
     indices = range(len(types))
+
+    def alphas_chisquare(alphas1, alphas2):
+        counts1 = defaultdict(int)
+        counts2 = defaultdict(int)
+        unique_alphas = set()
+        for alpha in alphas1:
+            counts1[alpha] += 1
+            unique_alphas.add(alpha)
+        for alpha in alphas2:
+            counts2[alpha] += 1
+            unique_alphas.add(alpha)
+
+        f_obs = []
+        f_exp = []
+        for alpha in sorted(unique_alphas):
+            f_obs.append(counts1[alpha])
+            f_exp.append(counts2[alpha])
+
+        return chisquare(f_obs, f_exp)
+
     for idx1, idx2 in combinations(indices, 2):
         print "------------"
         type1, type2 = types[idx1], types[idx2]
@@ -705,10 +737,12 @@ def neuron_type_alphas(df):
         print type1 + ' vs. ' + type2
         #print ttest_ind(dist1, dist2, equal_var=False)
         #print mannwhitneyu(dist1, dist2, alternative='two-sided')
+
         print "alphas ks-test", ks_2samp(alphas1, alphas2)
         print "alphas mann-whitney test", mannwhitneyu(alphas1, alphas2)
         print "alphas earth movers distance", wasserstein_distance(alphas1, alphas2)
-        #print "alphas welchs t-test", ttest_ind(alphas1, alphas2, equal_var=False)
+        print "alphas chi square", alphas_chisquare(alphas1, alphas2)
+        print "alphas welchs t-test", ttest_ind(alphas1, alphas2, equal_var=False)
         print "dists welch's t-test", ttest_ind(dists1, dists2, equal_var=False)
 
 def vals_correlation(df, val1, val2, **kwargs):
@@ -981,25 +1015,35 @@ def main():
     models_file = '%s/%s' % (output_dir, models_fname)
     tradeoffs_file = '%s/%s' % (output_dir, tradeoffs_fname)
     
-    models_df, categories_df = get_dfs(output_file=output_file,\
-                                       categories_file=categories_file,\
-                                       models_file=models_file,\
-                                       tradeoffs_file=tradeoffs_file)
-    
-    metadata(categories_df)
+    models_df, categories_df, tradeoffs_df, density_df = get_dfs(output_file,\
+                                                                 categories_file,\
+                                                                 models_file,\
+                                                                 tradeoffs_file)
     
     categories_df = categories_df[categories_df['points'] >= MIN_POINTS]
-    categories_df = categories_df[(categories_df['alpha'] >= MIN_ALPHA) & (categories_df['alpha'] <= MAX_ALPHA)]
+    models_df = models_df[models_df['points'] >= MIN_POINTS]
+    
+    metadata(categories_df) 
     
 
     if TEST_NEW_FUNCTION:
+        boxplot_alphas(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist')
+        boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
+                       fig_suffix='main',\
+                       category_subset=INTERESTING_CELL_TYPES, order_val='dist')
+        boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
+                       fig_suffix='transmitters',\
+                       category_subset=INTERESTING_TRANSMITTERS, order_val='dist')
+
+        violin_alphas(categories_df, ['region'], outdir=figs_dir, order_val='dist')
         return None
         
     if PAPER_PLOTS:
         neuron_type_alphas(categories_df)
-        #null_models_analysis(models_df)
+        null_models_analysis(models_df)
+        alphas_hist(categories_df, outdir=figs_dir)
     
-        #scatter_dists(models_df, outdir=figs_dir)
+        scatter_dists(models_df, outdir=figs_dir, subset=False)
         
         category_dists(categories_df, ['neuron type'], outdir=figs_dir, ymin=0, ymax=0.2)
         category_dists(categories_df, ['cell type'], outdir=figs_dir,\
@@ -1016,6 +1060,8 @@ def main():
         boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
                        fig_suffix='transmitters',\
                        category_subset=INTERESTING_TRANSMITTERS, order_val='dist')
+
+        violin_alphas(categories_df, ['region'], outdir=figs_dir, order_val='dist')
     
         alpha_dist_correlation(categories_df, outdir=figs_dir)
         alpha_dist_correlation(categories_df, outdir=figs_dir, grouping='cell type', grouping_subset=INTERESTING_CELL_TYPES)
