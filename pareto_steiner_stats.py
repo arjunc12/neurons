@@ -20,8 +20,8 @@ from check_robustness import INTERESTING_CELL_TYPES, INTERESTING_TRANSMITTERS
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = True
-PAPER_PLOTS = False
+TEST_NEW_FUNCTION = False
+PAPER_PLOTS = True
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -41,7 +41,7 @@ CATEGORIES = ['cell type', 'species', 'region', 'neuron type', 'lab']
 
 METADATA_DIR = '/iblsn/data/Arjun/neurons/metadata'
 
-CATEGORY_MIN_COUNTS = {'species': 35, 'cell type' : 125, 'region' : 400, 'neuron type' : 100, 'lab' : 100}
+CATEGORY_MIN_COUNTS = {'species': 35, 'cell type' : 125, 'region' : 600, 'neuron type' : 100, 'lab' : 100}
 MIN_COUNT = 50
 
 MIN_POINTS = 100
@@ -350,6 +350,13 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
             df2 = remove_small_counts(df2, category,\
                                       min_count=CATEGORY_MIN_COUNTS[category])
 
+        log_transform = False
+        if ('log_transform' in kwargs) and kwargs['log_transform']:
+            log_transform = True
+
+        if log_transform:
+            df2[val] = pylab.log10(df2[val])
+
         cat_vals = []
         order_vals = []
         order_val = kwargs['order_val']
@@ -358,8 +365,8 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
             if order_val == None:
                 order_val.append(pylab.median(group[val]))
             else:
-                order_vals.append(pylab.mean(group['dist']))
-            print name, val, pylab.mean(group[val]), "+/-", pylab.std(group[val], ddof=1)
+                order_vals.append(pylab.median(group[order_val]))
+            #print name, val, pylab.mean(group[val]), "+/-", pylab.std(group[val], ddof=1)
         
         cat_vals = pylab.array(cat_vals)
         #mean = pylab.array(medians)
@@ -373,9 +380,10 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
         dist_plot.tick_params(axis='y', labelsize=20)
         #pylab.xlabel(category, fontsize=20)
         dist_plot.xaxis.label.set_visible(False)
-        pylab.ylabel(val, fontsize=20)
-
-        #sns.violinplot(x=category, y=val, data=df2, order=order)
+        ylab = val
+        if log_transform:
+            ylab = 'log(' + ylab + ')'
+        pylab.ylabel(ylab, fontsize=20)
 
         pylab.tight_layout()
 
@@ -394,6 +402,11 @@ def cluster_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
 def boxplot_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
                    category_subset=None, **kwargs):
     val_distribution(df, 'alpha', identifiers, sns.boxplot, 'box', outdir,\
+                     fig_suffix, category_subset, **kwargs)
+
+def boxenplot_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                     category_subset=None, **kwargs):
+    val_distribution(df, 'alpha', identifiers, sns.boxenplot, 'box', outdir,\
                      fig_suffix, category_subset, **kwargs)
 
 def violin_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
@@ -426,6 +439,21 @@ def swarm_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
     val_distribution(df, 'tradeoff ratio', identifiers, sns.swarmplot,\
                      'swarm', outdir, fig_suffix, category_subset, **kwargs)
     
+def boxenplot_dists(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                    category_subset=None, **kwargs):
+    val_distribution(df, 'dist', identifiers, sns.boxenplot, 'box', outdir,\
+                     fig_suffix, category_subset, **kwargs)
+
+def violin_dists(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                 category_subset=None, **kwargs):
+    val_distribution(df, 'dist', identifiers, sns.violinplot, 'violin', outdir,\
+                     fig_suffix, category_subset, **kwargs)
+
+def swarm_dists(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
+                category_subset=None, **kwargs):
+    val_distribution(df, 'dist', identifiers, sns.swarmplot, 'swarm', outdir,\
+                     fig_suffix, category_subset, **kwargs)
+
 def category_dists(df, categories, outdir=FIGS_DIR, fig_suffix=None,\
                    category_subset=None, log_plot=True, **kwargs):
     for category in categories:
@@ -550,9 +578,9 @@ def scatter_dists(models_df, outdir=FIGS_DIR, subset=False):
     leg.get_frame().set_edgecolor('k')
     ax = pylab.gca()
     pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
-    pylab.ylim(0, max_dist + 0.6)
+    pylab.ylim(0, max_dist + 0.8)
 
-    pylab.xticks(fontsize=15)
+    pylab.xticks(fontsize=15, rotation=75)
     pylab.yticks(fontsize=15)
 
     fname = 'pareto_dists'
@@ -1027,15 +1055,21 @@ def main():
     
 
     if TEST_NEW_FUNCTION:
-        boxplot_alphas(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist')
-        boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
-                       fig_suffix='main',\
-                       category_subset=INTERESTING_CELL_TYPES, order_val='dist')
-        boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
-                       fig_suffix='transmitters',\
-                       category_subset=INTERESTING_TRANSMITTERS, order_val='dist')
-
-        violin_alphas(categories_df, ['region'], outdir=figs_dir, order_val='dist')
+        boxenplot_dists(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist', log_transform=True)
+        boxenplot_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                        fig_suffix='main',\
+                        category_subset=INTERESTING_CELL_TYPES, order_val='dist', log_transform=True)
+        boxenplot_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                        fig_suffix='transmitters',\
+                        category_subset=INTERESTING_TRANSMITTERS, order_val='dist', log_transform=True)
+        
+        violin_dists(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist', log_transform=True)
+        violin_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                     fig_suffix='main',\
+                     category_subset=INTERESTING_CELL_TYPES, order_val='dist', log_transform=True)
+        violin_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                     fig_suffix='transmitters',\
+                     category_subset=INTERESTING_TRANSMITTERS, order_val='dist', log_transform=True)
         return None
         
     if PAPER_PLOTS:
@@ -1053,16 +1087,22 @@ def main():
                        fig_suffix='transmitters',\
                        category_subset=INTERESTING_TRANSMITTERS)
        
-        boxplot_alphas(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist')
-        boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
+        boxenplot_alphas(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist')
+        boxenplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
                        fig_suffix='main',\
                        category_subset=INTERESTING_CELL_TYPES, order_val='dist')
-        boxplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
+        boxenplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
                        fig_suffix='transmitters',\
                        category_subset=INTERESTING_TRANSMITTERS, order_val='dist')
 
-        violin_alphas(categories_df, ['region'], outdir=figs_dir, order_val='dist')
-    
+        boxenplot_dists(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist', log_transform=True)
+        boxenplot_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                        fig_suffix='main',\
+                        category_subset=INTERESTING_CELL_TYPES, order_val='dist', log_transform=True)
+        boxenplot_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                        fig_suffix='transmitters',\
+                        category_subset=INTERESTING_TRANSMITTERS, order_val='dist', log_transform=True)
+          
         alpha_dist_correlation(categories_df, outdir=figs_dir)
         alpha_dist_correlation(categories_df, outdir=figs_dir, grouping='cell type', grouping_subset=INTERESTING_CELL_TYPES)
         alpha_dist_correlation(categories_df, outdir=figs_dir, grouping='cell type', grouping_subset=INTERESTING_TRANSMITTERS)
