@@ -150,6 +150,12 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
     #pylab.plot(mcosts, scosts, c='b', label='Pareto front')
     pylab.plot(mcosts, scosts, c='b', label='_nolegend_')
     pylab.scatter(mcosts, scosts, c='b', label='Pareto front')
+
+    x0, y0 = mcosts[0], scosts[0]
+    pylab.scatter([x0], [y0], c='y', label='alpha = 0')
+    
+    x1, y1 = mcosts[-1], scosts[-1]
+    pylab.scatter([x1], [y1], c='k', label='alpha = 1')
  
     plot_trees = None
     if log_plot:
@@ -174,17 +180,17 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
         xlab = 'log(' + xlab + ')'
         ylab = 'log(' + ylab + ')'
     
-    pylab.xlabel(xlab, fontsize=35)
-    pylab.ylabel(ylab, fontsize=35)
+    pylab.xlabel(xlab, fontsize=30)
+    pylab.ylabel(ylab, fontsize=30)
     
     leg = pylab.legend(frameon=True)
     ax = pylab.gca()
-    pylab.setp(ax.get_legend().get_texts(), fontsize=30) # for legend text
+    pylab.setp(ax.get_legend().get_texts(), fontsize=17) # for legend text
     leg.get_frame().set_linewidth(5)
     leg.get_frame().set_edgecolor('k')
     
-    ax.tick_params(axis='x', labelsize=30)
-    ax.tick_params(axis='y', labelsize=30)
+    ax.tick_params(axis='x', labelsize=20)
+    ax.tick_params(axis='y', labelsize=20)
     
     pylab.tight_layout()
    
