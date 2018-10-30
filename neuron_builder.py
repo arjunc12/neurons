@@ -9,13 +9,15 @@ import mpl_toolkits.mplot3d.axes3d as p3
 from matplotlib import animation
 from random_graphs import *
 
-from steiner_midpoint import slope_vector, delta_point
+from steiner_midpoint import slope_vector, delta_point, steiner_points
 
 import networkx as nx
 
 from random import uniform, random, expovariate, gauss, choice, seed
 
-from dist_functions import point_dist
+from dist_functions import point_dist, node_dist
+
+import math
 
 import argparse
 
@@ -25,6 +27,11 @@ BUILDER_EXE = 'neuronbuilder2'
 
 OUTDIR = '/iblsn/data/Arjun/neurons/neuron_builder'
 OUTFILE = 'neuron_builder.swc'
+
+STEINER_MIDPOINTS = 10
+
+MIN_ANGLE = -math.pi / 3
+MAX_ANGLE = math.pi / 3
 
 def grid_points2d(xmin=-10, xmax=10, ymin=-10, ymax=10, dist=1):
     x = xmin
@@ -94,7 +101,8 @@ def add_new_node(G, new_coord, u, synapse=False):
 def retract_branch(G, u):
     curr = u
     while G.degree(curr) == 1 and G.node[curr]['label'] not in ['synapse', 'root']:
-        parent = G.neighbors(curr)[0]
+        n = list(G.neighbors(curr))
+        parent = n[0]
         G.remove_node(curr)
         curr = parent
             
@@ -152,7 +160,14 @@ def connect_to_synapses(G, u, unmarked_points, puncta_radius=1, remove_radius=1)
     new_node = add_new_node(G, new_point, u, synapse=True) 
     return new_node
         
-def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None):
+def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None, **kwargs):
+    coord_mins = None
+    coord_maxes = None
+    if 'coord_mins' in kwargs:
+        coord_mins = kwargs['coord_mins']
+    if 'coord_maxes' in kwargs:
+        coord_maxes = kwargs['coord_maxes']
+    
     coord = G.node[u]['coord']
     new_nodes = []
     if dist == None:
@@ -164,7 +179,7 @@ def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None):
             next_coord = []
             magnitude = 0
             for i in xrange(dim):
-                delta = gauss(0, 1)
+                delta = abs(gauss(0, 1))
                 next_coord.append(delta)
                 magnitude += delta ** 2
             magnitude **= 0.5
@@ -173,8 +188,14 @@ def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None):
             for i in xrange(len(next_coord)):
                 delta = next_coord[i]
                 next_coord[i] = coord[i] + (dist * delta / magnitude)
+                
+                if coord_mins != None:
+                    next_coord[i] = max(next_coord[i], coord_mins[i])
+                if coord_maxes != None:
+                    next_coord[i] = min(next_coord[i], coord_maxes[i])
+                
             pdist = point_dist(coord, next_coord)
-            if pdist == dist:
+            if pdist <= dist:
                 done = True
             
         next_coord = tuple(next_coord)
@@ -220,12 +241,42 @@ def update_graph_barw(G, unmarked_points, dim=3, **kwargs):
                 add_extension_node(G, u, parent, trial_length)
                 
     return True
+
+def add_midpoints(G, u, v):
+    node_index = G.number_of_nodes() + 1
+    G.remove_edge(u, v)
+    
+    p1 = G.node[u]['coord']
+    p2 = G.node[v]['coord']
+   
+    midpoints = steiner_points(p1, p2, npoints=STEINER_MIDPOINTS)
+    midpoint_nodes = []
+    for midpoint in midpoints:
+        midpoint_node = node_index
+        node_index += 1
+        G.add_node(midpoint_node)
+        G.node[midpoint_node]['coord'] = midpoint
+
+        midpoint_nodes.append(midpoint_node)
+
+    line_nodes = [v] + list(reversed(midpoint_nodes)) + [u]
+    for i in xrange(-1, -len(line_nodes), -1):
+        n1 = line_nodes[i]
+        n2 = line_nodes[i - 1]
+        G.add_edge(n1, n2)
+        G[n1][n2]['length'] = node_dist(G, n1, n2)
+        if 'label' not in G.node[n2]:
+            G.node[n2]['label'] = 'steiner_midpoint'
                 
 def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
     trial_length = kwargs['trial_length']
     r_puncta = kwargs['radius_puncta']
     r_remove = kwargs['radius_remove']
     p_root = kwargs['prob_root']
+    
+    coord_mins = [kwargs['xmin'], kwargs['ymin'], kwargs['zmin']]
+    coord_maxes = [kwargs['xmax'], kwargs['ymax'], kwargs['zmax']]
+    
     u = None
     root = G.graph['root']
     candidates = list(G.nodes())
@@ -235,11 +286,16 @@ def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
     else:
         candidates.remove(root)
         u = choice(candidates)
-    new_extension = add_bifurcations(G, u, dim=dim, bifurcations=1, dist=trial_length)[0]
+    new_extension = add_bifurcations(G, u, dim=dim, bifurcations=1, dist=trial_length,\
+                                     coord_mins=coord_mins, coord_maxes=coord_maxes)
+    new_extension = new_extension[0]
     new_synapse = connect_to_synapses(G, new_extension, unmarked_points,\
                                       puncta_radius=r_puncta, remove_radius=r_remove)
     if new_synapse == None:
         G.remove_node(new_extension)
+    else:
+        add_midpoints(G, u, new_extension)
+        add_midpoints(G, new_extension, new_synapse)
         
     return can_extend(G, unmarked_points, trial_length, r_puncta)
 
@@ -319,7 +375,7 @@ def read_tree(tree_dir):
 
     return G
 
-def build_neuron(algorithm='snider', dim=3, **kwargs):
+def build_neuron(algorithm='snider', alpha=0.5, dim=3, **kwargs):
     #unmarked_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
     unmarked_points = random_points_uniform(num_points=400, xmin=-10, xmax=10, ymin=-10, ymax=10, zmin=0, zmax=0)
     G = init_graph(dim=dim)
@@ -358,15 +414,28 @@ def build_neuron(algorithm='snider', dim=3, **kwargs):
 def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     fig = plt.figure()
     ax = p3.Axes3D(fig)
-    #init_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
-    init_points = random_points(num_points=400, xmin=-10, xmax=10, ymin=-10, ymax=10, zmin=0, zmax=0)
+    
+    num_points = kwargs['npoints']
+    xmin = kwargs['xmin']
+    xmax = kwargs['xmax']
+    ymin = kwargs['ymin']
+    ymax = kwargs['ymax']
+    zmin = kwargs['zmin']
+    zmax = kwargs['zmax']
+    
+    init_points = random_points_uniform(num_points=400, xmin=xmin, xmax=xmax,\
+                                                        ymin=ymin, ymax=ymax,\
+                                                        zmin=zmin, zmax=zmax)
+    for i in xrange(len(init_points)):
+        init_points[i] = init_points[i][:dim]
     points = init_points[:]
     G = init_graph(dim=dim)
     graphs = [G.copy()]
     unmarked_points = [init_points]
 
     done = False
-    for i in xrange(MAX_STEPS):
+    max_steps = kwargs['max_steps']
+    for i in xrange(max_steps):
         if len(points) == 0:
             break
         can_extend = update_graph(G, algorithm, points, dim=dim, **kwargs)
@@ -382,6 +451,10 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     def init():
         x, y, z = zip(*init_points)
         ax.scatter(x, y, zs=z, s=25)
+        
+    def init2d():
+        x, y = zip(*init_points)
+        plt.scatter(x, y, s=250)
         
     def redraw(frame):
         plt.clf()
@@ -406,7 +479,7 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
         viz_tree(G, save=False)
 
     ani = animation.FuncAnimation(fig, redraw2d, init_func=init, frames=len(graphs), \
-                                  interval = 1000)
+                                  interval = 200)
     mywriter = animation.AVConvWriter()
     ani.save('neuron_builder/neuron_builder.mp4', writer=mywriter)
             
@@ -414,7 +487,8 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
         
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--algorithm', default='snider')
+    parser.add_argument('-a', '--alpha', default=0.5)
+    parser.add_argument('--algorithm', default='snider')
     parser.add_argument('-d', '--dim', default=3, type=int)
     parser.add_argument('-rp', '--radius_puncta', default=1, type=float)
     parser.add_argument('-rr', '--radius_remove', default=1, type=float)
@@ -423,18 +497,26 @@ def main():
     parser.add_argument('-p', '--branching_prob', default=0.1, type=float)
     parser.add_argument('-v', '--video', action='store_true')
     parser.add_argument('-proot', '--prob_root', default=0.1, type=float)
+    parser.add_argument('-m', '--max_steps', default=MAX_STEPS, type=int)
+    parser.add_argument('-xmin', type=float, default=-10)
+    parser.add_argument('-xmax', type=float, default=10)
+    parser.add_argument('-ymin', type=float, default=-10)
+    parser.add_argument('-ymax', type=float, default=10)
+    parser.add_argument('-zmin', type=float, default=0)
+    parser.add_argument('-zmax', type=float, default=0)
+    parser.add_argument('-n', '--npoints', type=int, default=400)
     
     args = parser.parse_args()
     algorithm = args.algorithm
     dim = args.dim
     video = args.video
     kwargs = vars(args)
-    del kwargs['algorithm'], kwargs['dim']
+    del kwargs['algorithm'], kwargs['alpha'], kwargs['dim']
 
     if video:
         build_neuron_video(algorithm, dim, **kwargs)
     else:
-        build_neuron(algorithm, dim, **kwargs)
+        build_neuron(algorithm, alpha, dim, **kwargs)
     #G = init_graph()
     #add_bifurcations(G, 1, dim=3, bifurcations=1, dist=0.775567698885)
 
