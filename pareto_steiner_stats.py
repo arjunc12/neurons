@@ -20,8 +20,8 @@ from check_robustness import INTERESTING_CELL_TYPES, INTERESTING_TRANSMITTERS
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = False
-PAPER_PLOTS = True
+TEST_NEW_FUNCTION = True
+PAPER_PLOTS = False
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -578,7 +578,7 @@ def scatter_dists(models_df, outdir=FIGS_DIR, subset=False):
     leg.get_frame().set_edgecolor('k')
     ax = pylab.gca()
     pylab.setp(ax.get_legend().get_texts(), fontsize=20) # for legend text
-    pylab.ylim(0, max_dist + 0.8)
+    pylab.ylim(-0.1, max_dist + 0.9)
 
     pylab.xticks(fontsize=15, rotation=75)
     pylab.yticks(fontsize=15)
@@ -1055,21 +1055,14 @@ def main():
     
 
     if TEST_NEW_FUNCTION:
-        boxenplot_dists(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist', log_transform=True)
-        boxenplot_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                        fig_suffix='main',\
-                        category_subset=INTERESTING_CELL_TYPES, order_val='dist', log_transform=True)
-        boxenplot_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                        fig_suffix='transmitters',\
-                        category_subset=INTERESTING_TRANSMITTERS, order_val='dist', log_transform=True)
-        
-        violin_dists(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist', log_transform=True)
-        violin_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                     fig_suffix='main',\
-                     category_subset=INTERESTING_CELL_TYPES, order_val='dist', log_transform=True)
-        violin_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                     fig_suffix='transmitters',\
-                     category_subset=INTERESTING_TRANSMITTERS, order_val='dist', log_transform=True)
+        scatter_dists(models_df, outdir=figs_dir, subset=False)
+        category_dists(categories_df, ['neuron type'], outdir=figs_dir)
+        category_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                       fig_suffix='main',\
+                       category_subset=INTERESTING_CELL_TYPES)
+        category_dists(categories_df, ['cell type'], outdir=figs_dir,\
+                       fig_suffix='transmitters',\
+                       category_subset=INTERESTING_TRANSMITTERS)
         return None
         
     if PAPER_PLOTS:
