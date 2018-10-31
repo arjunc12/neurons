@@ -150,13 +150,7 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
     #pylab.plot(mcosts, scosts, c='b', label='Pareto front')
     pylab.plot(mcosts, scosts, c='b', label='_nolegend_')
     pylab.scatter(mcosts, scosts, c='b', label='Pareto front')
-
-    x0, y0 = mcosts[0], scosts[0]
-    pylab.scatter([x0], [y0], c='y', label='alpha = 0')
     
-    x1, y1 = mcosts[-1], scosts[-1]
-    pylab.scatter([x1], [y1], c='k', label='alpha = 1')
- 
     plot_trees = None
     if log_plot:
         plot_trees = LOG_PLOT_TREES
@@ -173,7 +167,7 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
             pylab.scatter(mcosts, scosts, label=LABELS[tree],\
                           marker=MARKERS[tree], s=175, c=COLORS[tree])
             print tree, "tree", len(mcosts)
-    
+
     xlab = 'Wiring Cost'
     ylab = 'Conduction Delay'
     if log_plot:
