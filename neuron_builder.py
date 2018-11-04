@@ -15,7 +15,7 @@ import networkx as nx
 
 from random import uniform, random, expovariate, gauss, choice, seed
 
-from dist_functions import point_dist, node_dist
+from dist_functions import point_dist, node_dist, line_seg_dist
 
 import math
 
@@ -159,6 +159,13 @@ def connect_to_synapses(G, u, unmarked_points, puncta_radius=1, remove_radius=1)
     remove_close_points(new_point, unmarked_points, remove_radius=remove_radius)
     new_node = add_new_node(G, new_point, u, synapse=True) 
     return new_node
+
+def self_crossing(G, P0, Q1, radius_annihilation):
+    for Q0, Q1 in G.graph['line segments']:
+        dist = line_seg_dist(P0, P1, Q0, Q1)
+        if dist <= radius_annihilation:
+            return True
+    return False
         
 def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None, **kwargs):
     coord_mins = None
@@ -179,7 +186,7 @@ def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None, **kwargs):
             next_coord = []
             magnitude = 0
             for i in xrange(dim):
-                delta = abs(gauss(0, 1))
+                delta = gauss(0, 1)
                 next_coord.append(delta)
                 magnitude += delta ** 2
             magnitude **= 0.5
@@ -267,6 +274,8 @@ def add_midpoints(G, u, v):
         G[n1][n2]['length'] = node_dist(G, n1, n2)
         if 'label' not in G.node[n2]:
             G.node[n2]['label'] = 'steiner_midpoint'
+        G.node[n2]['parent'] = n1
+    G.graph['line segments'].append((u, v))
                 
 def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
     trial_length = kwargs['trial_length']
@@ -314,6 +323,8 @@ def init_graph(dim=3):
     G.node[1]['coord'] = tuple([0] * dim)
     G.graph['root'] = 1
     G.node[1]['label'] = 'root'
+    G.node[1]['parent'] = None
+    G.graph['line segments'] = []
     return G
 
 def update_graph(G, algorithm, unmarked_points, dim=3, **kwargs):
