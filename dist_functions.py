@@ -1,5 +1,83 @@
 import numpy as np
 from scipy.spatial.distance import euclidean
+from itertools import product
+
+def closest_midpoint(P0, P1, Q0):
+    P0 = np.array(P0)
+    P1 = np.array(P1)
+    Q0 = np.array(Q0)
+    
+    Pslope = P1 - P0
+    a = float(np.dot(Pslope, Q0))
+    b = float(np.dot(P0, Pslope))
+    c = float(np.dot(Pslope, Pslope))
+    t = (a - b) / c
+    t = np.clip(t, 0, 1)
+    return P0 + t * Pslope
+
+def line_seg_dist(P0, P1, Q0, Q1):
+    dim = len(P0)
+    assert len(P1) == dim
+    assert len(Q0) == dim
+    assert len(Q1) == dim
+    
+    P0 = np.array(P0)
+    P1 = np.array(P1)
+    Q0 = np.array(Q0)
+    Q1 = np.array(Q1)
+    
+    Pslope = P1 - P0
+    Qslope = Q1 - Q0
+    for i in xrange(dim):
+        Pslope[i] = P1[i] - P0[i]
+        Qslope[i] = Q1[i] - Q0[i]
+            
+    w0 = P0 - Q0
+    
+    a = float(np.dot(Pslope, Pslope))
+    b = float(np.dot(Pslope, Qslope))
+    c = float(np.dot(Qslope, Qslope))
+    d = float(np.dot(Pslope, w0))
+    e = float(np.dot(Qslope, w0))
+    
+    deltaPinf = None
+    deltaQinf = None
+    
+    denom = a * c - b * b
+    if denom == 0:
+        deltaPinf = 0
+        deltaQinf = d / float(b)
+    else:
+        deltaPinf = (b * e - c * d) / denom
+        deltaQinf = (a * e - b * d) / denom
+        
+    assert deltaPinf != None
+    assert deltaQinf != None
+    
+    candidates = []
+    if (0 <= deltaPinf <= 1) and (0 <= deltaQinf <= 1):
+        candidates.append((deltaPinf, deltaQinf))
+    if deltaPinf < 0:
+        candidates.append((0, e / c))
+    elif deltaPinf > 1:
+        candidates.append((1, (e + b) / c))
+        
+    if deltaQinf < 0:
+        candidates.append((-d / a, 0))
+    elif deltaQinf > 1:
+        candidates.append(((b - d) / a, 1))
+        
+    best_dist = float("inf")
+    for candidate in candidates:
+        candidate = np.clip(candidate, 0, 1)
+        deltaP0, deltaQ0 = candidate
+        Pc = P0 + Pslope * deltaP0
+        Qc = Q0 + Qslope * deltaQ0
+        dist = point_dist(Pc, Qc)
+        if dist < best_dist:
+            best_dist = dist
+            
+    return best_dist
 
 def point_dist(p1, p2):
     '''
@@ -81,13 +159,11 @@ def pareto_dist_scale(pareto_mcosts, pareto_scosts, mcost, scost):
     return best_scale, best_index
 
 def main():
-    import pandas as pd
-    mcost, scost = 24.105986, 381.100000
-    pareto_front = pd.read_csv('/iblsn/data/Arjun/neurons/pareto_steiner_output/pareto_fronts_synthetic/140826_02_recon-13/apical_dendrite/pareto_front.csv', skipinitialspace=True)
-    pareto_mcosts = pareto_front['mcost']
-    pareto_scosts = pareto_front['scost']
-
-    print pareto_dist_scale(pareto_mcosts, pareto_scosts, mcost, scost)
-
+    P0 = (0, 0, 0)
+    P1 = (0, 0, 0.1)
+    Q0 = (0, 1, 0)
+    Q1 = (1, 1, 0)
+    print line_seg_dist(P0, P1, Q0, Q1)
+    
 if __name__ == '__main__':
     main()
