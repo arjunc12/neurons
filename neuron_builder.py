@@ -1,5 +1,5 @@
 import os
-from neuron_utils import get_neuron_points, viz_tree, get_neuron_points
+from neuron_utils import get_neuron_points, viz_tree, get_neuron_points, retract_graph
 from graph_utils import is_tree
 from sys import argv
 
@@ -97,24 +97,7 @@ def add_new_node(G, new_coord, u, synapse=False):
         G.node[next_node]['label'] = 'steiner_midpoint'
     G.node[next_node]['state'] = 'active'
     return next_node
-    
-def retract_branch(G, u):
-    curr = u
-    while G.degree(curr) == 1 and G.node[curr]['label'] not in ['synapse', 'root']:
-        n = list(G.neighbors(curr))
-        parent = n[0]
-        G.remove_node(curr)
-        curr = parent
-            
-def retract_graph(G):
-    leaves = []
-    for u in G.nodes():
-        if (G.node[u]['label'] not in ['synapse', 'root']) and (G.degree(u) == 1):
-            leaves.append(u)
-    
-    for leaf in leaves:
-        retract_branch(G, leaf)
-        
+     
 def normalize_vector(vector):
     total = 0
     for val in vector:

@@ -24,6 +24,23 @@ SYNAPSE_RATES = {'dendrite' : DENDRITE_RATE, 'axon' : AXON_RATE,\
 
 INIT_OFFSET = 0.5
 
+def retract_branch(G, u):
+    curr = u
+    while G.degree(curr) == 1 and G.node[curr]['label'] not in ['synapse', 'root']:
+        n = list(G.neighbors(curr))
+        parent = n[0]
+        G.remove_node(curr)
+        curr = parent
+            
+def retract_graph(G):
+    leaves = []
+    for u in G.nodes():
+        if (G.node[u]['label'] not in ['synapse', 'root']) and (G.degree(u) == 1):
+            leaves.append(u)
+    
+    for leaf in leaves:
+        retract_branch(G, leaf)
+
 def truncate_graph(G):
     remove_nodes = set()
     queue = [G.graph['root']]
@@ -45,7 +62,10 @@ def truncate_graph(G):
             new_root = curr
 
     G.remove_nodes_from(remove_nodes)
-    G.graph['root'] = new_root
+    
+    if new_root != None:
+        G.graph['root'] = new_root
+        G.node[new_root]['label'] = 'root'
 
 def new_synapse_points(coord1, coord2, rate=SYNAPSE_RATE, offset=0):
     #assert 0 <= offset <= rate
@@ -217,7 +237,7 @@ def initialize_lengths(G):
 def get_label(G, u):
     if 'label' in G.node[u] and 'label' not in ['root', 'tip', 'branch', 'continue']:
         return G.node[u]['label']
-    if u == G.graph['root']: 
+    if u == G.graph['root']:
         return "root"
     elif G.degree(u) == 1: 
         return "tip"
@@ -252,12 +272,12 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
             node_size.append(350)
         elif label == 'synapse':
             node_color.append('green')
-            node_size.append(1)
+            node_size.append(20)
         elif label == 'tip':
             node_color.append('blue')
             node_size.append(10)
         elif label == 'branch':
-            node_color.append('blue')
+            node_color.append('brown')
             node_size.append(10)
         elif label == "continue":
             node_color.append('brown')
@@ -288,8 +308,15 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
     ax.tick_params(axis='x', labelsize=20)
     ax.tick_params(axis='y', labelsize=20)
     
-    pylab.xlabel('X coordinate (microns)', size=20)
-    pylab.ylabel('Y coordinate (microns)', size=20)
+    #pylab.xlabel('X coordinate (microns)', size=20)
+    #pylab.ylabel('Y coordinate (microns)', size=20)
+
+    '''
+    pylab.xticks(pylab.arange(100, 300, 50))
+    pylab.yticks(pylab.arange(950, 1250, 50))
+    pylab.xlim(98, 275.7196088709677)
+    pylab.ylim(945, 1205)
+    '''
 
     pylab.tight_layout()
 
@@ -316,14 +343,15 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
     return kwargs
 
 def main():
-    #filename = '/iblsn/data/Arjun/neurons/datasets/amacrine/human/retina/kantor/humret_CR_AII_63x_1.CNG.swc'
-    filename = '/iblsn/data/Arjun/neurons/datasets/somatic/mouse/peripheral_nervous_system/badea/Badea2012Fig6A-C-R.CNG.swc'
+    filename = '/iblsn/data/Arjun/neurons/datasets/somatic/mouse/peripheral_nervous_system/nathans/A40-1.CNG.swc'
     graphs = get_neuron_points(filename)
-    #G = graphs[2]
-    G = graphs[0]
-    viz_tree(G, name='no_synapses')
-    G = add_synapses(G)
-    viz_tree(G, name='synapses')
+    G = graphs[3]
+    root = G.graph['root']
+    print G.node[root]['label']
+    G = add_synapses(G, neuron_type='truncated axon')
+    retract_graph(G)
+    label_points(G)
+    viz_tree(G, name='paper_tree')
 
 if __name__ == '__main__':
     main()
