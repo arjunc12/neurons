@@ -20,8 +20,8 @@ from check_robustness import INTERESTING_CELL_TYPES, INTERESTING_TRANSMITTERS
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = True
-PAPER_PLOTS = False
+TEST_NEW_FUNCTION = False
+PAPER_PLOTS = True
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -51,6 +51,8 @@ MAX_ALPHA = 1
 MAX_POINTS = float("inf")
 
 LOG_DIST = True
+
+REMOVE_TRUNCATED = True
 
 def count_duplicate_rows(df):
     all_rows = len(df.index)
@@ -95,12 +97,16 @@ def get_dfs(output_file=OUTPUT_FILE, categories_file=CATEGORIES_FILE,\
     density_df = neuron_density.get_df()
     #print count_unique_neurons(categories_df)
 
-    models_df.drop_duplicates(inplace=True)
-    categories_df.drop_duplicates(inplace=True)
-    tradeoffs_df.drop_duplicates(inplace=True)
-    density_df.drop_duplicates(inplace=True)
+    dfs = [models_df, categories_df, tradeoffs_df, density_df]
 
-    return models_df, categories_df, tradeoffs_df, density_df
+    for i in xrange(len(dfs)):
+        df = dfs[i]
+        df.drop_duplicates(inplace=True)
+        if REMOVE_TRUNCATED:
+            df = df[df['neuron type'] != 'truncated axon']
+        dfs[i] = df
+
+    return dfs
 
 def get_filtered_df(df=None):
     if df is None:
@@ -360,13 +366,14 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
         cat_vals = []
         order_vals = []
         order_val = kwargs['order_val']
+        print "-----------------------------------------------------"
         for name, group in df2.groupby(category):
             cat_vals.append(name)
             if order_val == None:
                 order_val.append(pylab.median(group[val]))
             else:
-                order_vals.append(pylab.median(group[order_val]))
-            #print name, val, pylab.mean(group[val]), "+/-", pylab.std(group[val], ddof=1)
+                order_vals.append(pylab.mean(group[order_val]))
+            print name, val, pylab.mean(group[val]), "+/-", pylab.std(group[val], ddof=1)
         
         cat_vals = pylab.array(cat_vals)
         #mean = pylab.array(medians)
@@ -476,6 +483,7 @@ def category_dists(df, categories, outdir=FIGS_DIR, fig_suffix=None,\
         cat_vals = []
         cat_means = []
         
+        print "-----------------------------------------------------"
         for cat_val, group in df2.groupby(category):
             dist = pylab.array(group['dist']).copy()
 
@@ -1047,7 +1055,7 @@ def main():
                                                                  categories_file,\
                                                                  models_file,\
                                                                  tradeoffs_file)
-    
+   
     categories_df = categories_df[categories_df['points'] >= MIN_POINTS]
     models_df = models_df[models_df['points'] >= MIN_POINTS]
     
@@ -1072,7 +1080,7 @@ def main():
     
         scatter_dists(models_df, outdir=figs_dir, subset=False)
         
-        category_dists(categories_df, ['neuron type'], outdir=figs_dir, ymin=0, ymax=0.2)
+        category_dists(categories_df, ['neuron type'], outdir=figs_dir)
         category_dists(categories_df, ['cell type'], outdir=figs_dir,\
                        fig_suffix='main',\
                        category_subset=INTERESTING_CELL_TYPES)
@@ -1087,15 +1095,7 @@ def main():
         boxenplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
                        fig_suffix='transmitters',\
                        category_subset=INTERESTING_TRANSMITTERS, order_val='dist')
-
-        boxenplot_dists(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist', log_transform=True)
-        boxenplot_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                        fig_suffix='main',\
-                        category_subset=INTERESTING_CELL_TYPES, order_val='dist', log_transform=True)
-        boxenplot_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                        fig_suffix='transmitters',\
-                        category_subset=INTERESTING_TRANSMITTERS, order_val='dist', log_transform=True)
-          
+ 
         alpha_dist_correlation(categories_df, outdir=figs_dir)
         alpha_dist_correlation(categories_df, outdir=figs_dir, grouping='cell type', grouping_subset=INTERESTING_CELL_TYPES)
         alpha_dist_correlation(categories_df, outdir=figs_dir, grouping='cell type', grouping_subset=INTERESTING_TRANSMITTERS)

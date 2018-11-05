@@ -147,9 +147,11 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
     pylab.figure()
     sns.set()
 
-    #pylab.plot(mcosts, scosts, c='b', label='Pareto front')
     pylab.plot(mcosts, scosts, c='b', label='_nolegend_')
     pylab.scatter(mcosts, scosts, c='b', label='Pareto front')
+    
+    #pylab.plot(mcosts, scosts, c='k', label='_nolegend_')
+    #pylab.scatter(mcosts, scosts, c='k', label='Pareto front')
     
     plot_trees = None
     if log_plot:
@@ -176,9 +178,9 @@ def pareto_plot(fronts_dir, figs_dir, log_plot=False,\
     
     pylab.xlabel(xlab, fontsize=30)
     pylab.ylabel(ylab, fontsize=30)
-    
-    leg = pylab.legend(frameon=True)
+   
     ax = pylab.gca()
+    leg = pylab.legend(frameon=True)
     pylab.setp(ax.get_legend().get_texts(), fontsize=17) # for legend text
     leg.get_frame().set_linewidth(5)
     leg.get_frame().set_edgecolor('k')
