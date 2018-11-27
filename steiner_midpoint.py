@@ -2,6 +2,7 @@ import numpy as np
 from sys import argv
 from itertools import combinations
 from dist_functions import *
+from cost_functions import pareto_cost
 
 def slope_vector(p1, p2):
     assert len(p1) == len(p2)
@@ -27,9 +28,9 @@ def delta_point(p1, slope, t):
     '''
     #return p1 + slope * t
 
-def midpoint_cost(p2, p3, midpoint, alpha):
+def midpoint_cost(p1, p3, midpoint, alpha):
     a = point_dist(p3, midpoint)
-    b = point_dist(midpoint, p2)
+    b = point_dist(midpoint, p1)
 
     mcost = a
     scost = a + b
@@ -40,17 +41,7 @@ def midpoint_cost(p2, p3, midpoint, alpha):
 def best_midpoint(p1, p2, p3, alpha):
     pass
 
-def best_midpoint_approx(p1, p2, p3, alpha):
-    '''
-    print "p1"
-    print map(type, p1)
-    print "p2"
-    print map(type, p2)
-    print "p3"
-    print map(type, p3)
-    '''
-
-    delta = 0.01
+def best_midpoint_approx(p1, p2, p3, alpha, delta=0.01):
     slope = slope_vector(p1, p2)
 
     best_cost = float("inf")
@@ -61,7 +52,7 @@ def best_midpoint_approx(p1, p2, p3, alpha):
         #p4 = delta_point(p1, slope, dt)
         p4 = delta_point(p1, slope, float(dt))
         
-        cost = midpoint_cost(p2, p3, p4, alpha)
+        cost = midpoint_cost(p1, p3, p4, alpha)
         if cost < best_cost:
             best_cost = cost
             best_midpoint = p4
@@ -70,19 +61,19 @@ def best_midpoint_approx(p1, p2, p3, alpha):
 
     choice = 3
 
-    cost1 = midpoint_cost(p2, p3, p1, alpha)
+    cost1 = midpoint_cost(p1, p3, p1, alpha)
     if cost1 < best_cost:
         best_cost = cost1
         best_midpoint = p1
         choice = 1
 
-    cost2 = midpoint_cost(p2, p3, p2, alpha)
+    cost2 = midpoint_cost(p1, p3, p2, alpha)
     if cost2 < best_cost:
         best_cost = cost2
         best_midpoint = p2
         choice = 2
 
-    return best_midpoint, choice
+    return tuple(best_midpoint), choice
 
 def steiner_points(p1, p2, npoints=10):
     slope = slope_vector(p1, p2)
