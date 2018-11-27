@@ -2,6 +2,7 @@ from pareto_steiner import *
 from neuron_utils import *
 import os
 from collections import defaultdict
+from random import shuffle
 
 RATE = 4
 
@@ -23,12 +24,20 @@ def main():
     neuron_type_counts['axon'] = 0
     neuron_type_counts['apical dendrite'] = 0
     neuron_type_counts['basal dendrite'] = 0
-    for cell_type in os.listdir(datasets_dir):
+    cell_types = os.listdir(datasets_dir)
+    shuffle(cell_types)
+    for cell_type in cell_types:
         if cell_type in SKIP_TYPES:
             continue
-        for species in os.listdir(datasets_dir + '/' + cell_type):
-            for region in os.listdir(datasets_dir + '/' + cell_type + '/' + species):
-                for lab in os.listdir(datasets_dir + "/" + cell_type + '/' + species+ '/' + region):
+        specie = os.listdir(datasets_dir + '/' + cell_type)
+        shuffle(specie)
+        for species in specie:
+            regions = os.listdir(datasets_dir + '/' + cell_type + '/' + species)
+            shuffle(regions)
+            for region in regions:
+                labs = os.listdir(datasets_dir + "/" + cell_type + '/' + species+ '/' + region)
+                shuffle(labs)
+                for lab in labs:
                     for neuron_file in os.listdir(datasets_dir + "/" + cell_type + "/" + species + '/' + region + '/' + lab):
                         filename = datasets_dir + "/" + cell_type + "/" + species + "/" + region + '/' + lab + '/' + neuron_file
                         
