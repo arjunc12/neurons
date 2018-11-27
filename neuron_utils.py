@@ -272,7 +272,7 @@ def viz_tree(G, name='neuron', outdir='drawings', save=True, **kwargs):
             node_size.append(350)
         elif label == 'synapse':
             node_color.append('green')
-            node_size.append(20)
+            node_size.append(8)
         elif label == 'tip':
             node_color.append('blue')
             node_size.append(10)
