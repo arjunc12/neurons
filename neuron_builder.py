@@ -1,5 +1,6 @@
 import os
 from neuron_utils import get_neuron_points, viz_tree, get_neuron_points, retract_graph
+from steiner_midpoint import slope_vector, best_midpoint_approx
 from graph_utils import is_tree
 from sys import argv
 
@@ -32,6 +33,8 @@ STEINER_MIDPOINTS = 10
 
 MIN_ANGLE = -math.pi / 3
 MAX_ANGLE = math.pi / 3
+
+#seed(10)
 
 def grid_points2d(xmin=-10, xmax=10, ymin=-10, ymax=10, dist=1):
     x = xmin
@@ -149,6 +152,14 @@ def self_crossing(G, P0, Q1, radius_annihilation):
         if dist <= radius_annihilation:
             return True
     return False
+ 
+def normalize_vector(vector):
+    magnitude = 0
+    for delta in vector:
+        magnitude += delta ** 2
+    magnitude **= 0.5
+    for i in xrange(len(vector)):
+        vector[i] /= magnitude
         
 def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None, **kwargs):
     coord_mins = None
@@ -159,34 +170,39 @@ def add_bifurcations(G, u, dim=3, bifurcations=2, dist=None, **kwargs):
         coord_maxes = kwargs['coord_maxes']
     
     coord = G.node[u]['coord']
+    assert len(coord) == dim
+    
+    parent = G.node[u]['parent']
+    parent_coord = None
+    if parent != None:
+        parent_coord = G.node[parent]['coord']
+    else:
+        parent_coord = []
+        for i in xrange(dim):
+            parent_coord.append(gauss(0, 1))
+    assert len(parent_coord) == dim
+    parent_coord = tuple(parent_coord)
+      
+    slope = slope_vector(parent_coord, coord)
+    normalize_vector(slope)
+    slope_variance = 0.1
+        
     new_nodes = []
-    if dist == None:
-        dist = expovariate(1)
     for i in xrange(bifurcations):
-        next_coord = None
-        done = False
-        while not done:
-            next_coord = []
-            magnitude = 0
-            for i in xrange(dim):
-                delta = gauss(0, 1)
-                next_coord.append(delta)
-                magnitude += delta ** 2
-            magnitude **= 0.5
-            if magnitude == 0:
-                continue
-            for i in xrange(len(next_coord)):
-                delta = next_coord[i]
-                next_coord[i] = coord[i] + (dist * delta / magnitude)
-                
-                if coord_mins != None:
-                    next_coord[i] = max(next_coord[i], coord_mins[i])
-                if coord_maxes != None:
-                    next_coord[i] = min(next_coord[i], coord_maxes[i])
-                
-            pdist = point_dist(coord, next_coord)
-            if pdist <= dist:
-                done = True
+        next_coord = []
+        
+        if dist == None:
+            dist = expovariate(1)
+        
+        for i in xrange(dim):
+            delta = slope[i] + gauss(0, slope_variance)
+            next_coord.append(coord[i] + (dist * delta))
+        
+        for i in xrange(len(next_coord)):
+            if coord_mins != None:
+                next_coord[i] = max(next_coord[i], coord_mins[i])
+            if coord_maxes != None:
+                next_coord[i] = min(next_coord[i], coord_maxes[i])
             
         next_coord = tuple(next_coord)
         new_nodes.append(add_new_node(G, next_coord, u))
@@ -210,7 +226,7 @@ def can_extend(G, unmarked_points, trial_length, r_puncta):
                 return True
     return False 
 
-def update_graph_barw(G, unmarked_points, dim=3, **kwargs):
+def update_graph_barw(G, unmarked_points, alpha, dim=3, **kwargs):
     branching_prob = kwargs['branching_prob']
     trial_length = kwargs['trial_length']
     r_annihilation = kwargs['radius_annihilation']
@@ -233,8 +249,8 @@ def update_graph_barw(G, unmarked_points, dim=3, **kwargs):
     return True
 
 def add_midpoints(G, u, v):
-    node_index = G.number_of_nodes() + 1
     G.remove_edge(u, v)
+    node_index = G.number_of_nodes() + 1
     
     p1 = G.node[u]['coord']
     p2 = G.node[v]['coord']
@@ -243,11 +259,10 @@ def add_midpoints(G, u, v):
     midpoint_nodes = []
     for midpoint in midpoints:
         midpoint_node = node_index
-        node_index += 1
         G.add_node(midpoint_node)
         G.node[midpoint_node]['coord'] = midpoint
-
         midpoint_nodes.append(midpoint_node)
+        node_index += 1
 
     line_nodes = [v] + list(reversed(midpoint_nodes)) + [u]
     for i in xrange(-1, -len(line_nodes), -1):
@@ -259,8 +274,17 @@ def add_midpoints(G, u, v):
             G.node[n2]['label'] = 'steiner_midpoint'
         G.node[n2]['parent'] = n1
     G.graph['line segments'].append((u, v))
+
+def check_parents(G):
+    for u in G.nodes():
+        assert 'parent' in G.node[u]
+        parent = G.node[u]['parent']
+        if u == G.graph['root']:
+            assert parent == None
+        else:
+            assert G.has_edge(u, parent)
                 
-def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
+def update_graph_snider(G, unmarked_points, alpha, dim=3, **kwargs):
     trial_length = kwargs['trial_length']
     r_puncta = kwargs['radius_puncta']
     r_remove = kwargs['radius_remove']
@@ -283,10 +307,24 @@ def update_graph_snider(G, unmarked_points, dim=3, **kwargs):
     new_extension = new_extension[0]
     new_synapse = connect_to_synapses(G, new_extension, unmarked_points,\
                                       puncta_radius=r_puncta, remove_radius=r_remove)
+    
     if new_synapse == None:
         G.remove_node(new_extension)
     else:
-        add_midpoints(G, u, new_extension)
+        p1 = G.node[u]['coord']
+        p2 = G.node[new_extension]['coord']
+        p3 = G.node[new_synapse]['coord']
+        best_midpoint, best_choice = best_midpoint_approx(p1, p2, p3, alpha)
+        print "best choice", best_choice
+        if best_choice == 1:
+            G.remove_node(new_extension)
+            G.add_edge(u, new_synapse)
+            nx.relabel_nodes(G, {new_synapse : new_extension}, copy=False)
+            new_synapse = new_extension
+            new_extension = u
+        else:
+            G.node[new_extension]['coord'] = best_midpoint
+            add_midpoints(G, u, new_extension)
         add_midpoints(G, new_extension, new_synapse)
         
     return can_extend(G, unmarked_points, trial_length, r_puncta)
@@ -310,9 +348,9 @@ def init_graph(dim=3):
     G.graph['line segments'] = []
     return G
 
-def update_graph(G, algorithm, unmarked_points, dim=3, **kwargs):
+def update_graph(G, algorithm, unmarked_points, alpha, dim=3, **kwargs):
     update_func = get_update_func(algorithm)
-    return update_func(G, unmarked_points, dim=dim, **kwargs)
+    return update_func(G, unmarked_points, alpha, dim=dim, **kwargs)
 
 def swc_line(G, u, parents, point_labels):
     write_items = []
@@ -369,7 +407,7 @@ def read_tree(tree_dir):
 
     return G
 
-def build_neuron(algorithm='snider', alpha=0.5, dim=3, **kwargs):
+def build_neuron(algorithm='snider', dim=3, alpha=0.5, **kwargs):
     #unmarked_points = grid_points3d(xmin=-2, xmax=2, ymin=-2, ymax=2, zmin=0, zmax=0)
     unmarked_points = random_points_uniform(num_points=400, xmin=-10, xmax=10, ymin=-10, ymax=10, zmin=0, zmax=0)
     G = init_graph(dim=dim)
@@ -377,7 +415,7 @@ def build_neuron(algorithm='snider', alpha=0.5, dim=3, **kwargs):
     while not done:
         if len(unmarked_points) == 0:
             break
-        can_extend = update_graph(G, algorithm, unmarked_points, dim=dim, **kwargs)
+        can_extend = update_graph(G, algorithm, unmarked_points, alpha, dim=dim, **kwargs)
         done = not can_extend
         
     retract_graph(G)
@@ -405,7 +443,7 @@ def build_neuron(algorithm='snider', alpha=0.5, dim=3, **kwargs):
     print G.nodes()
     print G.graph['synapses']
             
-def build_neuron_video(algorithm='snider', dim=3, **kwargs):
+def build_neuron_video(algorithm='snider', dim=3, alpha=0.5, **kwargs):
     fig = plt.figure()
     ax = p3.Axes3D(fig)
     
@@ -432,7 +470,7 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
     for i in xrange(max_steps):
         if len(points) == 0:
             break
-        can_extend = update_graph(G, algorithm, points, dim=dim, **kwargs)
+        can_extend = update_graph(G, algorithm, points, alpha, dim=dim, **kwargs)
         graphs.append(G.copy())
         unmarked_points.append(points[:])
         if not can_extend:
@@ -481,7 +519,7 @@ def build_neuron_video(algorithm='snider', dim=3, **kwargs):
         
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--alpha', default=0.5)
+    parser.add_argument('-a', '--alpha', default=0.5, type=float)
     parser.add_argument('--algorithm', default='snider')
     parser.add_argument('-d', '--dim', default=3, type=int)
     parser.add_argument('-rp', '--radius_puncta', default=1, type=float)
@@ -503,14 +541,15 @@ def main():
     args = parser.parse_args()
     algorithm = args.algorithm
     dim = args.dim
+    alpha = args.alpha
     video = args.video
     kwargs = vars(args)
     del kwargs['algorithm'], kwargs['alpha'], kwargs['dim']
 
     if video:
-        build_neuron_video(algorithm, dim, **kwargs)
+        build_neuron_video(algorithm, dim, alpha, **kwargs)
     else:
-        build_neuron(algorithm, alpha, dim, **kwargs)
+        build_neuron(algorithm, dim, alpha, **kwargs)
     #G = init_graph()
     #add_bifurcations(G, 1, dim=3, bifurcations=1, dist=0.775567698885)
 
