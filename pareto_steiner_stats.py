@@ -20,8 +20,8 @@ from check_robustness import INTERESTING_CELL_TYPES, INTERESTING_TRANSMITTERS
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = False
-PAPER_PLOTS = True
+TEST_NEW_FUNCTION = True
+PAPER_PLOTS = False
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -695,7 +695,7 @@ def null_models_analysis(models_df):
         print "success rate", float(successes) / float(trials), "trials", trials
         print "binomial p-value", binom_test(successes, trials)
         print "neural to %s ratio" % model, pylab.mean(ratios), "+/-", pylab.std(ratios, ddof=1)
-        print "t-test p-value", ttest_1samp(ratios, popmean=1)
+        print "t-test p-value", len(ratios), ttest_1samp(ratios, popmean=1)
 
 def null_models_check(models_df):
     df2 = models_df[models_df['model'] != 'neural']
@@ -778,8 +778,8 @@ def neuron_type_alphas(df):
         print "alphas mann-whitney test", mannwhitneyu(alphas1, alphas2)
         print "alphas earth movers distance", wasserstein_distance(alphas1, alphas2)
         print "alphas chi square", alphas_chisquare(alphas1, alphas2)
-        print "alphas welchs t-test", ttest_ind(alphas1, alphas2, equal_var=False)
-        print "dists welch's t-test", ttest_ind(dists1, dists2, equal_var=False)
+        print "alphas welchs t-test", len(alphas1), len(alphas2), ttest_ind(alphas1, alphas2, equal_var=False)
+        print "dists welch's t-test", len(dists1), len(dists2), ttest_ind(dists1, dists2, equal_var=False)
 
 def vals_correlation(df, val1, val2, **kwargs):
     print "-----------------------------------------------------"
@@ -1013,6 +1013,13 @@ def paired_categories_test(df, categories=CATEGORIES):
                 print len(differences), pylab.mean(differences), pylab.std(differences, ddof=1)
                 print ttest_rel(sample1, sample2)
 
+def outliers_analysis(categories_df, models_df):
+    print categories_df
+    models_df = models_df[models_df['model'] == 'centroid']
+    print models_df
+    df = pd.merge(categories_df, models_df)
+    df.sort_values('dist', inplace=True, ascending=False)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-od', '--output_dir', default=OUTPUT_DIR)
@@ -1063,14 +1070,7 @@ def main():
     
 
     if TEST_NEW_FUNCTION:
-        scatter_dists(models_df, outdir=figs_dir, subset=False)
-        category_dists(categories_df, ['neuron type'], outdir=figs_dir)
-        category_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                       fig_suffix='main',\
-                       category_subset=INTERESTING_CELL_TYPES)
-        category_dists(categories_df, ['cell type'], outdir=figs_dir,\
-                       fig_suffix='transmitters',\
-                       category_subset=INTERESTING_TRANSMITTERS)
+        outliers_analysis(categories_df, models_df)
         return None
         
     if PAPER_PLOTS:
