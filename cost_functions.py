@@ -1,5 +1,5 @@
 import networkx as nx
-from neuron_utils import point_dist
+from dist_functions import point_dist
 
 def pareto_cost(mcost, scost, alpha):
     # alpha = 0 minimizes satellite cost
