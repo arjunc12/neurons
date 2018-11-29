@@ -7,37 +7,43 @@ def run_simulations_snider(rpmin, rpmax,\
                            lmin, lmax,\
                            proot_min, proot_max,\
                            rpstep, rrstep, lstep, proot_step,\
+                           amin, amax, astep,\
                            num_iters):
     for rp in pylab.arange(rpmin, rpmax, rpstep):
         for rr in pylab.arange(rrmin, rrmax, rrstep):
             for l in pylab.arange(lmin, lmax, lstep):
                 for proot in pylab.arange(proot_min, proot_max, proot_step):
-                    print 'rp = %f, rr = %f, l = %f, proot = %f' % (rp, rr, l, proot)
-                    command = 'python neuron_builder.py -a snider -rp %f -rr %f -l %f -proot %f' % (rp, rr, l, proot)
-                    print command
-                    os.system(command)
+                    for alpha in pylab.arange(amin, amax, astep):
+                        print 'rp = %f, rr = %f, l = %f, proot = %f' % (rp, rr, l, proot)
+                        command = 'python neuron_builder.py --algorithm snider -a %f -rp %f -rr %f -l %f -proot %f' % (alpha, rp, rr, l, proot)
+                        print command
+                        os.system(command)
 
 def main():
     parser = argparse.ArgumentParser()
 
     # ranges
-    parser.add_argument('-rpmin', type=float, default=1)
+    parser.add_argument('-rpmin', type=float, default=1.5)
     parser.add_argument('-rpmax', type=float, default=2)
     
-    parser.add_argument('-rrmin', type=float, default=1)
+    parser.add_argument('-rrmin', type=float, default=1.5)
     parser.add_argument('-rrmax', type=float, default=2)
     
     parser.add_argument('-proot_min', type=float, default=0.05)
     parser.add_argument('-proot_max', type=float, default=0.95)
     
-    parser.add_argument('-lmin', type=float, default=1)
+    parser.add_argument('-lmin', type=float, default=1.5)
     parser.add_argument('-lmax', type=float, default=2)
+
+    parser.add_argument('-amin', type=float, default=0)
+    parser.add_argument('-amax', type=float, default=1)
 
     # increments
     parser.add_argument('-rpstep', type=float, default=0.01)
     parser.add_argument('-rrstep', type=float, default=0.01)
     parser.add_argument('-lstep', type=float, default=0.01)
     parser.add_argument('-proot_step', type=float, default=0.05)
+    parser.add_argument('-astep', type=float, default=0.01)
 
     # number of different processes to use, so number of trials to run for each
     # parameter combination
@@ -61,6 +67,10 @@ def main():
     rrstep = args.rrstep
     lstep = args.lstep
     proot_step = args.proot_step
+
+    amin = args.amin
+    amax = args.amax
+    astep = args.astep
 
     num_iters = args.num_iters
 
@@ -120,6 +130,7 @@ def main():
                            lmin, lmax,\
                            proot_min, proot_max,\
                            rpstep, rrstep, lstep, proot_step,\
+                           amin, amax, astep,\
                            num_iters)
 
 if __name__ == '__main__':
