@@ -74,7 +74,7 @@ def random_mst(G, euclidean=False):
                 candidates = list(G.nodes())
                 candidates.remove(u)
             else:
-                candidates = G.neighbors(curr)
+                candidates = list(G.neighbors(curr))
             successor[curr] = choice(candidates)
             curr = successor[curr]
 

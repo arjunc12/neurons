@@ -4,7 +4,8 @@ from dist_functions import point_dist
 
 def complete_graph(G):
     H = G.copy()
-    H.remove_edges_from(H.edges())
+    ebunch = list(H.edges())
+    H.remove_edges_from(ebunch)
     for u, v in combinations(H.nodes(), 2):
         H.add_edge(u, v)
         H[u][v]['length'] = point_dist(H.node[u]['coord'], H.node[v]['coord'])
