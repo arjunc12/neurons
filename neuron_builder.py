@@ -74,7 +74,7 @@ def build_neuron_snider(radius=1):
     return G
 
 def draw_graph_3d(G, ax):
-    for u in G.nodes_iter():
+    for u in G.nodes():
         coord = G.node[u]['coord']
         x = [coord[0]]
         y = [coord[1]]
@@ -315,7 +315,6 @@ def update_graph_snider(G, unmarked_points, alpha, dim=3, **kwargs):
         p2 = G.node[new_extension]['coord']
         p3 = G.node[new_synapse]['coord']
         best_midpoint, best_choice = best_midpoint_approx(p1, p2, p3, alpha)
-        print "best choice", best_choice
         if best_choice == 1:
             G.remove_node(new_extension)
             G.add_edge(u, new_synapse)
@@ -401,7 +400,7 @@ def read_tree(tree_dir):
         synapse = int(line)
         G.node[synapse]['label'] = 'synapse'
         G.graph['synapses'].append(synapse)
-    for u in G.nodes_iter():
+    for u in G.nodes():
         if 'label' not in G.node[u] or  G.node[u]['label'] not in ['synapse', 'root']:
             G.node[u]['label'] = 'steiner_midpoint'
 
@@ -436,12 +435,15 @@ def build_neuron(algorithm='snider', dim=3, alpha=0.5, **kwargs):
             f.write('%d\n' % synapse)
 
     with open('%s/parameters.txt' % tree_dir, 'w') as f:
+        f.write('algorithm %s\n' % algorithm)
+        f.write('dimension %d\n' % dim)
+        f.write('alpha %f\n' % alpha)
         for key, value in kwargs.iteritems():
             f.write('%s %s\n' % (key, value))
 
     G = read_tree(tree_dir)
-    print G.nodes()
-    print G.graph['synapses']
+    #print G.nodes()
+    #print G.graph['synapses']
             
 def build_neuron_video(algorithm='snider', dim=3, alpha=0.5, **kwargs):
     fig = plt.figure()
@@ -491,7 +493,7 @@ def build_neuron_video(algorithm='snider', dim=3, alpha=0.5, **kwargs):
     def redraw(frame):
         plt.clf()
         G = graphs[frame]
-        for u in G.nodes_iter():
+        for u in G.nodes():
             if G.node[u]['label'] == 'synapse':
                 points.remove(G.node[u]['coord'])
         init()            
