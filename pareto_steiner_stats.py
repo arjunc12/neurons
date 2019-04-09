@@ -20,8 +20,8 @@ from check_robustness import INTERESTING_CELL_TYPES, INTERESTING_TRANSMITTERS
 
 FIGS_DIR = 'steiner_stats'
 
-TEST_NEW_FUNCTION = True
-PAPER_PLOTS = False
+TEST_NEW_FUNCTION = False
+PAPER_PLOTS = True
 
 OUTPUT_DIR = '/iblsn/data/Arjun/neurons/pareto_steiner_output'
 
@@ -387,7 +387,12 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
         dist_plot.tick_params(axis='y', labelsize=20)
         #pylab.xlabel(category, fontsize=20)
         dist_plot.xaxis.label.set_visible(False)
-        ylab = val
+        
+        ylab = None
+        if 'ylab' in kwargs:
+            ylab = kwargs['ylab']
+        else:
+            ylab = val
         if log_transform:
             ylab = 'log(' + ylab + ')'
         pylab.ylabel(ylab, fontsize=20)
@@ -401,64 +406,15 @@ def val_distribution(df, val, categories, plot_func, plot_descriptor,\
         pylab.savefig('%s/%s.pdf' % (outdir, fname), format='pdf')
         pylab.close()
 
-def cluster_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                   category_subset=None, **kwargs):
-    val_distribution(df, 'alpha', identifiers, sns.stripplot, 'cluster',\
-                     outdir, fig_suffix, category_subset, **kwargs)
-
-def boxplot_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                   category_subset=None, **kwargs):
-    val_distribution(df, 'alpha', identifiers, sns.boxplot, 'box', outdir,\
-                     fig_suffix, category_subset, **kwargs)
 
 def boxenplot_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
                      category_subset=None, **kwargs):
     val_distribution(df, 'alpha', identifiers, sns.boxenplot, 'box', outdir,\
                      fig_suffix, category_subset, **kwargs)
-
-def violin_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                  category_subset=None, **kwargs):
-    val_distribution(df, 'alpha', identifiers, sns.violinplot, 'violin',\
-                     outdir, fig_suffix, category_subset, **kwargs)
-
-def swarm_alphas(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                 category_subset=None, **kwargs):
-    val_distribution(df, 'alpha', identifiers, sns.swarmplot, 'swarm', outdir,\
-                     fig_suffix, category_subset, **kwargs)
-
-def cluster_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                      category_subset=None, **kwargs):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.stripplot,\
-                     'cluster', outdir, fig_suffix, category_subset, **kwargs)
-
-def boxplot_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                      category_subset=None, **kwargs):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.boxplot, 'box',\
-                     outdir, fig_suffix, category_subset, **kwargs)
-
-def violin_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                     category_subset=None, **kwargs):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.violinplot,\
-                     'violin', outdir, fig_suffix, category_subset, **kwargs)
-
-def swarm_tradeoffs(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                    category_subset=None, **kwargs):
-    val_distribution(df, 'tradeoff ratio', identifiers, sns.swarmplot,\
-                     'swarm', outdir, fig_suffix, category_subset, **kwargs)
-    
+ 
 def boxenplot_dists(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
                     category_subset=None, **kwargs):
     val_distribution(df, 'dist', identifiers, sns.boxenplot, 'box', outdir,\
-                     fig_suffix, category_subset, **kwargs)
-
-def violin_dists(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                 category_subset=None, **kwargs):
-    val_distribution(df, 'dist', identifiers, sns.violinplot, 'violin', outdir,\
-                     fig_suffix, category_subset, **kwargs)
-
-def swarm_dists(df, identifiers, outdir=FIGS_DIR, fig_suffix=None,\
-                category_subset=None, **kwargs):
-    val_distribution(df, 'dist', identifiers, sns.swarmplot, 'swarm', outdir,\
                      fig_suffix, category_subset, **kwargs)
 
 def category_dists(df, categories, outdir=FIGS_DIR, fig_suffix=None,\
@@ -554,7 +510,7 @@ def scatter_dists(models_df, outdir=FIGS_DIR, subset=False):
     
     model_colors = {'neural' : 'r', 'centroid' : 'g', 'random' : 'm', 'barabasi' : 'c'}
     model_markers = {'neural' : 'x', 'centroid' : 'o', 'random' : '^', 'barabasi' : 's'}
-    model_labels = {'neural': 'Neural arbor', 'centroid' : 'Centroid', 'random' : 'Random', 'barabasi' : 'Barabasi-Albert'}
+    model_labels = {'neural': 'Neural arbor', 'centroid' : 'Centroid', 'random' : 'Random', 'barabasi' : u'Barab\u00E1si-Albert'}
    
     max_dist = float('-inf')
 
@@ -1088,13 +1044,13 @@ def main():
                        fig_suffix='transmitters',\
                        category_subset=INTERESTING_TRANSMITTERS)
        
-        boxenplot_alphas(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist')
+        boxenplot_alphas(categories_df, ['neuron type'], outdir=figs_dir, order_val='dist', ylab=r'$\alpha$')
         boxenplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
                        fig_suffix='main',\
-                       category_subset=INTERESTING_CELL_TYPES, order_val='dist')
+                       category_subset=INTERESTING_CELL_TYPES, order_val='dist', ylab=r'$\alpha$')
         boxenplot_alphas(categories_df, ['cell type'], outdir=figs_dir,\
                        fig_suffix='transmitters',\
-                       category_subset=INTERESTING_TRANSMITTERS, order_val='dist')
+                       category_subset=INTERESTING_TRANSMITTERS, order_val='dist', ylab=r'$\alpha$')
  
         alpha_dist_correlation(categories_df, outdir=figs_dir)
         alpha_dist_correlation(categories_df, outdir=figs_dir, grouping='cell type', grouping_subset=INTERESTING_CELL_TYPES)

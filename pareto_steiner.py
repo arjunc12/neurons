@@ -66,7 +66,7 @@ NEURON_TYPES = {0 : 'axon', 1 : 'basal dendrite', 2: 'apical dendrite',\
 
 COLORS = {'neural' : 'r', 'centroid' : 'g', 'random' : 'm', 'barabasi' : 'c'}
 MARKERS = {'neural' : 'x', 'centroid' : 'o', 'random' : '^', 'barabasi' : 's'}
-LABELS = {'neural' : 'Neural arbor', 'centroid' : 'Centroid', 'random' : 'Random', 'barabasi' : 'Barabasi-Albert'}
+LABELS = {'neural' : 'Neural arbor', 'centroid' : 'Centroid', 'random' : 'Random', 'barabasi' : u'Barab\u00E1si-Albert'}
 
 PLOT_TREES = ['neural']
 LOG_PLOT_TREES = ['neural', 'centroid', 'barabasi', 'random']
